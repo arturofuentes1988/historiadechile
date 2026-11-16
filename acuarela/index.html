@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leftraru — Acto I: El niño del bosque</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1b1f1a; font-family: Georgia, 'Times New Roman', serif; color: #f6efdc; }
+  canvas { display: block; }
+  .bar { position: fixed; left: 0; right: 0; height: 0; background: #0c0d0b; transition: height .8s ease; z-index: 2; }
+  .bar.top { top: 0; } .bar.bot { bottom: 0; }
+  body.cine .bar { height: 11vh; }
+  #sub { position: fixed; left: 8%; right: 8%; bottom: 13vh; text-align: center; font-size: clamp(16px, 2.3vw, 28px); font-style: italic; text-shadow: 0 2px 8px #000, 0 0 2px #000; opacity: 0; transition: opacity .8s; z-index: 3; }
+  #sub.on { opacity: 1; }
+  #skip { position: fixed; right: 18px; bottom: 3.5vh; font-size: 13px; opacity: 0; z-index: 3; letter-spacing: .08em; }
+  body.cine #skip { opacity: .65; }
+  #hud { position: fixed; top: 16px; left: 18px; font-size: 20px; text-shadow: 0 2px 6px #000; opacity: 0; transition: opacity .6s; }
+  #hud.on { opacity: 1; }
+  #hint { position: fixed; top: 16px; left: 0; right: 0; text-align: center; font-size: 16px; text-shadow: 0 2px 6px #000; opacity: 0; transition: opacity .6s; pointer-events: none; }
+  #hint.on { opacity: .95; }
+  #title, #end { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: radial-gradient(ellipse at center, #0000 20%, #000a 100%); transition: opacity 1s; z-index: 4; }
+  #title.hide { opacity: 0; pointer-events: none; }
+  #title { background: radial-gradient(ellipse at center, #0003 10%, #000b 100%); }
+  #title h2 { margin-bottom: 1.6em; }
+  #end { opacity: 0; pointer-events: none; background: none; justify-content: flex-start; padding-top: 9vh; } #end.on { opacity: 1; }
+  h1 { font-size: clamp(44px, 9vw, 110px); margin: 0; letter-spacing: .12em; font-weight: normal; text-shadow: 0 4px 18px #000; }
+  h2 { font-size: clamp(16px, 2.4vw, 26px); margin: .4em 0 2.2em; font-weight: normal; font-style: italic; text-shadow: 0 2px 8px #000; }
+  .press { font-size: 15px; letter-spacing: .2em; text-transform: uppercase; animation: pulse 2s infinite; text-shadow: 0 2px 6px #000; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; background: #1b1f1a; z-index: 9; font-style: italic; }
+
+  #minimap { position: fixed; left: 16px; bottom: 16px; width: 170px; height: 170px; border-radius: 50%; box-shadow: 0 4px 14px #0008; opacity: 0; transition: opacity .6s; pointer-events: none; cursor: pointer; }
+  #btns { position: fixed; right: 16px; bottom: 16px; display: flex; gap: 10px; opacity: 0; transition: opacity .6s; pointer-events: none; }
+  body.playing #minimap { opacity: 1; pointer-events: auto; } body.playing #btns { opacity: 1; pointer-events: auto; }
+  #btns button { position: relative; font: inherit; font-size: 16px; color: #3a2c18; background: #e9dcb8; border: 3px solid #3a2c18; border-radius: 10px; padding: 10px 16px; cursor: pointer; box-shadow: 0 4px 12px #0007; }
+  #btns button:hover { background: #f6ecd0; } #btns kbd { font: inherit; font-size: 12px; opacity: .6; margin-left: 6px; }
+  #btns button.new::after { content: ''; position: absolute; top: -6px; right: -6px; width: 14px; height: 14px; border-radius: 50%; background: #c93040; border: 2px solid #e9dcb8; }
+  #skip, #sub, #hud { pointer-events: none; }
+  #panel { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: #0008; z-index: 5; }
+  #panel.on { display: flex; }
+  #sheet { width: min(860px, 92vw); max-height: 84vh; overflow: auto; background: #e9dcb8; color: #3a2c18; border: 4px solid #3a2c18; border-radius: 12px; padding: 18px 22px 22px; box-shadow: 0 12px 40px #000a; }
+  #sheet header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; } #sheet h2 { margin: 0; font-size: 28px; font-style: normal; text-shadow: none; letter-spacing: .06em; }
+  #panel-close { font: inherit; font-size: 15px; background: none; border: 2px solid #3a2c18; border-radius: 8px; padding: 4px 12px; cursor: pointer; color: inherit; }
+  .tabs { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; } .tabs button { font: inherit; font-size: 16px; color: inherit; background: #d6c597; border: 2px solid #3a2c18; border-radius: 8px; padding: 6px 14px; cursor: pointer; }
+  .tabs button.on { background: #3a2c18; color: #f6ecd0; } .tabs small { opacity: .7; }
+  .notes { display: grid; grid-template-columns: 230px 1fr; gap: 18px; } .notes ul { list-style: none; margin: 0; padding: 0; }
+  .notes li { padding: 8px 10px; border-bottom: 1px solid #3a2c1833; cursor: pointer; } .notes li.on { background: #d6c597; font-weight: bold; } .notes li.locked { opacity: .45; cursor: default; font-style: italic; }
+  article svg { width: 100%; max-width: 420px; border: 3px solid #3a2c18; border-radius: 6px; display: block; } article h3 { font-size: 22px; margin: 12px 0 6px; } article p { font-size: 17px; line-height: 1.5; margin: 0; }
+  .muted { opacity: .6; font-style: italic; }
+  .grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; } .slot { aspect-ratio: 1; border: 3px solid #3a2c18; border-radius: 8px; background: #d6c597; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 6px; }
+  .slot svg { width: 70%; border-radius: 4px; } .slot i { font-size: 18px; } .slot.empty { opacity: .35; border-style: dashed; }
+  @media (max-width: 640px) { .notes { grid-template-columns: 1fr; } #minimap { width: 120px; height: 120px; } }
+  .cover { display: flex; flex-direction: column; gap: 14px; align-items: center; }
+  .cover button, .mrow button { font: inherit; font-size: 19px; letter-spacing: .08em; color: #f6efdc; background: #1b1f1acc; border: 2px solid #f6efdc; border-radius: 10px; padding: 12px 34px; cursor: pointer; min-width: 260px; transition: background .2s, color .2s; }
+  .cover button.big { font-size: 24px; background: #d99a1c; color: #2a1a04; border-color: #2a1a04; }
+  .cover button:hover, .mrow button:hover { background: #f6efdc; color: #1b1f1a; }
+  .place { margin-top: 2.2em; font-style: italic; font-size: 16px; letter-spacing: .1em; opacity: .85; text-shadow: 0 2px 6px #000; }
+  #corner { position: fixed; top: 14px; right: 16px; display: flex; gap: 8px; z-index: 5; }
+  #corner button { font: inherit; font-size: 15px; color: #3a2c18; background: #e9dcb8; border: 3px solid #3a2c18; border-radius: 10px; padding: 7px 14px; cursor: pointer; box-shadow: 0 4px 12px #0007; }
+  #corner button:hover { background: #f6ecd0; }
+  #btn-menu { opacity: 0; pointer-events: none; transition: opacity .6s; }
+  body.playing #btn-menu { opacity: 1; pointer-events: auto; }
+  body.cine #corner { display: none; }
+  body.nomini #minimap { display: none; }
+  #menu { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: #000a; z-index: 6; }
+  #menu.on { display: flex; }
+  #menu-sheet { width: min(560px, 92vw); max-height: 88vh; overflow: auto; background: #e9dcb8; color: #3a2c18; border: 4px solid #3a2c18; border-radius: 12px; padding: 20px 26px 24px; box-shadow: 0 12px 40px #000a; }
+  #menu-sheet h2 { margin: 0 0 14px; font-size: 30px; font-style: normal; text-shadow: none; letter-spacing: .06em; text-align: center; }
+  #menu-sheet h3 { margin: 18px 0 6px; font-size: 18px; border-top: 1px solid #3a2c1855; padding-top: 14px; }
+  .opt { display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 9px 0; font-size: 17px; }
+  .opt select, .opt input[type=range] { font: inherit; font-size: 16px; width: 190px; } .opt select { background: #f6ecd0; color: inherit; border: 2px solid #3a2c18; border-radius: 6px; padding: 4px 6px; }
+  .opt input[type=checkbox] { width: 22px; height: 22px; accent-color: #3a2c18; }
+  #o-reload { font-size: 15px; margin: 0 0 6px; } #o-reload button { font: inherit; font-size: 14px; margin-left: 8px; cursor: pointer; }
+  .keys { font-size: 15px; line-height: 1.7; margin: 0; }
+  .mrow { display: flex; gap: 12px; margin-top: 18px; flex-wrap: wrap; } .mrow button { flex: 1; min-width: 0; font-size: 17px; padding: 10px 12px; color: #3a2c18; background: #d6c597; border-color: #3a2c18; }
+  .mrow button.main { background: #3a2c18; color: #f6ecd0; }
+  body.en-portada #m-portada { display: none; }
+  /* ---------- diseño inspirado en el tejido mapuche: grecas escalonadas en rojo, negro y crudo ---------- */
+  :root { --negro: #17151b; --rojo: #a82a2e; --crudo: #f1e7cf; --ocre: #d99a1c; --greca: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='16'%3E%3Crect width='32' height='16' fill='%23f1e7cf'/%3E%3Cpath d='M13 1h6v3h3v3h3v2h-3v3h-3v3h-6v-3h-3v-3h-3v-2h3v-3h3z' fill='%23a82a2e'/%3E%3Crect x='14' y='6' width='4' height='4' fill='%2317151b'/%3E%3Cpath d='M0 5h3v6h-3zM29 5h3v6h-3z' fill='%2317151b'/%3E%3C/svg%3E"); --grecaD: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='16'%3E%3Crect width='32' height='16' fill='%2317151b'/%3E%3Cpath d='M13 1h6v3h3v3h3v2h-3v3h-3v3h-6v-3h-3v-3h-3v-2h3v-3h3z' fill='%23a82a2e'/%3E%3Crect x='14' y='6' width='4' height='4' fill='%23f1e7cf'/%3E%3Cpath d='M0 5h3v6h-3zM29 5h3v6h-3z' fill='%23d99a1c'/%3E%3C/svg%3E"); --estrella: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpolygon points='12.00,2.00 13.76,7.75 19.07,4.93 16.25,10.24 22.00,12.00 16.25,13.76 19.07,19.07 13.76,16.25 12.00,22.00 10.24,16.25 4.93,19.07 7.75,13.76 2.00,12.00 7.75,10.24 4.93,4.93 10.24,7.75' fill='%23d99a1c'/%3E%3C/svg%3E"); --estrellaR: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpolygon points='12.00,2.00 13.76,7.75 19.07,4.93 16.25,10.24 22.00,12.00 16.25,13.76 19.07,19.07 13.76,16.25 12.00,22.00 10.24,16.25 4.93,19.07 7.75,13.76 2.00,12.00 7.75,10.24 4.93,4.93 10.24,7.75' fill='%23a82a2e'/%3E%3C/svg%3E"); }
+  .cover button, .mrow button, #btns button, #corner button, #panel-close, .tabs button {
+    color: var(--crudo); border: 2px solid var(--negro); border-radius: 3px; text-shadow: none; letter-spacing: .1em;
+    background: var(--grecaD) top left / auto 7px repeat-x, var(--grecaD) bottom left / auto 7px repeat-x, var(--negro);
+    box-shadow: 0 0 0 2px var(--crudo), 0 5px 14px #0009; transition: filter .15s, transform .15s; }
+  .cover button:hover, .mrow button:hover, #btns button:hover, #corner button:hover, #panel-close:hover, .tabs button:hover { filter: brightness(1.35); color: #fff; background: var(--grecaD) top left / auto 7px repeat-x, var(--grecaD) bottom left / auto 7px repeat-x, var(--negro); transform: translateY(-1px); }
+  .cover button { padding: 18px 40px; min-width: 300px; }
+  .cover button.big, .mrow button.main { background: var(--greca) top left / auto 7px repeat-x, var(--greca) bottom left / auto 7px repeat-x, var(--rojo); color: #fff; border-color: var(--negro); }
+  .cover button.big:hover, .mrow button.main:hover { background: var(--greca) top left / auto 7px repeat-x, var(--greca) bottom left / auto 7px repeat-x, var(--rojo); }
+  #btns button, #corner button { padding: 13px 16px; font-size: 15px; } #btns kbd { opacity: .7; color: var(--ocre); }
+  #btns button.new::after { background: var(--ocre); border-color: var(--negro); border-radius: 0; transform: rotate(45deg); width: 11px; height: 11px; }
+  .mrow button { padding: 15px 12px; } .tabs button { padding: 12px 16px; } .tabs button.on { background: var(--greca) bottom left / auto 7px repeat-x, var(--rojo); color: #fff; }
+  #panel-close { padding: 10px 14px; font-size: 14px; }
+  #sheet, #menu-sheet { background: var(--greca) top left / auto 14px repeat-x, var(--greca) bottom left / auto 14px repeat-x, var(--crudo); color: var(--negro); border: 3px solid var(--negro); border-radius: 4px; padding-top: 30px; padding-bottom: 34px; box-shadow: 0 0 0 3px var(--crudo), 0 0 0 5px var(--negro), 0 14px 44px #000b; }
+  #sheet h2::before, #menu-sheet h2::before, #sheet h2::after, #menu-sheet h2::after { content: ''; display: inline-block; width: 22px; height: 22px; background: var(--estrellaR) center / contain no-repeat; vertical-align: -2px; margin: 0 12px; }
+  #sheet h2::after { display: none; }
+  #menu-sheet h3 { border-top: 2px solid var(--negro); color: var(--rojo); letter-spacing: .08em; }
+  .opt select { border-color: var(--negro); border-radius: 2px; background: #fbf5e4; } .opt input[type=checkbox], .opt input[type=range] { accent-color: var(--rojo); }
+  .notes li.on { background: var(--negro); color: var(--crudo); } .notes li { border-bottom-color: #17151b33; }
+  article svg, .slot { border-color: var(--negro); border-radius: 2px; } .slot { background: #e6dabd; } article h3 { color: var(--rojo); }
+  #title h1 { display: flex; align-items: center; gap: .25em; }
+  #title h1::before, #title h1::after { content: ''; width: .42em; height: .42em; background: var(--estrella) center / contain no-repeat; filter: drop-shadow(0 3px 6px #000); }
+  #title h2::after { content: ''; display: block; width: min(420px, 70vw); height: 14px; margin: 18px auto 0; background: var(--greca) center / auto 14px repeat-x; box-shadow: 0 0 0 2px var(--negro), 0 4px 12px #0008; }
+  #hud { background: var(--negro); color: var(--crudo); padding: 8px 16px 8px 40px; border: 2px solid var(--crudo); box-shadow: 0 0 0 2px var(--negro), 0 4px 12px #0008; text-shadow: none; font-size: 17px; letter-spacing: .06em; background: var(--estrella) 10px center / 20px no-repeat, var(--negro); }
+  #hint { top: 64px; } #hint.on { opacity: 1; }
+  #hint:not(:empty) { left: 50%; right: auto; transform: translateX(-50%); background: #17151bdd; color: var(--crudo); padding: 8px 18px; border-left: 6px solid var(--rojo); border-right: 6px solid var(--rojo); text-shadow: none; max-width: 80vw; }
+  #minimap { box-shadow: 0 0 0 3px var(--crudo), 0 0 0 5px var(--negro), 0 6px 16px #0009; }
+</style>
+  <script type="module" crossorigin src="./assets/index-DqYh_nA7.js"></script>
+</head>
+<body>
+<div id="loading">Pintando el bosque…</div>
+<div class="bar top"></div><div class="bar bot"></div>
+<div id="title"><h1>LEFTRARU</h1><h2>Acto I — El mundo de Leftraru</h2>
+  <div class="cover"><button id="c-entrar" class="big">Entrar al mundo</button><button id="c-opciones">Opciones</button></div>
+  <p class="place">Nahuelbuta, invierno de 1545</p></div>
+<div id="hud">Piñones <span id="count">0</span> / <span id="total">5</span></div>
+<div id="hint"></div>
+<div id="sub"></div>
+<div id="skip">ENTER · saltar</div>
+<div id="end"><h2>Fin del prototipo — continuará…</h2></div>
+<canvas id="minimap" width="340" height="340"></canvas>
+<div id="btns"><button id="btn-notas">Notas<kbd>N</kbd></button><button id="btn-bolsa">Bolsa<kbd>B</kbd></button></div>
+<div id="panel"><div id="sheet"><header><h2 id="panel-title">Notas</h2><button id="panel-close">Cerrar (Esc)</button></header><div id="panel-body"></div></div></div>
+<div id="corner"><button id="btn-full" title="Pantalla completa (F)">⛶ Pantalla completa</button><button id="btn-menu">☰ Menú</button></div>
+<div id="menu"><div id="menu-sheet">
+  <h2>Opciones</h2>
+  <label class="opt">Calidad de imagen <select id="o-calidad"><option value="auto">Automática</option><option value="0.6">Baja (más rápido)</option><option value="1">Media</option><option value="1.5">Alta</option></select></label>
+  <label class="opt">Detalle del mundo <select id="o-detalle"><option value="0.5">Bajo (más rápido)</option><option value="1">Normal</option><option value="1.5">Alto</option></select></label>
+  <p id="o-reload" class="muted" hidden>Este cambio se aplica al recargar. <button id="o-recargar">Recargar ahora</button></p>
+  <label class="opt">Sensibilidad de la cámara <input id="o-sens" type="range" min="0.4" max="2.5" step="0.1"></label>
+  <label class="opt">Invertir cámara vertical <input id="o-inv" type="checkbox"></label>
+  <label class="opt">Mostrar minimapa <input id="o-mini" type="checkbox"></label>
+  <label class="opt">Pantalla completa <input id="o-full" type="checkbox"></label>
+  <h3>Controles</h3>
+  <p class="keys"><b>WASD</b> moverse · <b>Shift</b> correr · <b>Espacio</b> saltar<br><b>Clic + ratón</b> o <b>Q / E</b> girar la cámara<br><b>N</b> notas · <b>B</b> bolsa · <b>M</b> mapa · <b>F</b> pantalla completa · <b>Esc</b> este menú</p>
+  <div class="mrow"><button id="m-continuar" class="main">Continuar</button><button id="m-portada">Volver a la portada</button></div>
+</div></div>
+<script src="../estilos.js" defer></script>
+</body>
+</html>
