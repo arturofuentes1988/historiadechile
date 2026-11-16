@@ -156,13 +156,16 @@
   .skill h3 { margin: 0; font-weight: normal; font-size: 18px; } .skill p { margin: 0; font-size: 14px; line-height: 1.45; flex: 1; } .skill small { color: var(--dim); font-style: italic; font-size: 12.5px; } .skill em { color: var(--dim); font-size: 13px; }
   .skill .btn { padding: 8px 12px; font-size: 14px; margin-top: 4px; } .skill.can { background: #c98a4a2e; } .skill.have { background: #5c8a4a40; } .skill.have em { color: #b9dba8; }
   @media (max-width: 760px) { .tree { grid-template-columns: 1fr 1fr; } .skill { grid-column: auto !important; grid-row: auto !important; } .tree .sec2 { display: none; } .mrow.top { grid-template-columns: 1fr; } }
-  #loading { position: fixed; inset: 0; display: grid; place-items: center; background: #14110f; z-index: 9; font-style: italic; color: var(--dim); }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; background: #14110f; z-index: 9; transition: opacity .6s; } #loading.hide { opacity: 0; pointer-events: none; }
+  .lbox { width: min(460px, 80vw); text-align: center; } .lbox h1 { font-size: clamp(34px, 6vw, 64px); margin-bottom: 26px; text-shadow: none; }
+  .ltrack { height: 8px; background: #ffffff14; clip-path: var(--step); } #load-bar { display: block; height: 100%; width: 4%; background: linear-gradient(90deg, var(--red), var(--copper)); transition: width .35s ease; }
+  #load-text { margin: 14px 0 0; font-style: italic; color: var(--dim); font-size: 15px; }
   @media (max-width: 760px) { .dex { grid-template-columns: 1fr; } #minimap { width: 120px; height: 120px; } .tool { min-width: 58px; } }
 </style>
-  <script type="module" crossorigin src="./assets/index-BoVtMZxe.js"></script>
+  <script type="module" crossorigin src="./assets/index-Be3NCJYW.js"></script>
 </head>
 <body>
-<div id="loading">Preparando el bosque…</div>
+<div id="loading"><div class="lbox"><h1>LEFTRARU</h1><div class="ltrack"><i id="load-bar"></i></div><p id="load-text">Preparando…</p></div></div>
 <div class="bar top"></div><div class="bar bot"></div>
 
 <div id="title"><h1>LEFTRARU</h1><p class="sub">Acto I — El mundo de Leftraru</p><div class="rule"></div>
