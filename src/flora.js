@@ -100,6 +100,7 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
     reed: { geo: cross(0.9, 1.7), mat: MAT.grass(TEX.reed), range: 110, cells: new Map() },
     fern: { geo: fernGeo, mat: MAT.grass(TEX.fern), range: 95, cells: new Map() },
     flower: { geo: cross(0.7, 0.5, 2), mat: MAT.grass(TEX.flower), range: 60, cells: new Map() },
+    litter: { geo: (() => { const p = []; quad(p, V(0, 0.04, 0), V(1.5, 0, 0), V(0, 0, 1.5), UP); return mergeGeometries(p); })(), mat: new THREE.MeshStandardMaterial({ map: TEX.roble, alphaTest: 0.3, roughness: 1 }), range: 60, cells: new Map() }, // hojarasca
   };
   function scatter(kind, x, y, z, s = 1, color = 0xffffff) {
     const sc = SCATTER[kind], k = Math.floor(x / CS) + ',' + Math.floor(z / CS);
@@ -148,5 +149,13 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
   }
   function update(p) { for (const c of chunks) c.m.visible = Math.hypot(p.x - c.cx, p.z - c.cz) < c.range + 30; }
 
-  return { tree, scatter, rock, log, build, update };
+  // búsquedas para la exploración: ¿hay una planta de este tipo cerca?
+  function nearScatter(kind, x, z, r) {
+    const ci = Math.floor(x / CS), cj = Math.floor(z / CS); let best = null;
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const l = SCATTER[kind].cells.get(ci + i + ',' + (cj + j)); if (l) for (const t of l) { const d = Math.hypot(t.x - x, t.z - z); if (d < r && (!best || d < best.d)) best = { x: t.x, y: t.y, z: t.z, d }; } }
+    return best;
+  }
+  function nearBush(x, z, r) { let best = null; for (const l of SPEC.bush.inst) for (const t of l) { const d = Math.hypot(t.x - x, t.z - z); if (d < r && (!best || d < best.d)) best = { x: t.x, y: t.y, z: t.z, d }; } return best; }
+
+  return { tree, scatter, rock, log, build, update, nearScatter, nearBush };
 }

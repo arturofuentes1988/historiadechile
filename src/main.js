@@ -1,11 +1,14 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
-import { uTime, buildLights } from './gfx.js';
+import { uTime, buildLights, createPost } from './gfx.js';
 import { buildWorld } from './world.js';
 import { height, inBounds, POI, CERRO } from './terrain.js';
 import { buildPerson, animatePerson } from './life.js';
 import { Cinematic } from './cinematic.js';
 import { createUI } from './ui.js';
+import { createExplorer } from './explore.js';
+import { TALK } from './notes.js';
+import { riverZ } from './terrain.js';
 
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 const $ = (id) => document.getElementById(id);
@@ -19,9 +22,10 @@ renderer.setSize(innerWidth, innerHeight);
 document.body.prepend(renderer.domElement);
 const scene = new THREE.Scene();
 const lights = buildLights(scene, renderer);
-const draw = () => renderer.render(scene, camera);
 const camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.2, 12000);
-addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
+const post = createPost(renderer, scene, camera);
+const draw = () => post.render();
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); post.resize(); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
 
 const world = buildWorld(scene, RAPIER, physics);
 
@@ -47,8 +51,8 @@ const pp = () => pBody.translation();
 function enter() {
   if (state !== 'title') return;
   setMenu(false); state = 'play'; $('title').classList.add('hide'); document.body.classList.add('playing'); $('hud').classList.add('on');
-  hint('Sigue el sendero hacia el norte, al bosque de pewenes · WASD para moverte', 9);
-  ui.unlock('leftraru', 'curinancu', 'nahuelbuta');
+  lock(); hint('Sigue el sendero hacia el norte · Acércate a las cosas y pulsa E para observarlas', 10);
+  if (!ui.has('leftraru')) { const t = pp(); ui.discover('leftraru', photo({ x: t.x, y: t.y + 0.25, z: t.z }, { dist: 2.3, up: 0.2, fov: 40, self: true })); }
 }
 
 // ---------- opciones (se guardan en este navegador) ----------
@@ -57,13 +61,13 @@ const detalleInicial = opts.detalle;
 let menuOpen = false, pr = Math.min(devicePixelRatio, 1.5);
 function applyOpts() {
   pr = opts.calidad === 'auto' ? Math.min(devicePixelRatio, 1.5) : Math.min(parseFloat(opts.calidad), Math.max(1, devicePixelRatio));
-  renderer.setPixelRatio(pr); document.body.classList.toggle('nomini', !opts.mini);
+  renderer.setPixelRatio(pr); post.resize(); document.body.classList.toggle('nomini', !opts.mini);
   $('o-reload').hidden = opts.detalle === detalleInicial;
   localStorage.setItem('leftraru.opciones', JSON.stringify(opts));
 }
 function setMenu(on) {
   menuOpen = on; $('menu').classList.toggle('on', on); document.body.classList.toggle('en-portada', state === 'title');
-  if (on) { ui.show(null); document.exitPointerLock?.(); for (const k in keys) keys[k] = false; }
+  if (on) { ui.show(null); document.exitPointerLock?.(); for (const k in keys) keys[k] = false; } else if (state === 'play') lock();
 }
 $('o-calidad').value = opts.calidad; $('o-detalle').value = opts.detalle; $('o-sens').value = opts.sens; $('o-inv').checked = opts.inv; $('o-mini').checked = opts.mini;
 $('o-calidad').onchange = (e) => { opts.calidad = e.target.value; applyOpts(); };
@@ -72,16 +76,70 @@ $('o-sens').oninput = (e) => { opts.sens = parseFloat(e.target.value); applyOpts
 $('o-inv').onchange = (e) => { opts.inv = e.target.checked; applyOpts(); };
 $('o-mini').onchange = (e) => { opts.mini = e.target.checked; applyOpts(); };
 $('o-recargar').onclick = $('m-portada').onclick = () => location.reload();
-$('m-continuar').onclick = () => { setMenu(false); if (state === 'play') renderer.domElement.requestPointerLock?.(); };
+$('m-continuar').onclick = () => setMenu(false);
+$('o-borrar').onclick = () => { if (confirm('¿Borrar todo lo descubierto en el cuaderno?')) { ui.reset(); location.reload(); } };
 $('btn-menu').onclick = () => setMenu(!menuOpen);
 $('c-entrar').onclick = enter; $('c-opciones').onclick = () => setMenu(true);
 // pantalla completa
 const toggleFull = () => { if (document.fullscreenElement) document.exitFullscreen?.(); else document.documentElement.requestFullscreen?.().catch(() => hint('Este navegador no permitió la pantalla completa', 4)); };
 $('btn-full').onclick = toggleFull; $('o-full').onchange = toggleFull;
-document.addEventListener('fullscreenchange', () => { const on = !!document.fullscreenElement; $('o-full').checked = on; $('btn-full').textContent = on ? '⛶ Salir de pantalla completa' : '⛶ Pantalla completa'; });
+document.addEventListener('fullscreenchange', () => { const on = !!document.fullscreenElement; $('o-full').checked = on; $('full-label').textContent = on ? 'Salir de pantalla completa' : 'Pantalla completa'; });
 if (!document.documentElement.requestFullscreen) { $('btn-full').style.display = 'none'; $('o-full').parentElement.style.display = 'none'; }
 // al soltar el ratón con Escape durante el juego, se abre el menú
-document.addEventListener('pointerlockchange', () => { if (!document.pointerLockElement && state === 'play' && !ui.open && !menuOpen) setMenu(true); });
+// El ratón: al entrar al mundo queda tomado para girar la cámara. Escape lo suelta y abre el menú.
+// Si el navegador no deja tomarlo, también se puede girar arrastrando con el botón apretado.
+let dragging = false, lockWanted = 0;
+function lock() { lockWanted = performance.now(); try { const r = renderer.domElement.requestPointerLock?.(); r?.catch?.(() => {}); } catch { /* el navegador no lo permitió */ } }
+const locked = () => document.pointerLockElement === renderer.domElement;
+document.addEventListener('pointerlockchange', () => {
+  document.body.classList.toggle('sin-raton', !locked());
+  if (!locked() && state === 'play' && !ui.open && !menuOpen && performance.now() - lockWanted > 400) setMenu(true);
+});
+document.body.classList.add('sin-raton');
+renderer.domElement.addEventListener('mousedown', () => { dragging = true; if (state === 'play' && !ui.open && !menuOpen && !locked()) lock(); });
+addEventListener('mouseup', () => { dragging = false; });
+
+// ---------- fotos para el cuaderno: se toman del elemento real, en el momento de descubrirlo ----------
+const shot = document.createElement('canvas'); shot.width = 480; shot.height = 300;
+function grab() { const c = shot.getContext('2d'), el = renderer.domElement, sw = Math.min(el.width, el.height * 1.6), sh = sw / 1.6; c.drawImage(el, (el.width - sw) / 2, (el.height - sh) / 2, sw, sh, 0, 0, 480, 300); return shot.toDataURL('image/jpeg', 0.72); }
+function withCamera(place) { // dibuja una vista aparte, la copia y deja todo como estaba, sin que se note en pantalla
+  const sp = camera.position.clone(), sq = camera.quaternion.clone(), sf = camera.fov; place();
+  camera.updateProjectionMatrix(); world.update(0, time, camera.position, pp()); draw(); const img = grab();
+  boy.g.visible = true; camera.position.copy(sp); camera.quaternion.copy(sq); camera.fov = sf; camera.updateProjectionMatrix(); world.update(0, time, camera.position, pp()); draw(); return img;
+}
+function photo(target, { dist = 4, up = 1, fov = 45, fromPlayer = false, self = false } = {}) {
+  return withCamera(() => {
+    const t = pp(); camera.fov = fov; boy.g.visible = self;
+    if (fromPlayer) camera.position.set(t.x, t.y + 1, t.z);
+    else { let dx = t.x - target.x, dz = t.z - target.z; if (self) { dx = Math.sin(player.facing); dz = Math.cos(player.facing); } const l = Math.hypot(dx, dz) || 1; camera.position.set(target.x + dx / l * dist, target.y + up, target.z + dz / l * dist); camera.position.y = Math.max(camera.position.y, height(camera.position.x, camera.position.z) + 0.5); }
+    camera.lookAt(target.x, target.y, target.z);
+  });
+}
+const top = () => V3(CERRO[0], height(...CERRO) + 4, CERRO[1]);
+const VIEWS = { // vistas fijas para lo que no es un objeto al alcance de la mano
+  pillan: () => [top(), world.volcano, 22], lafken: () => [top(), V3(-3000, -40, CERRO[1] + 300), 40],
+  trengtreng: () => [V3(24, 12, 14), top(), 30], ngen: () => [V3(POI.viejo.x + 16, height(POI.viejo.x + 16, POI.viejo.z + 12) + 2.2, POI.viejo.z + 12), V3(POI.viejo.x, height(POI.viejo.x, POI.viejo.z) + 9, POI.viejo.z), 60],
+  pewma: () => [V3(4.5, 3.4, 4.5), V3(0, 2.7, 0), 38], wetripantu: () => [V3(4, 1.2, riverZ(4) - 15), V3(160, 26, riverZ(160) - 40), 50],
+  'pewen-sagrado': () => [V3(2, height(2, -72) + 1.8, -72), V3(0, height(0, -92) + 15, -92), 60], incas: () => [V3(-2, 7, -24), V3(0, 6, -140), 50],
+  palin: () => [V3(POI.cancha.x + 15, 6, POI.cancha.z + 11), V3(POI.cancha.x, 2.5, POI.cancha.z), 50],
+};
+const viewPhoto = (id) => withCamera(() => { const [from, look, fov] = VIEWS[id](); boy.g.visible = false; camera.position.copy(from); camera.fov = fov; camera.lookAt(look); });
+const herePhoto = () => { draw(); return grab(); };
+
+// ---------- observar y conversar (tecla E) ----------
+let near = null, scanT = 0, talk = null;
+function say() { document.body.classList.add('talking'); const t = talk; $('dlg-name').textContent = t.name; $('dlg-text').textContent = t.lines[t.i]; $('dlg-more').textContent = t.i < t.lines.length - 1 ? 'E · seguir' : 'E · cerrar'; $('dialogo').classList.add('on'); }
+function interact() {
+  if (talk) { if (++talk.i < talk.lines.length) return say(); const t = talk; talk = null; $('dialogo').classList.remove('on'); document.body.classList.remove('talking'); if (t.done) t.done(); return; }
+  if (!near || state !== 'play' || ui.open) return;
+  const c = near; near = null; $('prompt').classList.remove('on');
+  if (c.person) {
+    const d = TALK[c.id], a = c.person; a.face = Math.atan2(pp().x - a.x, pp().z - a.z); player.facing = Math.atan2(a.x - pp().x, a.z - pp().z);
+    talk = { name: d.name, lines: c.known ? [d.again] : d.lines, i: 0, done: c.known ? null : () => { ui.discover(c.id, photo(c.target, c.shot)); for (const id of d.da) ui.discover(id, VIEWS[id] ? viewPhoto(id) : ''); } }; say();
+  } else ui.discover(c.id, c.shot.view ? viewPhoto(c.shot.view) : photo(c.target, c.shot));
+}
+$('dialogo').addEventListener('click', () => interact());
+
 
 function outro() {
   setMenu(false); state = 'cine'; ui.show(null); document.body.classList.remove('playing'); $('hud').classList.remove('on');
@@ -95,36 +153,37 @@ let hintT = 0;
 function hint(txt, secs) { $('hint').textContent = txt; $('hint').classList.add('on'); hintT = secs; }
 
 addEventListener('keydown', (e) => {
-  if (e.code === 'Enter') { if (state === 'title') enter(); else cine.skip(); }
+  if (e.code === 'Enter') { if (state === 'title') enter(); else if (!talk) cine.skip(); }
   if (e.code === 'KeyF' && !e.repeat) toggleFull();
   if (menuOpen) { if (e.code === 'Escape') setMenu(false); return; }
   keys[e.code] = true;
-  if (state === 'play' && e.code === 'KeyN') { ui.show('notas'); ui.seen(); }
+  if (e.code === 'KeyE' && !e.repeat) interact();
+  if (talk) { if (e.code === 'Enter' || e.code === 'Space') interact(); return; }
+  if (state === 'play' && e.code === 'KeyN') ui.show('notas');
   if (state === 'play' && e.code === 'KeyB') ui.show('bolsa');
   if (state === 'play' && e.code === 'KeyM') ui.show('mapa');
   if (e.code === 'Escape') { if (ui.open) ui.show(null); else if (state !== 'cine') setMenu(true); }
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
 });
 addEventListener('keyup', (e) => { keys[e.code] = false; });
-renderer.domElement.addEventListener('click', () => { if (state === 'play' && !ui.open && !menuOpen) renderer.domElement.requestPointerLock?.(); });
 addEventListener('mousemove', (e) => {
-  if (document.pointerLockElement !== renderer.domElement) return;
+  if (!locked() && !(dragging && state === 'play')) return;
   cam.yaw -= e.movementX * 0.0028 * opts.sens; cam.pitch = Math.min(1.2, Math.max(-0.25, cam.pitch + e.movementY * 0.0022 * opts.sens * (opts.inv ? -1 : 1)));
 });
 
 function updatePlayer(dt) {
   let ix = 0, iz = 0;
-  if (state === 'play' && !ui.open) {
+  if (state === 'play' && !ui.open && !talk) {
     ix = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
     iz = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
-    cam.yaw += ((keys.KeyQ ? 1 : 0) - (keys.KeyE ? 1 : 0)) * dt * 1.8;
+    cam.yaw += ((keys.KeyZ ? 1 : 0) - (keys.KeyC ? 1 : 0)) * dt * 1.8;
   }
   const run = keys.ShiftLeft || keys.ShiftRight, target = ix || iz ? (run ? 6.2 : 3.3) : 0;
   player.speed += (target - player.speed) * Math.min(1, dt * 10);
   const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw);
   let dx = fx * iz + rx * ix, dz = fz * iz + rz * ix; const l = Math.hypot(dx, dz);
   if (l > 0) { dx /= l; dz /= l; player.dirX = dx; player.dirZ = dz; let d = Math.atan2(dx, dz) - player.facing; d = Math.atan2(Math.sin(d), Math.cos(d)); player.facing += d * Math.min(1, dt * 12); }
-  if (player.grounded && state === 'play' && !ui.open && keys.Space) { player.vy = 6.6; player.grounded = false; }
+  if (player.grounded && state === 'play' && !ui.open && !talk && keys.Space) { player.vy = 6.6; player.grounded = false; }
   player.vy = Math.max(-25, player.vy - 18 * dt);
   if (player.vy > 0) ctrl.disableSnapToGround(); else ctrl.enableSnapToGround(0.3);
   const mvx = (player.dirX || 0) * player.speed * dt, mvz = (player.dirZ || 0) * player.speed * dt;
@@ -141,7 +200,9 @@ function updatePlayer(dt) {
   const t = pp(); boy.g.position.set(t.x, t.y - FEET, t.z); boy.g.rotation.y = player.facing;
   player.phase += dt * (2.5 + player.speed * 1.9);
   animatePerson(boy, player.phase, Math.min(1, player.speed / 6.2) * 0.9 + (player.speed > 0.2 ? 0.25 : 0), !player.grounded);
-  for (const k in POI) if (state === 'play' && Math.hypot(t.x - POI[k].x, t.z - POI[k].z) < 20) ui.discover(k);
+  for (const k in POI) if (state === 'play' && Math.hypot(t.x - POI[k].x, t.z - POI[k].z) < 20) { ui.place(k); if (!ui.has('l-' + k) && !talk && player.grounded) ui.discover('l-' + k, herePhoto()); }
+  // ¿hay algo cerca que observar o alguien con quien hablar?
+  if ((scanT -= dt) <= 0 && state === 'play') { scanT = 0.2; near = talk || ui.open ? null : explorer.scan(t); $('prompt').classList.toggle('on', !!near); if (near) $('prompt-text').textContent = `${near.verb} ${near.label}`; }
 }
 
 function updateCamera(dt) {
@@ -160,8 +221,8 @@ function updateItems() {
     if (it.taken) continue;
     it.mesh.position.y = it.base.y + Math.sin(time * 2 + it.base.x) * 0.15; it.mesh.rotation.y = time * 1.5;
     if (state === 'play' && Math.hypot(t.x - it.base.x, t.y - it.base.y + 0.3, t.z - it.base.z) < 1.25) {
+      if (!ui.has('pinon')) ui.discover('pinon', photo({ x: it.base.x, y: it.mesh.position.y, z: it.base.z }, { dist: 1.5, up: 0.25, fov: 34 }));
       it.taken = true; it.mesh.visible = false; got++; ui.addItem('pinon');
-      if (got === 1) ui.unlock('pinon', 'pewen', 'ngen'); if (got === 2) ui.unlock('copihue'); if (got === 3) ui.unlock('pewen-sagrado'); if (got === 4) ui.unlock('traro');
       $('count').textContent = got;
       if (got === world.items.length) outro();
       else if (got === world.items.length - 1) hint('Falta uno. Está sobre las rocas, al fondo del bosque: sube saltando.', 8);
@@ -169,10 +230,11 @@ function updateItems() {
   }
 }
 
-const ui = createUI({ world, onToast: (t) => hint(t, 5) });
+const ui = createUI({ world, onToast: (t) => hint(t, 5), onClose: () => { if (state === 'play' && !menuOpen) lock(); } });
+const explorer = createExplorer({ world, ui });
 $('total').textContent = world.items.length;
 $('loading').remove();
-window.__g = { ui, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
+window.__g = { ui, explorer, interact, get near() { return near; }, get talk() { return talk; }, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
   tp(x, y, z) { pBody.setTranslation({ x, y, z }, true); player.vy = 0; },
   view(x, y, z, lx, ly, lz) { camera.position.set(x, y, z); camera.lookAt(lx, ly, lz); world.update(0, time, camera.position, pp()); draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); },
   snap() { draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); } };
@@ -198,6 +260,6 @@ function frame() {
   if (!menuOpen || state === 'title') tick(dt); // el juego se detiene con el menú abierto
   draw();
   // si el equipo va lento, baja la resolución de a poco
-  fpsT += dt; fpsN++; if (fpsT > 3) { if (opts.calidad === 'auto' && !menuOpen && fpsN / fpsT < 27 && pr > 0.6) { pr = Math.max(0.6, pr - 0.25); renderer.setPixelRatio(pr); } fpsT = fpsN = 0; }
+  fpsT += dt; fpsN++; if (fpsT > 3) { if (opts.calidad === 'auto' && !menuOpen && fpsN / fpsT < 27 && pr > 0.6) { pr = Math.max(0.6, pr - 0.25); renderer.setPixelRatio(pr); post.resize(); } fpsT = fpsN = 0; }
 }
 frame();

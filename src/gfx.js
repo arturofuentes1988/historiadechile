@@ -1,10 +1,15 @@
 // Gráficos realistas hechos por código: texturas generadas, materiales con luz y sombra reales,
 // agua, cielo y partículas. No se usa ninguna imagen ni modelo externo.
 import * as THREE from 'three';
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
+import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 
-export const SUN = new THREE.Vector3(0.52, 0.62, -0.38).normalize(); // sol de la mañana, desde el nororiente
+export const SUN = new THREE.Vector3(0.62, 0.4, -0.44).normalize(); // sol bajo y dorado de la mañana, desde el nororiente
 export const uTime = { value: 0 };
-export const FOG = { color: new THREE.Color(0xb7c9d6), density: 0.0034 };
+export const FOG = { color: new THREE.Color(0xc9cdc4), density: 0.0038 };
 
 export function mulberry32(a) {
   return function () {
@@ -202,12 +207,13 @@ export function buildSky(scene) {
     fragmentShader: /* glsl */ `uniform vec3 uSun; varying vec3 vD;
       void main(){
         vec3 d = normalize(vD); float h = max(d.y, 0.);
-        vec3 col = mix(vec3(0.50, 0.66, 0.82), vec3(0.20, 0.40, 0.72), pow(h, 0.55));   // del horizonte pálido al azul del cenit
+        float s0 = max(dot(normalize(vec3(d.x, 0., d.z)), normalize(vec3(uSun.x, 0., uSun.z))), 0.);
+        vec3 col = mix(mix(vec3(0.62, 0.72, 0.82), vec3(1.0, 0.82, 0.58), pow(s0, 3.) * 0.75), vec3(0.20, 0.40, 0.72), pow(h, 0.5));   // del horizonte dorado al azul del cenit
         col = mix(col, vec3(0.09, 0.24, 0.58), smoothstep(0.45, 1., h));
         float s = max(dot(d, uSun), 0.);
-        col += vec3(1.0, 0.85, 0.6) * (pow(s, 6.) * 0.16 + pow(s, 60.) * 0.5) + vec3(1.) * smoothstep(0.9993, 0.9997, s) * 2.; // resplandor y disco del sol
-        if (d.y < 0.) col = vec3(0.47, 0.58, 0.67);
-        gl_FragColor = vec4(col, 1.);
+        col += vec3(1.0, 0.82, 0.55) * (pow(s, 5.) * 0.3 + pow(s, 50.) * 0.9) + vec3(1.0, 0.95, 0.85) * smoothstep(0.9992, 0.9997, s) * 6.; // resplandor y disco del sol
+        if (d.y < 0.) col = vec3(0.58, 0.61, 0.56);
+        gl_FragColor = vec4(col * 1.7, 1.);
         #include <colorspace_fragment>
       }`,
   }));
@@ -224,7 +230,7 @@ export function buildSky(scene) {
         vec2 p = d.xz / (d.y + 0.18) * 1.5 + vec2(uTime*0.006, uTime*0.002);
         float n = fbm(p), c = smoothstep(0.62, 0.82, n), thick = smoothstep(0.68, 0.95, n);
         vec3 col = mix(vec3(0.96, 0.95, 0.93), vec3(0.50, 0.55, 0.64), thick*0.75) * (0.9 + 0.25*pow(max(dot(d, uSun), 0.), 3.));
-        gl_FragColor = vec4(col, c * 0.92 * smoothstep(0.02, 0.2, d.y));
+        gl_FragColor = vec4(col * 1.9, c * 0.92 * smoothstep(0.02, 0.2, d.y));
         ${END}
       }`,
   }));
@@ -235,14 +241,14 @@ export function buildSky(scene) {
 export class ParticleBatch {
   constructor() { this.pos = []; this.par = []; this.col = []; this.n = 0; }
   add(x, y, z, size, speed, color) { const c = new THREE.Color(color); this.pos.push(x, y, z); this.par.push((this.n * 0.754877 + 0.13) % 1, size, speed, 0); this.col.push(c.r, c.g, c.b); this.n++; }
-  build({ dir = [0, 1, 0], wind = [0, 0, 0], span = 8, speed = 1, drift = 0.5, wob = 1, s0 = 1, s1 = 1, opacity = 1, aspect = 1, glow = false, hard = false } = {}) {
+  build({ dir = [0, 1, 0], wind = [0, 0, 0], span = 8, speed = 1, drift = 0.5, wob = 1, s0 = 1, s1 = 1, opacity = 1, aspect = 1, glow = false, hard = false, boost = 1 } = {}) {
     const g = new THREE.InstancedBufferGeometry(), q = new THREE.PlaneGeometry(1, 1);
     g.index = q.index; g.setAttribute('position', q.attributes.position); g.setAttribute('uv', q.attributes.uv);
     const ia = (arr, n) => new THREE.InstancedBufferAttribute(new Float32Array(arr), n);
     g.setAttribute('iPos', ia(this.pos, 3)); g.setAttribute('iP', ia(this.par, 4)); g.setAttribute('iCol', ia(this.col, 3)); g.instanceCount = this.n;
     const m = new THREE.ShaderMaterial({
       transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: glow ? THREE.AdditiveBlending : THREE.NormalBlending,
-      uniforms: { uTime, ...fogU(), uDir: { value: new THREE.Vector3(...dir) }, uWind: { value: new THREE.Vector3(...wind) }, uSpan: { value: span }, uSpeed: { value: speed }, uDrift: { value: drift }, uWob: { value: wob }, uS0: { value: s0 }, uS1: { value: s1 }, uOpacity: { value: opacity }, uAspect: { value: aspect }, uHard: { value: hard ? 1 : 0 } },
+      uniforms: { uTime, ...fogU(), uDir: { value: new THREE.Vector3(...dir) }, uWind: { value: new THREE.Vector3(...wind) }, uSpan: { value: span }, uSpeed: { value: speed }, uDrift: { value: drift }, uWob: { value: wob }, uS0: { value: s0 }, uS1: { value: s1 }, uOpacity: { value: opacity }, uAspect: { value: aspect }, uHard: { value: hard ? 1 : 0 }, uBoost: { value: boost } },
       vertexShader: /* glsl */ `attribute vec3 iPos; attribute vec4 iP; attribute vec3 iCol;
         uniform float uTime, uSpan, uSpeed, uDrift, uWob, uS0, uS1, uAspect; uniform vec3 uDir, uWind;
         varying vec2 vUv; varying vec3 vColor; varying float vT, vDist;
@@ -254,14 +260,14 @@ export class ParticleBatch {
           vec2 q = position.xy * vec2(1., uAspect) * iP.y * mix(uS0, uS1, t); q = vec2(cs*q.x - sn*q.y, sn*q.x + cs*q.y);
           vec4 mv = viewMatrix * vec4(c, 1.); mv.xy += q; vDist = -mv.z; gl_Position = projectionMatrix * mv;
         }`,
-      fragmentShader: /* glsl */ `uniform float uOpacity, uHard; varying vec2 vUv; varying vec3 vColor; varying float vT, vDist;
+      fragmentShader: /* glsl */ `uniform float uOpacity, uHard, uBoost; varying vec2 vUv; varying vec3 vColor; varying float vT, vDist;
         ${FOG_GLSL}
         void main(){
           float r = length(vUv - 0.5)*2.;
           float shape = mix(smoothstep(1., 0.15, r), step(r, 0.9), uHard);
-          float a = shape * pow(sin(3.14159*vT), 0.7) * uOpacity;
+          float a = shape * pow(sin(3.14159*vT), 0.7) * uOpacity * smoothstep(0.6, 3.5, vDist); // no encandila al pasar junto a la cámara
           if (a < 0.01) discard;
-          gl_FragColor = vec4(fogged(vColor, vDist), a);
+          gl_FragColor = vec4(fogged(vColor * uBoost, vDist), a);
           ${END}
         }`,
     });
@@ -272,14 +278,68 @@ export class ParticleBatch {
 // ---------- luces ----------
 export function buildLights(scene, renderer) {
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 0.7;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
   scene.fog = new THREE.FogExp2(FOG.color, FOG.density);
-  scene.add(new THREE.HemisphereLight(0xc4d8f0, 0x7a7058, 2.1));
-  const sun = new THREE.DirectionalLight(0xfff0d6, 3.0);
+  scene.add(new THREE.HemisphereLight(0xb8cff0, 0x7a6c52, 1.9));
+  const sun = new THREE.DirectionalLight(0xffdcae, 3.6);
   sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.35;
   const c = sun.shadow.camera; c.left = c.bottom = -75; c.right = c.top = 75; c.near = 20; c.far = 420; c.updateProjectionMatrix();
   scene.add(sun, sun.target);
   // la sombra sigue al jugador, ajustada a la rejilla del mapa de sombras para que no tiemble
   const follow = (p) => { const s = 150 / 4096 * 8; sun.target.position.set(Math.round(p.x / s) * s, Math.round(p.y / s) * s, Math.round(p.z / s) * s); sun.position.copy(sun.target.position).addScaledVector(SUN, 230); };
   return { sun, follow };
+}
+
+// ---------- rayos de sol entre los árboles: láminas de luz alineadas con el sol ----------
+export function buildShafts(scene, points) {
+  const g = new THREE.InstancedBufferGeometry(), q = new THREE.PlaneGeometry(1, 1), pos = [], par = [];
+  for (const [x, y, z, w, len] of points) { pos.push(x, y, z); par.push(w, len, Math.random(), Math.random()); }
+  g.index = q.index; g.setAttribute('position', q.attributes.position); g.setAttribute('uv', q.attributes.uv);
+  g.setAttribute('iPos', new THREE.InstancedBufferAttribute(new Float32Array(pos), 3)); g.setAttribute('iP', new THREE.InstancedBufferAttribute(new Float32Array(par), 4)); g.instanceCount = points.length;
+  const m = new THREE.Mesh(g, new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: { uTime, uSun: { value: SUN } },
+    vertexShader: /* glsl */ `attribute vec3 iPos; attribute vec4 iP; uniform vec3 uSun; varying vec2 vUv; varying float vSeed, vDist;
+      void main(){
+        vUv = uv; vSeed = iP.z;
+        vec3 c = iPos + uSun * (uv.y * iP.y);                                   // la lámina sube hacia el sol
+        vec3 side = normalize(cross(uSun, normalize(cameraPosition - c)));      // y siempre da la cara a quien mira
+        vec4 mv = viewMatrix * vec4(c + side * (uv.x - 0.5) * iP.x, 1.); vDist = -mv.z; gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: /* glsl */ `uniform float uTime; varying vec2 vUv; varying float vSeed, vDist;
+      void main(){
+        float across = pow(sin(3.14159 * vUv.x), 2.), along = smoothstep(0., 0.12, vUv.y) * smoothstep(1., 0.45, vUv.y);
+        float flick = 0.7 + 0.3 * sin(uTime * (0.3 + vSeed) + vSeed * 40.);
+        float a = across * along * flick * 0.16 * smoothstep(3., 12., vDist) * smoothstep(150., 70., vDist);
+        gl_FragColor = vec4(vec3(1.0, 0.86, 0.6) * a * 2.2, a);
+        ${END}
+      }`,
+  }));
+  m.frustumCulled = false; m.renderOrder = 3; scene.add(m);
+}
+
+// ---------- acabado: resplandor de lo que brilla y una gradación cálida, como de recuerdo ----------
+export function createPost(renderer, scene, camera) {
+  const size = renderer.getDrawingBufferSize(new THREE.Vector2());
+  const rt = new THREE.WebGLRenderTarget(size.x, size.y, { samples: 4, type: THREE.HalfFloatType });
+  const composer = new EffectComposer(renderer, rt);
+  composer.addPass(new RenderPass(scene, camera));
+  composer.addPass(new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.42, 0.8, 0.92));
+  composer.addPass(new OutputPass());
+  composer.addPass(new ShaderPass({
+    uniforms: { tDiffuse: { value: null } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
+    fragmentShader: /* glsl */ `uniform sampler2D tDiffuse; varying vec2 vUv;
+      void main(){
+        vec3 c = texture2D(tDiffuse, vUv).rgb; float l = dot(c, vec3(0.299, 0.587, 0.114));
+        c = mix(vec3(l), c, 1.14);                                                        // un poco más de color
+        c = mix(c * vec3(0.94, 0.99, 1.08), c * vec3(1.07, 1.01, 0.9), smoothstep(0.15, 0.75, l)); // sombras frías, luces doradas
+        c = c * c * (3. - 2. * c) * 0.35 + c * 0.65;                                       // contraste suave
+        vec2 q = vUv - 0.5; c *= 1. - dot(q, q) * 0.55;                                    // viñeta
+        gl_FragColor = vec4(c, 1.);
+      }`,
+  }));
+  return {
+    render: () => composer.render(),
+    resize() { const s = renderer.getDrawingBufferSize(new THREE.Vector2()); composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(s.x / renderer.getPixelRatio(), s.y / renderer.getPixelRatio()); },
+  };
 }

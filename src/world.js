@@ -1,6 +1,6 @@
 // Arma el mundo del Acto I: terreno, agua, bosque, aldea, lejanía y vida.
 import * as THREE from 'three';
-import { TEX, GeoBag, mulberry32, waterMaterial, buildSky } from './gfx.js';
+import { TEX, GeoBag, FOG, mulberry32, waterMaterial, buildSky, buildShafts } from './gfx.js';
 import { B, WATER_Y, CERRO, POI, height, normalAt, zone, pathDist, vnoise, fbm, smooth } from './terrain.js';
 import { makeFlora } from './flora.js';
 import { buildVillage, CORRAL } from './village.js';
@@ -54,9 +54,9 @@ export function buildWorld(scene, RAPIER, physics) {
   const VOL = { x: 1500, z: -520, H: 640, R: 620 };
   { const pts = []; for (let i = 0; i <= 24; i++) { const u = i / 24; pts.push(new THREE.Vector2(VOL.R * Math.pow(1 - u, 1.5) + 14 * (1 - u), u * VOL.H)); }
     const g = new THREE.LatheGeometry(pts, 48), P = g.attributes.position, C = [], c = new THREE.Color();
-    for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i), a = Math.atan2(z, x), k = 1 + 0.07 * Math.sin(a * 9 + y * 0.01) + 0.04 * Math.sin(a * 23); P.setX(i, x * k); P.setZ(i, z * k); c.set(y / VOL.H > 0.38 + 0.1 * Math.sin(a * 7) + 0.05 * Math.sin(a * 19) ? 0xf2f4f6 : 0x4a5262); C.push(c.r, c.g, c.b); }
+    for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i), a = Math.atan2(z, x), k = 1 + 0.07 * Math.sin(a * 9 + y * 0.01) + 0.04 * Math.sin(a * 23); P.setX(i, x * k); P.setZ(i, z * k); c.set(y / VOL.H > 0.38 + 0.1 * Math.sin(a * 7) + 0.05 * Math.sin(a * 19) ? 0xf2f4f6 : 0x4a5262).lerp(FOG.color, 0.42); C.push(c.r, c.g, c.b); } // la bruma se mezcla a mano: a esta distancia la niebla lo borraría
     g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.computeVertexNormals();
-    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9 })); m.position.set(VOL.x, 20, VOL.z); scene.add(m);
+    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, fog: false })); m.position.set(VOL.x, 20, VOL.z); scene.add(m);
   }
 
   // ---------- agua ----------
@@ -106,9 +106,9 @@ export function buildWorld(scene, RAPIER, physics) {
     else if (zk === 'marsh') { if (u < 0.45) flora.scatter('reed', x, h, z, R(0.8, 1.3)); else if (u < 0.75) flora.scatter('grass', x, h, z, R(1, 1.5), 0xb8d8a8); }
     else if (zk === 'pebble') { if (u < 0.1) flora.scatter('reed', x, h, z, R(0.7, 1.1)); }
     else if (zk === 'earth') { if (u < 0.08 && Math.hypot(x, z) > 20) flora.scatter('grass', x, h, z, R(0.5, 0.8), 0xe0d8a0); }
-    else if (zk === 'forest') { if (u < 0.2) flora.scatter('grass', x, h, z, R(0.6, 1.0), 0xc8d8a0); else if (u < 0.27) flora.scatter('fern', x, h, z, R(0.8, 1.3)); }
-    else if (zk === 'moss') { if (u < 0.3) flora.scatter('fern', x, h, z, R(1, 1.9)); else if (u < 0.36) flora.scatter('grass', x, h, z, R(0.6, 1), 0xa8c090); }
-    else if (zk === 'needles') { if (u < 0.05) flora.scatter('fern', x, h, z, R(0.7, 1.1)); else if (u < 0.09) flora.scatter('grass', x, h, z, R(0.5, 0.8), 0xd8d0a0); }
+    else if (zk === 'forest') { if (u < 0.2) flora.scatter('grass', x, h, z, R(0.6, 1.0), 0xc8d8a0); else if (u < 0.27) flora.scatter('fern', x, h, z, R(0.8, 1.3)); else if (u < 0.55) flora.scatter('litter', x, h, z, R(0.7, 1.3), near(x, z, 6) && rng() < 0.5 ? 0xf0d890 : 0xb09070); }
+    else if (zk === 'moss') { if (u < 0.3) flora.scatter('fern', x, h, z, R(1, 1.9)); else if (u < 0.36) flora.scatter('grass', x, h, z, R(0.6, 1), 0xa8c090); else if (u < 0.55) flora.scatter('litter', x, h, z, R(0.7, 1.3), 0x8a8a5a); }
+    else if (zk === 'needles') { if (u < 0.05) flora.scatter('fern', x, h, z, R(0.7, 1.1)); else if (u < 0.09) flora.scatter('grass', x, h, z, R(0.5, 0.8), 0xd8d0a0); else if (u < 0.2) flora.scatter('litter', x, h, z, R(0.7, 1.2), 0x9a7050); }
   }
   for (let i = 0, n = 2600 * Q; i < n; i++) {
     const x = R(B.x0 + 2, B.x1 - 2), z = R(B.z0 + 2, B.z1 - 2), h = height(x, z);
@@ -129,6 +129,8 @@ export function buildWorld(scene, RAPIER, physics) {
   scene.add(bag.build());
   const tris = flora.build();
   buildSky(scene);
+  // rayos de sol que se cuelan entre las copas, en las zonas de bosque
+  { const pts = []; for (let i = 0; i < 4000 && pts.length < 190 * Q; i++) { const x = R(B.x0 + 10, B.x1 - 10), z = R(B.z0 + 10, B.z1 - 10), h = height(x, z), zk = zone(x, z, h, 1); if ((zk === 'forest' || zk === 'needles' || zk === 'moss') && near(x, z, 9)) pts.push([x, h - 1, z, R(1.2, 3.4), R(22, 38)]); } buildShafts(scene, pts); }
   const life = buildLife({ scene, rng, emit, trees });
 
   // ---------- piñones (coleccionables) ----------
@@ -141,7 +143,9 @@ export function buildWorld(scene, RAPIER, physics) {
   });
 
   return {
-    items, trees, life, strokes: Math.round(tris), volcano: new THREE.Vector3(VOL.x, 380, VOL.z),
+    items, trees, life, strokes: Math.round(tris),
+    nearTree(x, z, r) { const ci = Math.floor(x / 8), cj = Math.floor(z / 8); let best = null; for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const l = grid.get(ci + i + ',' + (cj + j)); if (l) for (const t of l) { const d = Math.hypot(t.x - x, t.z - z); if (d < r && (!best || d < best.d)) best = { ...t, d }; } } return best; },
+    nearPlant: flora.nearScatter, nearBush: flora.nearBush, volcano: new THREE.Vector3(VOL.x, 380, VOL.z),
     update(dt, t, camPos, playerPos) { flora.update(camPos); life.update(dt, t, playerPos); if (emit.glow) emit.glow.intensity = 12 + Math.sin(t * 11) * 2.5 + Math.sin(t * 23.7) * 1.5; },
   };
 }
