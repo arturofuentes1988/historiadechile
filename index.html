@@ -60,7 +60,7 @@
   .tool { position: relative; border: 0; color: var(--cream); background: var(--panel); clip-path: var(--step); padding: 10px 14px 8px; min-width: 74px; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 13px; letter-spacing: .06em; transition: background .15s, color .15s; }
   .tool svg { width: 22px; height: 22px; color: var(--copper); transition: color .15s; } .tool kbd { font: inherit; font-size: 11px; color: var(--dim); }
   .tool:hover { background: #c98a4a; color: var(--ink); } .tool:hover svg, .tool:hover kbd { color: var(--ink); }
-  .tool.row { flex-direction: row; min-width: 0; padding: 10px 14px; gap: 8px; } .tool.row svg { width: 18px; height: 18px; }
+  .tool.row { flex-direction: row; min-width: 0; padding: 10px 14px; gap: 8px; } .tool.row kbd { margin-left: 2px; } .tool.row svg { width: 18px; height: 18px; }
   .tool.new::after { content: ''; position: absolute; top: 7px; right: 9px; width: 9px; height: 9px; background: #e9b03a; transform: rotate(45deg); }
   #prompt { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; background: var(--panel); clip-path: var(--step); padding: 10px 22px 10px 12px; font-size: 17px; opacity: 0; transition: opacity .2s; pointer-events: none; }
   #prompt.on { opacity: 1; }
@@ -113,11 +113,25 @@
   #o-reload { font-size: 14px; margin: 8px 0 0; color: #e9b03a; } #o-reload button { margin-left: 8px; }
   h3.sec { margin: 20px 0 8px; font-weight: normal; color: var(--copper); letter-spacing: .14em; text-transform: uppercase; font-size: 14px; }
   .keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 15px; margin: 0; align-items: center; } .keys dt { color: var(--copper); white-space: nowrap; } .keys dd { margin: 0; color: var(--cream); }
-  .mrow { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 22px; } body.en-portada #m-portada { display: none; } body.en-portada .mrow { grid-template-columns: 1fr; }
+  .mrow { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 22px; } .mrow.top { grid-template-columns: 1fr 1fr 1fr; margin: 0 0 6px; } .mrow .btn { padding: 12px 10px; font-size: 15px; }
+  body.en-portada #m-portada { display: none; } body.en-portada .mrow.top { grid-template-columns: 1fr 1fr; }
+  .keybtn { min-width: 150px; padding: 8px 14px; font-size: 15px; } .keybtn.wait { background: var(--copper); color: var(--ink); }
+  #ctl-list .opt { padding: 7px 0; }
+  .sec2 { margin: 18px 0 4px; font-weight: normal; color: var(--copper); letter-spacing: .14em; text-transform: uppercase; font-size: 14px; }
+  .mis { display: grid; grid-template-columns: 44px 1fr; gap: 14px; padding: 12px 14px; margin-top: 8px; background: #ffffff0d; }
+  .mis .mk { width: 40px; height: 40px; display: grid; place-items: center; background: var(--copper); color: var(--ink); font-size: 19px; font-weight: bold; clip-path: var(--step); }
+  .mis h3 { margin: 0 0 4px; font-weight: normal; font-size: 19px; } .mis h3 small { color: var(--dim); font-size: 13px; font-style: italic; } .mis p { margin: 0 0 8px; font-size: 15px; line-height: 1.5; } .mis em { color: var(--copper); font-size: 13px; }
+  .mis.done { opacity: .7; } .mis.done .mk { background: #5c8a4a; color: #fff; } .mis.locked { opacity: .5; } .mis.locked .mk { background: #ffffff22; color: var(--dim); }
+  .prog { height: 5px; background: #ffffff18; margin-bottom: 6px; } .prog i { display: block; height: 100%; background: linear-gradient(90deg, var(--red), var(--copper)); }
+  .tree { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px 12px; }
+  .skill { background: #ffffff0d; padding: 14px 14px 16px; display: flex; flex-direction: column; gap: 6px; clip-path: var(--step); }
+  .skill h3 { margin: 0; font-weight: normal; font-size: 18px; } .skill p { margin: 0; font-size: 14px; line-height: 1.45; flex: 1; } .skill small { color: var(--dim); font-style: italic; font-size: 12.5px; } .skill em { color: var(--dim); font-size: 13px; }
+  .skill .btn { padding: 8px 12px; font-size: 14px; margin-top: 4px; } .skill.can { background: #c98a4a2e; } .skill.have { background: #5c8a4a40; } .skill.have em { color: #b9dba8; }
+  @media (max-width: 760px) { .tree { grid-template-columns: 1fr 1fr; } .skill { grid-column: auto !important; grid-row: auto !important; } .tree .sec2 { display: none; } .mrow.top { grid-template-columns: 1fr; } }
   #loading { position: fixed; inset: 0; display: grid; place-items: center; background: #14110f; z-index: 9; font-style: italic; color: var(--dim); }
   @media (max-width: 760px) { .dex { grid-template-columns: 1fr; } #minimap { width: 120px; height: 120px; } .tool { min-width: 58px; } }
 </style>
-  <script type="module" crossorigin src="./assets/index-92sEgJJ7.js"></script>
+  <script type="module" crossorigin src="./assets/index-DB3UNYZ1.js"></script>
 </head>
 <body>
 <div id="loading">Preparando el bosque…</div>
@@ -127,40 +141,50 @@
   <div class="cover shadow"><button id="c-entrar" class="btn main">Entrar al mundo<small>Recorre la aldea y el bosque</small></button><button id="c-opciones" class="btn">Opciones<small>Imagen, cámara y estilo visual</small></button></div>
   <p class="place">Nahuelbuta, invierno de 1545</p></div>
 
-<div id="hudbox" class="shadow"><div id="hud" class="chip"><span>Piñones <b id="count">0</b> <small>/ <span id="total">5</span></small></span></div><div class="chip"><span><b id="score-n">0</b> <small>puntos de investigación</small></span></div></div>
+<div id="hudbox" class="shadow"><div id="hud" class="chip"><span><small>Misión ·</small> <span id="mis-title"></span> <b id="mis-prog"></b></span></div><div class="chip"><span><b id="score-n">0</b> <small>puntos para gastar en saberes</small></span></div></div>
 <div id="hint"></div>
 <div id="sub"></div>
 <div id="skip">ENTER · saltar</div>
 <div id="end">Fin del prototipo — continuará…</div>
 <canvas id="minimap" width="340" height="340" title="Abrir el mapa (M)"></canvas>
-<div id="prompt" class="shadow"><span class="key">E</span><span id="prompt-text"></span></div>
+<div id="prompt" class="shadow"><span class="key" data-key="observar">E</span><span id="prompt-text"></span></div>
 <div id="mousehint">Haz clic en el juego para girar la cámara con el ratón</div>
 <div id="dialogo"><div id="dlg-name"></div><div id="dlg-text"></div><div id="dlg-more"></div></div>
 <div id="btns" class="shadow">
-  <button id="btn-notas" class="tool" title="Cuaderno: todo lo que has descubierto, con sus fotos y tus puntos de investigación"><svg viewBox='0 0 24 24'><polygon points='12.00,2.00 13.76,7.75 19.07,4.93 16.25,10.24 22.00,12.00 16.25,13.76 19.07,19.07 13.76,16.25 12.00,22.00 10.24,16.25 4.93,19.07 7.75,13.76 2.00,12.00 7.75,10.24 4.93,4.93 10.24,7.75' fill='currentColor'/></svg>Cuaderno<kbd>N</kbd></button>
-  <button id="btn-bolsa" class="tool" title="Bolsa: lo que Leftraru lleva consigo"><svg viewBox='0 0 24 24' fill='currentColor'><path d='M8 3h8v3h-8z'/><path d='M6 8h12l2 4v7h-2v2H6v-2H4v-7z'/><rect x='10' y='12' width='4' height='4' fill='#14110f'/></svg>Bolsa<kbd>B</kbd></button>
-  <button id="btn-mapa" class="tool" title="Mapa: el territorio completo y los lugares visitados"><svg viewBox='0 0 24 24' fill='currentColor'><path d='M9 2h6v4h3v3h4v6h-4v3h-3v4H9v-4H6v-3H2V9h4V6h3z'/><rect x='10' y='10' width='4' height='4' fill='#14110f'/></svg>Mapa<kbd>M</kbd></button>
+  <button id="btn-notas" class="tool" title="Cuaderno: todo lo que has descubierto, con sus fotos"><svg viewBox='0 0 24 24'><polygon points='12.00,2.00 13.76,7.75 19.07,4.93 16.25,10.24 22.00,12.00 16.25,13.76 19.07,19.07 13.76,16.25 12.00,22.00 10.24,16.25 4.93,19.07 7.75,13.76 2.00,12.00 7.75,10.24 4.93,4.93 10.24,7.75' fill='currentColor'/></svg>Cuaderno<kbd data-key="cuaderno">N</kbd></button>
+  <button id="btn-misiones" class="tool" title="Misiones: lo que tienes por hacer, principales y secundarias"><svg viewBox='0 0 24 24' fill='currentColor'><path d='M5 3h14v3h-2v12h2v3H5v-3h2V6H5z'/><path d='M10 8h4v2h-4zM10 12h4v2h-4z' fill='#14110f'/></svg>Misiones<kbd data-key="misiones">J</kbd></button>
+  <button id="btn-saberes" class="tool" title="Saberes: habilidades que aprendes con tus puntos de investigación"><svg viewBox='0 0 24 24' fill='currentColor'><path d='M11 2h2v5h3v2h-3v3h5v2h-5v8h-2v-8H6v-2h5V9H8V7h3z'/><rect x='4' y='11' width='4' height='4'/><rect x='16' y='11' width='4' height='4'/><rect x='6' y='5' width='4' height='4'/><rect x='14' y='5' width='4' height='4'/></svg>Saberes<kbd data-key="saberes">K</kbd></button>
+  <button id="btn-bolsa" class="tool" title="Bolsa: lo que Leftraru lleva consigo"><svg viewBox='0 0 24 24' fill='currentColor'><path d='M8 3h8v3h-8z'/><path d='M6 8h12l2 4v7h-2v2H6v-2H4v-7z'/><rect x='10' y='12' width='4' height='4' fill='#14110f'/></svg>Bolsa<kbd data-key="bolsa">B</kbd></button>
+  <button id="btn-mapa" class="tool" title="Mapa: el territorio completo y los lugares visitados"><svg viewBox='0 0 24 24' fill='currentColor'><path d='M9 2h6v4h3v3h4v6h-4v3h-3v4H9v-4H6v-3H2V9h4V6h3z'/><rect x='10' y='10' width='4' height='4' fill='#14110f'/></svg>Mapa<kbd data-key="mapa">M</kbd></button>
 </div>
 <div id="corner" class="shadow">
-  <button id="btn-full" class="tool row" title="Pantalla completa (F)"><svg viewBox='0 0 24 24' fill='currentColor'><path d='M3 3h7v3H6v4H3zM14 3h7v7h-3V6h-4zM3 14h3v4h4v3H3zM18 14h3v7h-7v-3h4z'/></svg><span id="full-label">Pantalla completa</span></button>
-  <button id="btn-menu" class="tool row" title="Pausa y opciones (Esc)"><svg viewBox='0 0 24 24' fill='currentColor'><path d='M3 5h18v3H3zM6 10.5h12v3H6zM3 16h18v3H3z'/></svg>Menú</button>
+  <button id="btn-full" class="tool row" title="Pantalla completa"><svg viewBox='0 0 24 24' fill='currentColor'><path d='M3 3h7v3H6v4H3zM14 3h7v7h-3V6h-4zM3 14h3v4h4v3H3zM18 14h3v7h-7v-3h4z'/></svg><span id="full-label">Pantalla completa</span><kbd data-key="pantalla">F</kbd></button>
+  <button id="btn-menu" class="tool row" title="Pausa, opciones y controles"><svg viewBox='0 0 24 24' fill='currentColor'><path d='M3 5h18v3H3zM6 10.5h12v3H6zM3 16h18v3H3z'/></svg>Menú<kbd data-key="menu">P</kbd></button>
 </div>
 
 <div id="panel"><div id="sheet"><div class="head"><h2 id="panel-title">Cuaderno</h2><button id="panel-close" class="btn">Cerrar · Esc</button></div><div class="greca"></div><div id="panel-body"></div></div></div>
 
 <div id="menu"><div id="menu-sheet">
-  <h2>Opciones</h2><div class="greca"></div>
+ <div id="pg-opciones">
+  <h2>Menú</h2><div class="greca"></div>
+  <div class="mrow top"><button id="m-continuar" class="btn main">Continuar<small>Volver al juego</small></button><button id="o-controles" class="btn">Controles<small>Ver y cambiar las teclas</small></button><button id="m-portada" class="btn">Salir a la portada<small>Tu progreso se conserva</small></button></div>
+  <h3 class="sec">Imagen</h3>
   <label class="opt"><div><b>Calidad de imagen</b><small>Nitidez de la imagen. Bájala si el juego va lento.</small></div><select id="o-calidad"><option value="auto">Automática</option><option value="0.6">Baja (más rápido)</option><option value="1">Media</option><option value="1.5">Alta</option></select></label>
   <label class="opt"><div><b>Detalle del mundo</b><small>Cantidad de árboles, pasto y piedras. Se aplica al recargar.</small><p id="o-reload" hidden>Falta recargar para aplicarlo. <button id="o-recargar" class="btn">Recargar ahora</button></p></div><select id="o-detalle"><option value="0.5">Bajo (más rápido)</option><option value="1">Normal</option><option value="1.5">Alto</option></select></label>
+  <label class="opt"><div><b>Pantalla completa</b><small>Oculta la barra del navegador. También con su tecla.</small></div><input id="o-full" type="checkbox"></label>
+  <label class="opt"><div><b>Mostrar minimapa</b><small>El mapa redondo de la esquina inferior izquierda.</small></div><input id="o-mini" type="checkbox"></label>
+  <h3 class="sec">Cámara</h3>
   <label class="opt"><div><b>Sensibilidad de la cámara</b><small>Qué tan rápido gira la vista al mover el ratón.</small></div><input id="o-sens" type="range" min="0.4" max="2.5" step="0.1"></label>
   <label class="opt"><div><b>Invertir cámara vertical</b><small>Mover el ratón hacia arriba baja la vista, y al revés.</small></div><input id="o-inv" type="checkbox"></label>
-  <label class="opt"><div><b>Mostrar minimapa</b><small>El mapa redondo de la esquina inferior izquierda.</small></div><input id="o-mini" type="checkbox"></label>
-  <label class="opt"><div><b>Pantalla completa</b><small>Oculta la barra del navegador. También con la tecla F.</small></div><input id="o-full" type="checkbox"></label>
-  <div class="opt"><div><b>Empezar el cuaderno de cero</b><small>Borra todo lo descubierto y los puntos de investigación.</small></div><button id="o-borrar" class="btn">Borrar</button></div>
-  <h3 class="sec">Controles</h3>
-  <dl class="keys"><dt>W A S D</dt><dd>Caminar</dd><dt>Shift</dt><dd>Correr</dd><dt>Espacio</dt><dd>Saltar</dd><dt>Ratón</dt><dd>Girar la cámara (o las teclas Z y C)</dd><dt>E</dt><dd>Observar lo que tienes cerca, o hablar con alguien</dd><dt>N · B · M</dt><dd>Cuaderno, bolsa y mapa</dd><dt>Esc</dt><dd>Soltar el ratón y abrir este menú</dd></dl>
-  <div class="mrow"><button id="m-continuar" class="btn main">Continuar<small>Volver al juego</small></button><button id="m-portada" class="btn">Salir a la portada<small>El cuaderno se conserva</small></button></div>
+  <h3 class="sec">Progreso</h3>
+  <div class="opt"><div><b>Empezar de cero</b><small>Borra el cuaderno, los puntos, los saberes y las misiones.</small></div><button id="o-borrar" class="btn">Borrar</button></div>
+ </div>
+ <div id="pg-controles" hidden>
+  <h2>Controles</h2><div class="greca"></div>
+  <p class="muted how">Haz clic en una tecla y pulsa la nueva. Si ya estaba en uso, las dos se intercambian. El ratón gira la cámara; Escape siempre suelta el ratón y abre el menú.</p>
+  <div id="ctl-list"></div>
+  <div class="mrow"><button id="ctl-volver" class="btn main">Volver<small>Al menú</small></button><button id="ctl-reset" class="btn">Restablecer<small>Teclas originales</small></button></div>
+ </div>
 </div></div>
-<script src="./estilos.js" defer></script>
 </body>
 </html>
