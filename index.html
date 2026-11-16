@@ -75,8 +75,36 @@
   .mrow { display: flex; gap: 12px; margin-top: 18px; flex-wrap: wrap; } .mrow button { flex: 1; min-width: 0; font-size: 17px; padding: 10px 12px; color: #3a2c18; background: #d6c597; border-color: #3a2c18; }
   .mrow button.main { background: #3a2c18; color: #f6ecd0; }
   body.en-portada #m-portada { display: none; }
+  /* ---------- diseño inspirado en el tejido mapuche: grecas escalonadas en rojo, negro y crudo ---------- */
+  :root { --negro: #17151b; --rojo: #a82a2e; --crudo: #f1e7cf; --ocre: #d99a1c; --greca: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='16'%3E%3Crect width='32' height='16' fill='%23f1e7cf'/%3E%3Cpath d='M13 1h6v3h3v3h3v2h-3v3h-3v3h-6v-3h-3v-3h-3v-2h3v-3h3z' fill='%23a82a2e'/%3E%3Crect x='14' y='6' width='4' height='4' fill='%2317151b'/%3E%3Cpath d='M0 5h3v6h-3zM29 5h3v6h-3z' fill='%2317151b'/%3E%3C/svg%3E"); --grecaD: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='16'%3E%3Crect width='32' height='16' fill='%2317151b'/%3E%3Cpath d='M13 1h6v3h3v3h3v2h-3v3h-3v3h-6v-3h-3v-3h-3v-2h3v-3h3z' fill='%23a82a2e'/%3E%3Crect x='14' y='6' width='4' height='4' fill='%23f1e7cf'/%3E%3Cpath d='M0 5h3v6h-3zM29 5h3v6h-3z' fill='%23d99a1c'/%3E%3C/svg%3E"); --estrella: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpolygon points='12.00,2.00 13.76,7.75 19.07,4.93 16.25,10.24 22.00,12.00 16.25,13.76 19.07,19.07 13.76,16.25 12.00,22.00 10.24,16.25 4.93,19.07 7.75,13.76 2.00,12.00 7.75,10.24 4.93,4.93 10.24,7.75' fill='%23d99a1c'/%3E%3C/svg%3E"); --estrellaR: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24'%3E%3Cpolygon points='12.00,2.00 13.76,7.75 19.07,4.93 16.25,10.24 22.00,12.00 16.25,13.76 19.07,19.07 13.76,16.25 12.00,22.00 10.24,16.25 4.93,19.07 7.75,13.76 2.00,12.00 7.75,10.24 4.93,4.93 10.24,7.75' fill='%23a82a2e'/%3E%3C/svg%3E"); }
+  .cover button, .mrow button, #btns button, #corner button, #panel-close, .tabs button {
+    color: var(--crudo); border: 2px solid var(--negro); border-radius: 3px; text-shadow: none; letter-spacing: .1em;
+    background: var(--grecaD) top left / auto 7px repeat-x, var(--grecaD) bottom left / auto 7px repeat-x, var(--negro);
+    box-shadow: 0 0 0 2px var(--crudo), 0 5px 14px #0009; transition: filter .15s, transform .15s; }
+  .cover button:hover, .mrow button:hover, #btns button:hover, #corner button:hover, #panel-close:hover, .tabs button:hover { filter: brightness(1.35); color: #fff; background: var(--grecaD) top left / auto 7px repeat-x, var(--grecaD) bottom left / auto 7px repeat-x, var(--negro); transform: translateY(-1px); }
+  .cover button { padding: 18px 40px; min-width: 300px; }
+  .cover button.big, .mrow button.main { background: var(--greca) top left / auto 7px repeat-x, var(--greca) bottom left / auto 7px repeat-x, var(--rojo); color: #fff; border-color: var(--negro); }
+  .cover button.big:hover, .mrow button.main:hover { background: var(--greca) top left / auto 7px repeat-x, var(--greca) bottom left / auto 7px repeat-x, var(--rojo); }
+  #btns button, #corner button { padding: 13px 16px; font-size: 15px; } #btns kbd { opacity: .7; color: var(--ocre); }
+  #btns button.new::after { background: var(--ocre); border-color: var(--negro); border-radius: 0; transform: rotate(45deg); width: 11px; height: 11px; }
+  .mrow button { padding: 15px 12px; } .tabs button { padding: 12px 16px; } .tabs button.on { background: var(--greca) bottom left / auto 7px repeat-x, var(--rojo); color: #fff; }
+  #panel-close { padding: 10px 14px; font-size: 14px; }
+  #sheet, #menu-sheet { background: var(--greca) top left / auto 14px repeat-x, var(--greca) bottom left / auto 14px repeat-x, var(--crudo); color: var(--negro); border: 3px solid var(--negro); border-radius: 4px; padding-top: 30px; padding-bottom: 34px; box-shadow: 0 0 0 3px var(--crudo), 0 0 0 5px var(--negro), 0 14px 44px #000b; }
+  #sheet h2::before, #menu-sheet h2::before, #sheet h2::after, #menu-sheet h2::after { content: ''; display: inline-block; width: 22px; height: 22px; background: var(--estrellaR) center / contain no-repeat; vertical-align: -2px; margin: 0 12px; }
+  #sheet h2::after { display: none; }
+  #menu-sheet h3 { border-top: 2px solid var(--negro); color: var(--rojo); letter-spacing: .08em; }
+  .opt select { border-color: var(--negro); border-radius: 2px; background: #fbf5e4; } .opt input[type=checkbox], .opt input[type=range] { accent-color: var(--rojo); }
+  .notes li.on { background: var(--negro); color: var(--crudo); } .notes li { border-bottom-color: #17151b33; }
+  article svg, .slot { border-color: var(--negro); border-radius: 2px; } .slot { background: #e6dabd; } article h3 { color: var(--rojo); }
+  #title h1 { display: flex; align-items: center; gap: .25em; }
+  #title h1::before, #title h1::after { content: ''; width: .42em; height: .42em; background: var(--estrella) center / contain no-repeat; filter: drop-shadow(0 3px 6px #000); }
+  #title h2::after { content: ''; display: block; width: min(420px, 70vw); height: 14px; margin: 18px auto 0; background: var(--greca) center / auto 14px repeat-x; box-shadow: 0 0 0 2px var(--negro), 0 4px 12px #0008; }
+  #hud { background: var(--negro); color: var(--crudo); padding: 8px 16px 8px 40px; border: 2px solid var(--crudo); box-shadow: 0 0 0 2px var(--negro), 0 4px 12px #0008; text-shadow: none; font-size: 17px; letter-spacing: .06em; background: var(--estrella) 10px center / 20px no-repeat, var(--negro); }
+  #hint { top: 64px; } #hint.on { opacity: 1; }
+  #hint:not(:empty) { left: 50%; right: auto; transform: translateX(-50%); background: #17151bdd; color: var(--crudo); padding: 8px 18px; border-left: 6px solid var(--rojo); border-right: 6px solid var(--rojo); text-shadow: none; max-width: 80vw; }
+  #minimap { box-shadow: 0 0 0 3px var(--crudo), 0 0 0 5px var(--negro), 0 6px 16px #0009; }
 </style>
-  <script type="module" crossorigin src="./assets/index-DInN4kdC.js"></script>
+  <script type="module" crossorigin src="./assets/index-DqYh_nA7.js"></script>
 </head>
 <body>
 <div id="loading">Pintando el bosque…</div>
