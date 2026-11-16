@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Leftraru — Acto I: El niño del bosque</title>
+<style>
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #1b1f1a; font-family: Georgia, 'Times New Roman', serif; color: #f6efdc; }
+  canvas { display: block; }
+  .bar { position: fixed; left: 0; right: 0; height: 0; background: #0c0d0b; transition: height .8s ease; z-index: 2; }
+  .bar.top { top: 0; } .bar.bot { bottom: 0; }
+  body.cine .bar { height: 11vh; }
+  #sub { position: fixed; left: 8%; right: 8%; bottom: 13vh; text-align: center; font-size: clamp(16px, 2.3vw, 28px); font-style: italic; text-shadow: 0 2px 8px #000, 0 0 2px #000; opacity: 0; transition: opacity .8s; z-index: 3; }
+  #sub.on { opacity: 1; }
+  #skip { position: fixed; right: 18px; bottom: 3.5vh; font-size: 13px; opacity: 0; z-index: 3; letter-spacing: .08em; }
+  body.cine #skip { opacity: .65; }
+  #hud { position: fixed; top: 16px; left: 18px; font-size: 20px; text-shadow: 0 2px 6px #000; opacity: 0; transition: opacity .6s; }
+  #hud.on { opacity: 1; }
+  #hint { position: fixed; top: 16px; left: 0; right: 0; text-align: center; font-size: 16px; text-shadow: 0 2px 6px #000; opacity: 0; transition: opacity .6s; pointer-events: none; }
+  #hint.on { opacity: .95; }
+  #title, #end { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; background: radial-gradient(ellipse at center, #0000 20%, #000a 100%); transition: opacity 1s; z-index: 4; }
+  #title { cursor: pointer; } #title.hide { opacity: 0; pointer-events: none; }
+  #end { opacity: 0; pointer-events: none; background: none; justify-content: flex-start; padding-top: 9vh; } #end.on { opacity: 1; }
+  h1 { font-size: clamp(44px, 9vw, 110px); margin: 0; letter-spacing: .12em; font-weight: normal; text-shadow: 0 4px 18px #000; }
+  h2 { font-size: clamp(16px, 2.4vw, 26px); margin: .4em 0 2.2em; font-weight: normal; font-style: italic; text-shadow: 0 2px 8px #000; }
+  .press { font-size: 15px; letter-spacing: .2em; text-transform: uppercase; animation: pulse 2s infinite; text-shadow: 0 2px 6px #000; }
+  @keyframes pulse { 50% { opacity: .35; } }
+  #loading { position: fixed; inset: 0; display: grid; place-items: center; background: #1b1f1a; z-index: 9; font-style: italic; }
+</style>
+  <script type="module" crossorigin src="./assets/index-DLZ2BQJE.js"></script>
+</head>
+<body>
+<div id="loading">Pintando el bosque…</div>
+<div class="bar top"></div><div class="bar bot"></div>
+<div id="title"><h1>LEFTRARU</h1><h2>Acto I — El niño del bosque</h2><div class="press">Clic o Enter para comenzar</div></div>
+<div id="hud">Piñones <span id="count">0</span> / <span id="total">5</span></div>
+<div id="hint"></div>
+<div id="sub"></div>
+<div id="skip">ENTER · saltar</div>
+<div id="end"><h2>Fin del prototipo — continuará…</h2></div>
+</body>
+</html>
