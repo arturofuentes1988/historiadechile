@@ -6,7 +6,7 @@
   const base = actual === 'realista' ? location.pathname.replace(/index\.html$/, '') : location.pathname.replace(/[^/]+\/(index\.html)?$/, '');
   const hoja = document.getElementById('menu-sheet'); if (!hoja) return;
   const fila = document.createElement('label'); fila.className = 'opt';
-  fila.innerHTML = 'Estilo visual <select id="o-estilo">' + ESTILOS.map(([k, n]) => `<option value="${k}"${k === actual ? ' selected' : ''}>${n}</option>`).join('') + '</select>';
+  fila.innerHTML = '<div><b>Estilo visual</b><small>Cambia cómo se dibuja el mundo. El juego se recarga y vuelves a la portada.</small></div><select id="o-estilo">' + ESTILOS.map(([k, n]) => `<option value="${k}"${k === actual ? ' selected' : ''}>${n}</option>`).join('') + '</select>';
   hoja.insertBefore(fila, hoja.querySelector('.opt'));
   fila.querySelector('select').onchange = (e) => { location.href = base + (e.target.value === 'realista' ? '' : e.target.value + '/') + location.search; };
 })();
