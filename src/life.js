@@ -1,13 +1,13 @@
 // Lo que se mueve: gente, animales, aves y partículas (humo, fuego, hojas, neblina).
 import * as THREE from 'three';
-import { PAL, ParticleBatch, paintMaterial, shade } from './strokes.js';
+import { ParticleBatch } from './gfx.js';
 import { height, POI, CERRO, riverZ, WATER_Y } from './terrain.js';
 import { RUKAS, CORRAL, FOGON } from './village.js';
 
 const mats = new Map();
-const mat = (c) => mats.get(c) || mats.set(c, paintMaterial({ color: c, side: THREE.DoubleSide })).get(c);
-const vmat = paintMaterial({ vertexColors: true, side: THREE.DoubleSide });
-const shadowMat = new THREE.MeshBasicMaterial({ color: 0x2a2a3c, transparent: true, opacity: 0.2, depthWrite: false });
+const mat = (c) => mats.get(c) || mats.set(c, new THREE.MeshStandardMaterial({ color: c, roughness: 0.88, side: THREE.DoubleSide })).get(c);
+const vmat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, side: THREE.DoubleSide });
+const shadows = (g) => { g.traverse((o) => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); return g; };
 const mesh = (geo, c, par, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, mat(c)); m.position.set(x, y, z); par.add(m); return m; };
 const ball = (r, c, par, x, y, z, sx = 1, sy = 1, sz = 1) => { const m = mesh(new THREE.SphereGeometry(r, 12, 10), c, par, x, y, z); m.scale.set(sx, sy, sz); return m; };
 // segmento de extremidad que cuelga de su articulación
@@ -24,7 +24,6 @@ function drape(profile, zs, colorAt, par) {
 // Se construye con altura 1 y luego se escala. kind: 'man' | 'woman' | 'boy' | 'girl'.
 export function buildPerson({ h = 1.38, kind = 'boy', skin = 0xa9714b, cloth = 0x3a3440, trim = 0xb3262e, band = 0xb3262e, hair = 0x1b1819 } = {}) {
   const g = new THREE.Group(), woman = kind === 'woman' || kind === 'girl', child = kind === 'boy' || kind === 'girl', hs = child ? 1.16 : 1; // la cabeza de un niño es más grande
-  const sh = new THREE.Mesh(new THREE.CircleGeometry(0.2, 16), shadowMat); sh.rotation.x = -Math.PI / 2; sh.position.y = 0.03; g.add(sh);
   const body = new THREE.Group(); g.add(body);
   // piernas: muslo, canilla y pie
   const leg = (sx) => {
@@ -64,7 +63,7 @@ export function buildPerson({ h = 1.38, kind = 'boy', skin = 0xa9714b, cloth = 0
     drape([[0.074, 0.58], [0.098, 0.52], [0.1, 0.4], [0.094, 0.33]], 0.82, () => 0x7a6a56, body); // chiripa
     drape([[0.038, 0.872], [0.13, 0.838], [0.172, 0.74], [0.186, 0.6], [0.192, 0.47]], 0.6, (y) => ((y > 0.5 && y < 0.53) || (y > 0.57 && y < 0.585) ? trim : cloth), body); // makuñ (poncho) con franjas
   }
-  g.scale.setScalar(h);
+  g.scale.setScalar(h); shadows(g);
   return { g, body, head, legL, legR, shinL, shinR, armL, armR, foreL, foreR, h, woman };
 }
 // phase: fase del paso; amp: 0 quieto, 1 corriendo; air: en el aire
@@ -80,8 +79,7 @@ export function animatePerson(p, phase, amp, air = false) {
 
 // Cuadrúpedo por código: weke (pariente de la llama) o pudú (ciervo enano)
 function buildQuad({ s = 1, kind = 'weke', body = 0xd9d0b6, legs = 0x8a7a66 }) {
-  const g = new THREE.Group(), weke = kind === 'weke', H = weke ? 0.8 : 0.32, L = weke ? 0.92 : 0.5, legLen = weke ? 0.62 : 0.22;
-  const sh = new THREE.Mesh(new THREE.CircleGeometry(L * 0.42, 14), shadowMat); sh.rotation.x = -Math.PI / 2; sh.position.y = 0.03; sh.scale.set(0.7, 1.2, 1); g.add(sh);
+  const g = new THREE.Group(), weke = kind === 'weke', H = weke ? 0.8 : 0.32, L = weke ? 0.92 : 0.5, legLen = weke ? 0.66 : 0.24;
   ball(1, body, g, 0, H, 0, L * 0.24, H * (weke ? 0.27 : 0.42), L * 0.5);                       // barriga
   ball(1, body, g, 0, H + (weke ? 0.04 : 0.02), L * 0.3, L * 0.2, H * (weke ? 0.26 : 0.4), L * 0.24); // pecho
   ball(1, body, g, 0, H + 0.02, -L * 0.33, L * 0.22, H * (weke ? 0.27 : 0.42), L * 0.24);        // grupa
@@ -96,11 +94,11 @@ function buildQuad({ s = 1, kind = 'weke', body = 0xd9d0b6, legs = 0x8a7a66 }) {
   hd.rotation.x = -0.35; neck.rotation.x = 0.35;
   const Ls = [], Ks = [];
   for (const [x, z] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
-    const hip = new THREE.Group(); hip.position.set(x * L * 0.14, H - 0.02, z * L * 0.34); g.add(hip); seg(legLen * 0.5, weke ? 0.05 : 0.03, weke ? 0.032 : 0.02, body, hip);
+    const hip = new THREE.Group(); hip.position.set(x * L * 0.14, legLen, z * L * 0.34); g.add(hip); seg(legLen * 0.5, weke ? 0.05 : 0.03, weke ? 0.032 : 0.02, body, hip);
     const knee = new THREE.Group(); knee.position.y = -legLen * 0.5; hip.add(knee); seg(legLen * 0.5, weke ? 0.028 : 0.018, weke ? 0.022 : 0.014, legs, knee);
     Ls.push(hip); Ks.push(knee);
   }
-  g.scale.setScalar(s);
+  g.scale.setScalar(s); shadows(g);
   return { g, legs: Ls, knees: Ks, neck, headPivot: hd };
 }
 
@@ -142,16 +140,15 @@ export function buildLife({ scene, rng, emit, trees }) {
 
   // ---------- partículas ----------
   const P = (fill, opts) => { const b = new ParticleBatch(); fill(b); const m = b.build(opts); scene.add(m); return m; };
-  const pick = (pal) => shade(pal, 0, R(-0.6, 1), 0, rng);
-  P((b) => { for (const [x, y, z, k] of emit.smoke) for (let i = 0; i < 22 * k; i++) b.add(x + R(-0.2, 0.2), y, z + R(-0.2, 0.2), R(0.7, 1.2) * (0.6 + k * 0.4), R(0.7, 1.2), pick(PAL.smoke)); }, { span: 13, speed: 1.0, drift: 0.8, wob: 0.6, s0: 0.5, s1: 2.6, opacity: 0.5, wind: [0.28, 0, 0.1], aspect: 0.85, blend: true });
-  P((b) => { for (const [x, y, z] of emit.fire) for (let i = 0; i < 22; i++) b.add(x + R(-0.3, 0.3), y, z + R(-0.3, 0.3), R(0.4, 0.75), R(0.8, 1.4), pick(PAL.fire)); }, { span: 1.3, speed: 1.9, drift: 0.12, wob: 5, s0: 1, s1: 0.25, opacity: 1.3, aspect: 1.5 });
-  P((b) => { for (const t of trees) if (t.kind === 'roble') for (let i = 0; i < 4; i++) b.add(t.x + R(-3, 3), t.y + t.H * R(0.5, 0.95), t.z + R(-3, 3), R(0.16, 0.26), R(0.6, 1.3), pick(PAL.leafFall)); }, { dir: [0, -1, 0], span: 11, speed: 1.0, drift: 1.4, wob: 1.6, opacity: 1.6, wind: [0.2, 0, 0.08], aspect: 0.7 });
-  P((b) => { for (const [cx, cz, r, n] of [[0, 0, 34, 220], [POI.maqui.x, POI.maqui.z, 24, 200], [POI.pewen.x, POI.pewen.z, 50, 200], [POI.antiguos.x, POI.antiguos.z, 16, 80], [POI.viejo.x, POI.viejo.z, 40, 160]]) for (let i = 0; i < n; i++) { const a = R(0, 6.28), d = Math.sqrt(rng()) * r, x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d; b.add(x, height(x, z) + R(0.4, 5), z, R(0.05, 0.09), R(0.5, 1.5), pick(PAL.mote)); } }, { dir: [0, 1, 0], span: 2.5, speed: 0.25, drift: 1.3, wob: 0.7, opacity: 1.5, aspect: 1 });
-  P((b) => { for (let i = 0; i < 46; i++) { const a = R(0, 6.28), d = Math.sqrt(rng()) * 20, x = POI.maqui.x + Math.cos(a) * d, z = POI.maqui.z + Math.sin(a) * d; b.add(x, height(x, z) + R(0.5, 1.6), z, R(0.13, 0.19), R(0.6, 1.2), pick(PAL.fly)); } }, { dir: [0, 0, 0], span: 1, speed: 0.07, drift: 2.4, wob: 1.4, opacity: 2.5, aspect: 0.8 });
+  const pick = (cols) => cols[(rng() * cols.length) | 0];
+  P((b) => { for (const [x, y, z, k] of emit.smoke) for (let i = 0; i < 26 * k; i++) b.add(x + R(-0.2, 0.2), y, z + R(-0.2, 0.2), R(0.8, 1.3) * (0.6 + k * 0.4), R(0.7, 1.2), pick([0x8a8782, 0xa6a39c, 0x6c6a66])); }, { span: 14, speed: 1.0, drift: 0.8, wob: 0.6, s0: 0.5, s1: 3.4, opacity: 0.26, wind: [0.28, 0, 0.1] });
+  P((b) => { for (const [x, y, z] of emit.fire) for (let i = 0; i < 26; i++) b.add(x + R(-0.3, 0.3), y, z + R(-0.3, 0.3), R(0.45, 0.8), R(0.8, 1.4), pick([0xff5a18, 0xff9a2a, 0xffd060])); }, { span: 1.3, speed: 1.9, drift: 0.12, wob: 5, s0: 1, s1: 0.25, opacity: 0.8, aspect: 1.5, glow: true });
+  P((b) => { for (const t of trees) if (t.kind === 'roble') for (let i = 0; i < 4; i++) b.add(t.x + R(-3, 3), t.y + t.H * R(0.5, 0.95), t.z + R(-3, 3), R(0.12, 0.2), R(0.6, 1.3), pick([0xc48a28, 0xdcaa3a, 0xa86a1c])); }, { dir: [0, -1, 0], span: 11, speed: 1.0, drift: 1.4, wob: 1.6, opacity: 1, wind: [0.2, 0, 0.08], aspect: 0.6, hard: true });
+  P((b) => { for (const [cx, cz, r, n] of [[0, 0, 34, 200], [POI.maqui.x, POI.maqui.z, 24, 200], [POI.pewen.x, POI.pewen.z, 50, 200], [POI.antiguos.x, POI.antiguos.z, 16, 80], [POI.viejo.x, POI.viejo.z, 40, 160]]) for (let i = 0; i < n; i++) { const a = R(0, 6.28), d = Math.sqrt(rng()) * r, x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d; b.add(x, height(x, z) + R(0.4, 5), z, R(0.04, 0.07), R(0.5, 1.5), 0xfff4c8); } }, { dir: [0, 1, 0], span: 2.5, speed: 0.25, drift: 1.3, wob: 0.7, opacity: 0.8, glow: true });
   P((b) => {
-    for (let i = 0; i < 80; i++) { const a = R(0, 6.28), d = Math.sqrt(rng()) * 44, x = POI.menoko.x + Math.cos(a) * d, z = POI.menoko.z + Math.sin(a) * d * 0.8; b.add(x, Math.max(WATER_Y, height(x, z)) + R(0.6, 2.4), z, R(7, 12), R(0.6, 1.2), pick(PAL.mist)); }
-    for (let i = 0; i < 70; i++) { const x = R(-190, 170); b.add(x, WATER_Y + R(0.5, 1.8), riverZ(x) + R(-7, 7), R(6, 10), R(0.6, 1.2), pick(PAL.mist)); }
-  }, { dir: [0, 0, 0], span: 30, speed: 0.9, drift: 0.8, wob: 0.25, s0: 0.8, s1: 1.3, opacity: 0.2, wind: [1, 0, 0.1], aspect: 0.4, blend: true });
+    for (let i = 0; i < 70; i++) { const a = R(0, 6.28), d = Math.sqrt(rng()) * 44, x = POI.menoko.x + Math.cos(a) * d, z = POI.menoko.z + Math.sin(a) * d * 0.8; b.add(x, Math.max(WATER_Y, height(x, z)) + R(0.6, 2.2), z, R(9, 15), R(0.6, 1.2), 0xe6eef0); }
+    for (let i = 0; i < 60; i++) { const x = R(-190, 170); b.add(x, WATER_Y + R(0.5, 1.6), riverZ(x) + R(-7, 7), R(8, 13), R(0.6, 1.2), 0xe6eef0); }
+  }, { dir: [0, 0, 0], span: 30, speed: 0.9, drift: 0.8, wob: 0.25, s0: 0.8, s1: 1.3, opacity: 0.1, wind: [1, 0, 0.1], aspect: 0.35 });
 
   const turn = (o, tx, tz, dt, k = 6) => { let d = Math.atan2(tx - o.x, tz - o.z) - o.face; d = Math.atan2(Math.sin(d), Math.cos(d)); o.face += d * Math.min(1, dt * k); };
 

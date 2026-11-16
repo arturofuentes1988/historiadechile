@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
-import { shared, createWatercolor } from './strokes.js';
+import { uTime, buildLights } from './gfx.js';
 import { buildWorld } from './world.js';
 import { height, inBounds, POI, CERRO } from './terrain.js';
 import { buildPerson, animatePerson } from './life.js';
@@ -14,14 +14,13 @@ await RAPIER.init();
 const physics = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
 renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.setSize(innerWidth, innerHeight);
 document.body.prepend(renderer.domElement);
 const scene = new THREE.Scene();
-const paper = createWatercolor(renderer); // acabado de acuarela sobre toda la imagen
-const draw = () => paper.render(scene, camera);
-const camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.1, 3000);
+const lights = buildLights(scene, renderer);
+const draw = () => renderer.render(scene, camera);
+const camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.2, 12000);
 addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
 
 const world = buildWorld(scene, RAPIER, physics);
@@ -181,13 +180,13 @@ window.__g = { ui, player, cam, world, pp, get state() { return state; }, get go
 const clock = new THREE.Clock(); let fpsT = 0, fpsN = 0;
 applyOpts();
 function tick(dt) {
-  time += dt; shared.uTime.value = time;
+  time += dt; uTime.value = time;
   updatePlayer(dt);
   if (cine.active) cine.update(dt);
   else if (state === 'title') { const a = time * 0.04 + 2.4; camera.position.set(Math.sin(a) * 31, 12, Math.cos(a) * 31); camera.lookAt(0, 4, 0); }
   else updateCamera(dt);
   updateItems();
-  world.update(dt, time, camera.position, pp());
+  world.update(dt, time, camera.position, pp()); lights.follow(state === 'title' ? { x: 0, y: 3, z: 0 } : pp());
   if (state === 'play') ui.drawMap(pp(), player.facing);
   if (hintT > 0 && (hintT -= dt) <= 0) $('hint').classList.remove('on');
 }
