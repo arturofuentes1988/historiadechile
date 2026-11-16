@@ -134,8 +134,14 @@ Todavía no existían aquí caballos, ovejas, trigo, hierro ni platería. Los an
 3. Misiones 1 y 2 (ya hay base en el prototipo) más la secundaria A.
 4. El resto, zona por zona.
 
-## 8. Decisiones abiertas
+## 8. Decisiones tomadas
 
-1. **Idioma:** ¿español con palabras en mapudungun, o mapudungun con subtítulos?
-2. **Última línea:** ¿termina solo con el amanecer, o con un texto como *"Fue el último We Tripantu que Leftraru pasó en su casa"*?
-3. **Día y noche:** ¿el tiempo avanza solo, o cambia al completar misiones principales?
+1. **Idioma:** español con palabras en mapudungun.
+2. **Última línea:** el acto termina con el texto *"Fue el último We Tripantu que Leftraru pasó en su casa."*
+3. **Día y noche:** el momento del día cambia al completar misiones principales.
+
+## 9. Interfaz
+
+- **Minimapa** (abajo a la izquierda): el jugador al centro con una flecha que indica hacia dónde camina; los objetivos fuera de vista se marcan en el borde.
+- **Notas** (abajo a la derecha, tecla N): todo lo descubierto, separado en Mitología, Personajes y Naturaleza. Cada nota es una hoja con imagen y descripción.
+- **Bolsa** (abajo a la derecha, tecla B): lo que Leftraru va encontrando.

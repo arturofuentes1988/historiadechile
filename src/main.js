@@ -3,6 +3,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { shared, paintMaterial } from './strokes.js';
 import { buildWorld, height, PLAY_RADIUS } from './world.js';
 import { Cinematic } from './cinematic.js';
+import { createUI } from './ui.js';
 
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 const $ = (id) => document.getElementById(id);
@@ -57,18 +58,18 @@ function intro() {
   state = 'cine'; $('title').classList.add('hide');
   const p = V3(0, height(0, 0) + 1, 0);
   cine.play([
-    { dur: 8, from: V3(70, 46, 120), to: V3(40, 34, 70), lookFrom: world.volcano, lookTo: world.volcano.clone().add(V3(0, -40, 0)), text: 'Tierras de Nahuelbuta. Verano de 1546.' },
-    { dur: 8, from: V3(34, 24, 44), to: V3(12, 6, 15), lookFrom: V3(0, 14, 0), lookTo: p, text: 'Antes de ser toqui, antes de la guerra, Leftraru era un niño del bosque.' },
-    { dur: 7, from: V3(5, p.y + 1.2, 6), to: V3(2.4, p.y + 0.5, 3.2), lookFrom: p, text: 'Su padre le encargó algo simple: reunir piñones del pewen antes de que caiga el sol.' },
-  ], () => { state = 'play'; $('hud').classList.add('on'); hint('Muévete con WASD · Espacio: saltar · Shift: correr', 7); });
+    { dur: 8, from: V3(70, 46, 120), to: V3(40, 34, 70), lookFrom: world.volcano, lookTo: world.volcano.clone().add(V3(0, -40, 0)), text: 'Tierras de Nahuelbuta. Invierno de 1545.' },
+    { dur: 8, from: V3(34, 24, 44), to: V3(12, 6, 15), lookFrom: V3(0, 14, 0), lookTo: p, text: 'Faltan pocos días para el We Tripantu, el regreso del sol. Leftraru tiene once años.' },
+    { dur: 7, from: V3(5, p.y + 1.2, 6), to: V3(2.4, p.y + 0.5, 3.2), lookFrom: p, text: 'Su padre le encargó reunir los últimos piñones del pewen para la celebración.' },
+  ], () => { state = 'play'; document.body.classList.add('playing'); $('hud').classList.add('on'); hint('Muévete con WASD · Espacio: saltar · Shift: correr', 7); ui.unlock('leftraru', 'curinancu', 'nahuelbuta'); });
 }
 function outro() {
-  state = 'cine'; $('hud').classList.remove('on'); world.smoke.visible = true;
-  const p = V3(pp().x, pp().y + 0.6, pp().z), dir = world.smokePos.clone().sub(p).setY(0).normalize();
+  state = 'cine'; ui.show(null); document.body.classList.remove('playing'); $('hud').classList.remove('on');
+  const p = V3(pp().x, pp().y + 0.6, pp().z), dir = world.volcano.clone().sub(p).setY(0).normalize();
   cine.play([
-    { dur: 6, from: p.clone().addScaledVector(dir, 3.5).add(V3(0, 0.6, 0)), to: p.clone().addScaledVector(dir, 2.6).add(V3(0, 0.3, 0)), lookFrom: p, text: 'El último piñón. Leftraru sonríe… y entonces lo escucha.' },
-    { dur: 10, from: p.clone().addScaledVector(dir, -4).add(V3(0, 2, 0)), to: p.clone().addScaledVector(dir, -6).add(V3(0, 34, 0)), lookFrom: p.clone().add(V3(0, 6, 0)), lookTo: world.smokePos, text: 'Un trueno que no viene del cielo. Humo sobre el valle. Y un sonido que el bosque no conoce: cascos.' },
-  ], () => { state = 'play'; $('end').classList.add('on'); });
+    { dur: 6, from: p.clone().addScaledVector(dir, 3.5).add(V3(0, 0.6, 0)), to: p.clone().addScaledVector(dir, 2.6).add(V3(0, 0.3, 0)), lookFrom: p, text: 'El último piñón. Suficientes para todos.' },
+    { dur: 10, from: p.clone().addScaledVector(dir, -4).add(V3(0, 2, 0)), to: p.clone().addScaledVector(dir, -8).add(V3(0, 36, 0)), lookFrom: p.clone().add(V3(0, 6, 0)), lookTo: world.volcano, text: 'Desde el cerro, su padre lo llama. Hay algo que quiere mostrarle.' },
+  ], () => { state = 'play'; document.body.classList.add('playing'); $('end').classList.add('on'); });
 }
 let hintT = 0;
 function hint(txt, secs) { $('hint').textContent = txt; $('hint').classList.add('on'); hintT = secs; }
@@ -76,11 +77,14 @@ function hint(txt, secs) { $('hint').textContent = txt; $('hint').classList.add(
 addEventListener('keydown', (e) => {
   keys[e.code] = true;
   if (e.code === 'Enter') { if (state === 'title') intro(); else cine.skip(); }
+  if (state === 'play' && e.code === 'KeyN') { ui.show('notas'); ui.seen(); }
+  if (state === 'play' && e.code === 'KeyB') ui.show('bolsa');
+  if (e.code === 'Escape') ui.show(null);
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
 });
 addEventListener('keyup', (e) => { keys[e.code] = false; });
 $('title').addEventListener('click', () => { if (state === 'title') intro(); });
-renderer.domElement.addEventListener('click', () => { if (state === 'play') renderer.domElement.requestPointerLock?.(); });
+renderer.domElement.addEventListener('click', () => { if (state === 'play' && !ui.open) renderer.domElement.requestPointerLock?.(); });
 addEventListener('mousemove', (e) => {
   if (document.pointerLockElement !== renderer.domElement) return;
   cam.yaw -= e.movementX * 0.0028; cam.pitch = Math.min(1.2, Math.max(-0.25, cam.pitch + e.movementY * 0.0022));
@@ -88,7 +92,7 @@ addEventListener('mousemove', (e) => {
 
 function updatePlayer(dt) {
   let ix = 0, iz = 0;
-  if (state === 'play') {
+  if (state === 'play' && !ui.open) {
     ix = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
     iz = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
     cam.yaw += ((keys.KeyQ ? 1 : 0) - (keys.KeyE ? 1 : 0)) * dt * 1.8;
@@ -98,7 +102,7 @@ function updatePlayer(dt) {
   const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw);
   let dx = fx * iz + rx * ix, dz = fz * iz + rz * ix; const l = Math.hypot(dx, dz);
   if (l > 0) { dx /= l; dz /= l; player.dirX = dx; player.dirZ = dz; let d = Math.atan2(dx, dz) - player.facing; d = Math.atan2(Math.sin(d), Math.cos(d)); player.facing += d * Math.min(1, dt * 12); }
-  if (player.grounded && state === 'play' && keys.Space) { player.vy = 6.6; player.grounded = false; }
+  if (player.grounded && state === 'play' && !ui.open && keys.Space) { player.vy = 6.6; player.grounded = false; }
   player.vy = Math.max(-25, player.vy - 18 * dt);
   if (player.vy > 0) ctrl.disableSnapToGround(); else ctrl.enableSnapToGround(0.3);
   const mvx = (player.dirX || 0) * player.speed * dt, mvz = (player.dirZ || 0) * player.speed * dt;
@@ -136,7 +140,8 @@ function updateItems() {
     if (it.taken) continue;
     it.mesh.position.y = it.base.y + Math.sin(time * 2 + it.base.x) * 0.15; it.mesh.rotation.y = time * 1.5;
     if (state === 'play' && Math.hypot(t.x - it.base.x, t.y - it.base.y + 0.3, t.z - it.base.z) < 1.25) {
-      it.taken = true; it.mesh.visible = false; got++;
+      it.taken = true; it.mesh.visible = false; got++; ui.addItem('pinon');
+      if (got === 1) ui.unlock('pinon', 'pewen', 'ngen'); if (got === 2) ui.unlock('copihue'); if (got === 3) ui.unlock('pewen-sagrado'); if (got === 4) ui.unlock('traro');
       $('count').textContent = got;
       if (got === world.items.length) outro();
       else if (got === world.items.length - 1) hint('Falta uno. Busca las rocas escalonadas y sube saltando.', 8);
@@ -144,9 +149,10 @@ function updateItems() {
   }
 }
 
+const ui = createUI({ world, playRadius: PLAY_RADIUS, onToast: (t) => hint(t, 5) });
 $('total').textContent = world.items.length;
 $('loading').remove();
-window.__g = { player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, intro, paused: false, keys,
+window.__g = { ui, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, intro, paused: false, keys,
   tp(x, y, z) { pBody.setTranslation({ x, y, z }, true); player.vy = 0; },
   snap() { renderer.render(scene, camera); return renderer.domElement.toDataURL('image/jpeg', 0.9); } };
 
@@ -158,6 +164,7 @@ function tick(dt) {
   else if (state === 'title') { const a = time * 0.05; camera.position.set(Math.sin(a) * 30, height(0, 0) + 9, Math.cos(a) * 30); camera.lookAt(0, height(0, 0) + 6, 0); }
   else updateCamera(dt);
   updateItems();
+  if (state === 'play') ui.drawMap(pp(), player.facing);
   if (hintT > 0 && (hintT -= dt) <= 0) $('hint').classList.remove('on');
 }
 window.__g.advance = (secs) => { for (let t = 0; t < secs; t += 1 / 60) tick(1 / 60); }; // para pruebas automáticas

@@ -196,5 +196,5 @@ export function buildWorld(scene, RAPIER, physics) {
     return { mesh: g, base: p.clone(), taken: false };
   });
 
-  return { items, smoke, smokePos: new THREE.Vector3(S.x + 20, 80, S.z), volcano: new THREE.Vector3(V.x, 200, V.z), strokes: near.n + leaves.n + distant.n };
+  return { trees, rocks: stairTop, items, smoke, smokePos: new THREE.Vector3(S.x + 20, 80, S.z), volcano: new THREE.Vector3(V.x, 200, V.z), strokes: near.n + leaves.n + distant.n };
 }
