@@ -186,23 +186,42 @@ export const TEX = {
 };
 
 // ---------- texturas fotográficas (generadas aparte y guardadas en public/assets/tex) ----------
-const loader = new THREE.TextureLoader();
-export function photo(name, repeat) { const t = loader.load(`assets/tex/${name}.jpg`); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; if (repeat) t.repeat.set(...repeat); return t; }
+// Se cargan mientras se arma el mundo; la pantalla de carga muestra el avance.
+export const assets = { loaded: 0, total: 0, onProgress: null };
+const manager = new THREE.LoadingManager();
+manager.onStart = manager.onProgress = (url, l, t) => { assets.loaded = l; assets.total = t; assets.onProgress?.(l, t); };
+manager.onError = () => {};
+// Se llama cuando el mundo ya está armado (ya se pidieron todas): espera a que lleguen. Si alguna no llega, el juego igual parte.
+assets.whenLoaded = () => new Promise((res) => { const t0 = performance.now(), chk = () => (assets.loaded >= assets.total || performance.now() - t0 > 90000 ? res() : setTimeout(chk, 120)); chk(); });
+const loader = new THREE.TextureLoader(manager), cache = new Map();
+// repeat: cuántas veces se repite (texturas continuas); cut: recorte con fondo transparente (hojas y plantas)
+export function photo(name, { repeat, cut = false } = {}) {
+  const key = name + (repeat ? repeat.join('x') : '');
+  if (cache.has(key)) return cache.get(key);
+  const t = loader.load(`assets/tex/${name}.webp`); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  if (cut) { t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; } else { t.wrapS = t.wrapT = THREE.RepeatWrapping; if (repeat) t.repeat.set(...repeat); }
+  cache.set(key, t); return t;
+}
 
-// Suelo: color por zona (como antes) y, en las zonas de bosque, la foto de la hojarasca.
-// La foto se muestrea a dos escalas y se mezclan con ruido, para que no se note que se repite.
+// Suelo: cada vértice dice cuánto tiene de bosque, tierra, pasto, piedras y roca, y se mezclan las fotos.
+// El color de zona de antes se conserva como claridad; cada foto se muestrea a dos escalas para que no se note que se repite.
 export function groundMaterial() {
-  const m = new THREE.MeshStandardMaterial({ vertexColors: true, map: TEX.grain, bumpMap: TEX.grainBump, bumpScale: 9, roughness: 1 }), tex = photo('suelo-bosque');
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, map: TEX.grain, bumpMap: TEX.grainBump, bumpScale: 9, roughness: 1 });
+  const U = { uForest: photo('suelo-bosque'), uEarth: photo('suelo-tierra'), uGrass: photo('suelo-pasto'), uPebble: photo('suelo-piedras'), uRock: photo('roca') };
   m.onBeforeCompile = (sh) => {
-    sh.uniforms.uForest = { value: tex };
-    sh.vertexShader = 'attribute float aForest; varying float vForest;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vForest = aForest;');
-    sh.fragmentShader = 'uniform sampler2D uForest; varying float vForest;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
-      if (vForest > 0.01) {
-        vec2 fu = vMapUv * 0.62;
-        vec3 a = texture2D(uForest, fu).rgb, b = texture2D(uForest, vec2(fu.y, -fu.x) * 0.37 + 0.31).rgb;
+    for (const k in U) sh.uniforms[k] = { value: U[k] };
+    sh.vertexShader = 'attribute vec4 aTex; attribute float aRock; varying vec4 vTex; varying float vRock;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vTex = aTex; vRock = aRock;');
+    sh.fragmentShader = 'uniform sampler2D uForest, uEarth, uGrass, uPebble, uRock; varying vec4 vTex; varying float vRock;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+      {
+        vec2 fu = vMapUv * 0.62, fv = vec2(fu.y, -fu.x) * 0.37 + 0.31;
         float k = smoothstep(0.35, 0.65, texture2D(map, vMapUv * 0.11).r);
-        vec3 lum = vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11)));
-        diffuseColor.rgb = mix(diffuseColor.rgb, mix(a, b, k) * (0.55 + lum * 3.2), vForest); // conserva lo claro y lo oscuro de cada zona
+        vec3 ph = vec3(0.); float w = vTex.x + vTex.y + vTex.z + vTex.w + vRock;
+        if (vTex.x > 0.01) ph += vTex.x * mix(texture2D(uForest, fu).rgb, texture2D(uForest, fv).rgb, k);
+        if (vTex.y > 0.01) ph += vTex.y * mix(texture2D(uEarth, fu * 0.8).rgb, texture2D(uEarth, fv).rgb, k);
+        if (vTex.z > 0.01) ph += vTex.z * mix(texture2D(uGrass, fu * 1.3).rgb, texture2D(uGrass, fv * 1.6).rgb, k);
+        if (vTex.w > 0.01) ph += vTex.w * mix(texture2D(uPebble, fu * 0.9).rgb, texture2D(uPebble, fv).rgb, k);
+        if (vRock > 0.01) ph += vRock * mix(texture2D(uRock, fu * 0.5).rgb, texture2D(uRock, fv * 0.6).rgb, k);
+        if (w > 0.01) { float lum = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11)); diffuseColor.rgb = mix(diffuseColor.rgb, ph / w * (0.6 + lum * 2.6), min(w, 1.)); }
       }`);
   };
   return m;
@@ -233,7 +252,7 @@ export const MAT = {
   leaf: (map, color = 0xffffff) => withWind(new THREE.MeshStandardMaterial({ map, color, alphaTest: 0.3, alphaToCoverage: true, side: THREE.DoubleSide, roughness: 0.75, metalness: 0, emissiveMap: map, emissive: 0x24301a }), 0.07, false, true),
   bark: (color, map = TEX.bark) => new THREE.MeshStandardMaterial({ map, bumpMap: map, bumpScale: 2.2, color, roughness: 1 }),
   grass: (map, color = 0xffffff) => withWind(new THREE.MeshStandardMaterial({ map, color, alphaTest: 0.3, alphaToCoverage: true, side: THREE.DoubleSide, roughness: 0.9 }), 0.09, true, true),
-  rock: () => new THREE.MeshStandardMaterial({ map: TEX.grain, bumpMap: TEX.grainBump, bumpScale: 4, color: 0xffffff, roughness: 0.95 }),
+  rock: () => { const t = photo('roca'); return new THREE.MeshStandardMaterial({ map: t, bumpMap: t, bumpScale: 5, color: 0xffffff, roughness: 0.95 }); },
   thatch: () => new THREE.MeshStandardMaterial({ map: TEX.thatch, bumpMap: TEX.thatch, bumpScale: 3, roughness: 1 }),
   solid: () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }),
 };

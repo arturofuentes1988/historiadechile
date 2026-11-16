@@ -20,16 +20,18 @@ export function buildWorld(scene, RAPIER, physics) {
   const bag = new GeoBag(), flora = makeFlora({ rng, scene, physics, RAPIER, fixed });
 
   // ---------- terreno: malla fina para ver, malla más gruesa para chocar ----------
-  { const NX = B.x1 - B.x0, NZ = B.z1 - B.z0, P = new Float32Array((NX + 1) * (NZ + 1) * 3), C = new Float32Array(P.length), U = new Float32Array((NX + 1) * (NZ + 1) * 2), F = new Float32Array((NX + 1) * (NZ + 1)), I = new Uint32Array(NX * NZ * 6), c = new THREE.Color(), FOREST = { forest: 1, moss: 0.9, needles: 0.75, grassy: 0.6, marsh: 0.3 };
+  { const NX = B.x1 - B.x0, NZ = B.z1 - B.z0, P = new Float32Array((NX + 1) * (NZ + 1) * 3), C = new Float32Array(P.length), U = new Float32Array((NX + 1) * (NZ + 1) * 2), F = new Float32Array((NX + 1) * (NZ + 1) * 4), RK = new Float32Array((NX + 1) * (NZ + 1)), I = new Uint32Array(NX * NZ * 6), c = new THREE.Color(),
+      // cuánto de cada foto lleva cada zona: [bosque, tierra, pasto, piedras, roca]
+      MIXT = { forest: [1, 0, 0, 0, 0], moss: [0.85, 0, 0.15, 0, 0], needles: [0.75, 0.2, 0, 0, 0], grassy: [0.3, 0, 0.7, 0, 0], meadow: [0, 0, 1, 0, 0], alpine: [0, 0.1, 0.6, 0, 0.3], marsh: [0.3, 0, 0.6, 0, 0], earth: [0, 1, 0, 0, 0], path: [0, 1, 0, 0, 0], pebble: [0, 0, 0, 1, 0], bed: [0, 0, 0, 0.9, 0], rock: [0, 0, 0, 0, 1] };
     for (let j = 0, k = 0, u = 0; j <= NZ; j++) for (let i = 0; i <= NX; i++, k += 3, u += 2) {
       const x = B.x0 + i, z = B.z0 + j, h = height(x, z), ny = normalAt(x, z)[1];
       // el color se promedia con puntos vecinos para que las zonas se fundan
-      c.setRGB(0, 0, 0); let fo = 0; for (let s = 0; s < 3; s++) { const jx = x + (vnoise(x * 0.9 + s * 7, z * 0.9) - 0.5) * 3.5, jz = z + (vnoise(x * 0.9, z * 0.9 + s * 5) - 0.5) * 3.5, zk = zone(jx, jz, height(jx, jz), ny); c.add(GC[zk]); fo += (FOREST[zk] || 0) / 3; } F[u / 2] = fo;
+      c.setRGB(0, 0, 0); const mx = [0, 0, 0, 0, 0]; for (let s = 0; s < 3; s++) { const jx = x + (vnoise(x * 0.9 + s * 7, z * 0.9) - 0.5) * 3.5, jz = z + (vnoise(x * 0.9, z * 0.9 + s * 5) - 0.5) * 3.5, zk = zone(jx, jz, height(jx, jz), ny); c.add(GC[zk]); for (let q = 0; q < 5; q++) mx[q] += MIXT[zk][q] / 3; } F.set(mx.slice(0, 4), (u / 2) * 4); RK[u / 2] = mx[4];
       const sh = (0.8 + 0.3 * vnoise(x * 0.35, z * 0.35) + 0.15 * vnoise(x * 0.05, z * 0.05)) * (0.9 + 0.2 * fbm(x * 0.02, z * 0.02));
       P[k] = x; P[k + 1] = h; P[k + 2] = z; C[k] = c.r * sh; C[k + 1] = c.g * sh; C[k + 2] = c.b * sh; U[u] = x / 3.3; U[u + 1] = z / 3.3;
     }
     for (let j = 0, k = 0; j < NZ; j++) for (let i = 0; i < NX; i++) { const a = j * (NX + 1) + i, b = a + 1, cc = a + NX + 1, d = cc + 1; I[k++] = a; I[k++] = cc; I[k++] = b; I[k++] = b; I[k++] = cc; I[k++] = d; }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('color', new THREE.BufferAttribute(C, 3)); g.setAttribute('uv', new THREE.BufferAttribute(U, 2)); g.setAttribute('aForest', new THREE.BufferAttribute(F, 1)); g.setIndex(new THREE.BufferAttribute(I, 1)); g.computeVertexNormals();
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('color', new THREE.BufferAttribute(C, 3)); g.setAttribute('uv', new THREE.BufferAttribute(U, 2)); g.setAttribute('aTex', new THREE.BufferAttribute(F, 4)); g.setAttribute('aRock', new THREE.BufferAttribute(RK, 1)); g.setIndex(new THREE.BufferAttribute(I, 1)); g.computeVertexNormals();
     const m = new THREE.Mesh(g, groundMaterial()); m.receiveShadow = true; scene.add(m);
   }
   { const ST = 2, NX = (B.x1 - B.x0) / ST, NZ = (B.z1 - B.z0) / ST, verts = new Float32Array((NX + 1) * (NZ + 1) * 3), idx = new Uint32Array(NX * NZ * 6);

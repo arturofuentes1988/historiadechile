@@ -75,20 +75,22 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
   }
 
   // Cada especie con su porte real: altura del modelo (H), grosor del tronco (r0), a qué altura se abre (fork) y forma de la copa
-  const barkPewen = MAT.bark(0xffffff, photo('corteza-pewen')); barkPewen.bumpScale = 3; // corteza fotográfica
+  // cortezas y hojas fotográficas de cada especie
+  const bark = (n, tint = 0xffffff) => { const m = MAT.bark(tint, photo(n)); m.bumpScale = 3; return m; }, leaf = (n, tint) => MAT.leaf(photo(n, { cut: true }), tint);
+  const barkPewen = bark('corteza-pewen'), bCoigue = bark('corteza-coigue'), bRoble = bark('corteza-roble'), bCanelo = bark('corteza-canelo'), bPeumo = bark('corteza-peumo'), bQuillay = bark('corteza-quillay');
   const SPEC = {
-    coigue: { n: 3, make: (i) => broadleafModel(11 + i, { H: 22, r0: 0.6, cards: 34, size: 2.6, flat: 0.42, spread: 0.3 }), leaf: MAT.leaf(TEX.coigue), bark: MAT.bark(0xffffff, TEX.barkCoigue) },          // alto, de copa en pisos horizontales
-    roble: { n: 3, make: (i) => broadleafModel(31 + i, { H: 20, r0: 0.5, cards: 22, size: 2.5, fork: [0.45, 0.6] }), leaf: MAT.leaf(TEX.roble), bark: MAT.bark(0xffffff, TEX.barkRoble) },                    // tronco recto y oscuro, copa abierta
-    canelo: { n: 2, make: (i) => broadleafModel(51 + i, { H: 9, r0: 0.2, cone: true, spread: 0.2, cards: 24, size: 1.7 }), leaf: MAT.leaf(TEX.canelo), bark: MAT.bark(0xffffff, TEX.barkCanelo) },            // delgado, cónico, de corteza clara
-    giant: { n: 2, make: (i) => broadleafModel(71 + i, { H: 32, r0: 1.3, limbs: 6, spread: 0.3, cards: 44, size: 3.2, flat: 0.5 }), leaf: MAT.leaf(TEX.coigue, 0xd0e0c8), bark: MAT.bark(0xe8ecd8, TEX.barkCoigue) },
-    pewen: { n: 3, make: (i) => pewenModel(91 + i, false), leaf: MAT.leaf(TEX.pewen), bark: barkPewen },                                                                             // corteza gruesa en placas
-    pewenYoung: { n: 2, make: (i) => pewenModel(111 + i, true), leaf: MAT.leaf(TEX.pewen), bark: barkPewen },
+    coigue: { n: 3, make: (i) => broadleafModel(11 + i, { H: 22, r0: 0.6, cards: 34, size: 2.6, flat: 0.42, spread: 0.3 }), leaf: leaf('hoja-coigue'), bark: bCoigue },          // alto, de copa en pisos horizontales
+    roble: { n: 3, make: (i) => broadleafModel(31 + i, { H: 20, r0: 0.5, cards: 22, size: 2.5, fork: [0.45, 0.6] }), leaf: leaf('hoja-roble'), bark: bRoble },                    // tronco recto y oscuro, copa abierta
+    canelo: { n: 2, make: (i) => broadleafModel(51 + i, { H: 9, r0: 0.2, cone: true, spread: 0.2, cards: 24, size: 1.7 }), leaf: leaf('hoja-canelo'), bark: bCanelo },            // delgado, cónico, de corteza clara
+    giant: { n: 2, make: (i) => broadleafModel(71 + i, { H: 32, r0: 1.3, limbs: 6, spread: 0.3, cards: 44, size: 3.2, flat: 0.5 }), leaf: leaf('hoja-coigue', 0xd0e0c8), bark: bark('corteza-coigue', 0xe8ecd8) },
+    pewen: { n: 3, make: (i) => pewenModel(91 + i, false), leaf: leaf('rama-pewen'), bark: barkPewen },                                                                             // corteza gruesa en placas
+    pewenYoung: { n: 2, make: (i) => pewenModel(111 + i, true), leaf: leaf('rama-pewen'), bark: barkPewen },
     // bosque esclerófilo: árboles más bajos, de hoja dura y siempre verde, en las laderas soleadas
-    peumo: { n: 2, make: (i) => broadleafModel(151 + i, { H: 12, r0: 0.34, limbs: 5, spread: 0.36, cards: 36, size: 2.0, fork: [0.24, 0.34] }), leaf: MAT.leaf(TEX.peumo), bark: MAT.bark(0xffffff, TEX.barkPardo) },   // copa redonda y densa
-    boldo: { n: 2, make: (i) => broadleafModel(171 + i, { H: 8, r0: 0.26, limbs: 5, spread: 0.42, cards: 34, size: 1.7, fork: [0.16, 0.26] }), leaf: MAT.leaf(TEX.boldo), bark: MAT.bark(0xffffff, TEX.barkPardo) },    // bajo, ramificado desde abajo
-    quillay: { n: 2, make: (i) => broadleafModel(191 + i, { H: 13, r0: 0.36, limbs: 4, spread: 0.3, cards: 18, size: 2.0, fork: [0.36, 0.5] }), leaf: MAT.leaf(TEX.quillay), bark: MAT.bark(0xffffff, TEX.barkGris) },  // copa rala e irregular, corteza gris agrietada
-    litre: { n: 2, make: (i) => broadleafModel(211 + i, { H: 6, r0: 0.2, limbs: 5, spread: 0.5, cards: 24, size: 1.5, fork: [0.2, 0.3] }), leaf: MAT.leaf(TEX.litre), bark: MAT.bark(0xffffff, TEX.barkGris) },         // pequeño y ancho, casi un arbusto
-    bush: { n: 2, make: (i) => { const r = mulberry32(131 + i), w = [], l = []; for (let k = 0; k < 4; k++) cyl(w, V(0, 0, 0), V(r() - 0.5, 0.9, r() - 0.5), 0.05, 0.02, 4); cluster(l, V(0, 1, 0), 1.0, 26, 1.4, r); return { wood: mergeGeometries(w), leaves: mergeGeometries(l), H: 1 }; }, leaf: MAT.leaf(TEX.bush), bark: MAT.bark(0xa08a74) },
+    peumo: { n: 2, make: (i) => broadleafModel(151 + i, { H: 12, r0: 0.34, limbs: 5, spread: 0.36, cards: 36, size: 2.0, fork: [0.24, 0.34] }), leaf: leaf('hoja-peumo'), bark: bPeumo },   // copa redonda y densa
+    boldo: { n: 2, make: (i) => broadleafModel(171 + i, { H: 8, r0: 0.26, limbs: 5, spread: 0.42, cards: 34, size: 1.7, fork: [0.16, 0.26] }), leaf: leaf('hoja-boldo'), bark: bPeumo },    // bajo, ramificado desde abajo
+    quillay: { n: 2, make: (i) => broadleafModel(191 + i, { H: 13, r0: 0.36, limbs: 4, spread: 0.3, cards: 18, size: 2.0, fork: [0.36, 0.5] }), leaf: leaf('hoja-quillay'), bark: bQuillay },  // copa rala e irregular, corteza gris agrietada
+    litre: { n: 2, make: (i) => broadleafModel(211 + i, { H: 6, r0: 0.2, limbs: 5, spread: 0.5, cards: 24, size: 1.5, fork: [0.2, 0.3] }), leaf: leaf('hoja-litre'), bark: bQuillay },         // pequeño y ancho, casi un arbusto
+    bush: { n: 2, make: (i) => { const r = mulberry32(131 + i), w = [], l = []; for (let k = 0; k < 4; k++) cyl(w, V(0, 0, 0), V(r() - 0.5, 0.9, r() - 0.5), 0.05, 0.02, 4); cluster(l, V(0, 1, 0), 1.0, 26, 1.4, r); return { wood: mergeGeometries(w), leaves: mergeGeometries(l), H: 1 }; }, leaf: leaf('hoja-maqui'), bark: MAT.bark(0xa08a74) },
   };
   for (const k in SPEC) { SPEC[k].models = Array.from({ length: SPEC[k].n }, (_, i) => SPEC[k].make(i)); SPEC[k].inst = SPEC[k].models.map(() => []); SPEC[k].far = SPEC[k].models.map(() => []); }
 
@@ -105,14 +107,14 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
   const CS = 40, cross = (w, h, n = 3) => { const parts = []; for (let i = 0; i < n; i++) { const a = (i / n) * PI; quad(parts, V(0, h / 2, 0), V(Math.cos(a) * w, 0, Math.sin(a) * w), V(0, h, 0), UP); } return mergeGeometries(parts); };
   const fernGeo = (() => { const parts = []; for (let i = 0; i < 7; i++) { const a = (i / 7) * PI * 2, d = V(Math.cos(a), 0.75, Math.sin(a)).normalize(); quad(parts, d.clone().multiplyScalar(0.55), V(-Math.sin(a), 0, Math.cos(a)).multiplyScalar(0.42), d.clone().multiplyScalar(1.1), UP); } return mergeGeometries(parts); })();
   const SCATTER = {
-    grass: { geo: cross(1.0, 0.62), mat: MAT.grass(TEX.grass), range: 75, cells: new Map() },
-    grass2: { geo: cross(0.8, 1.05), mat: MAT.grass(TEX.grass2), range: 80, cells: new Map() },
-    reed: { geo: cross(0.9, 1.7), mat: MAT.grass(TEX.reed), range: 110, cells: new Map() },
-    fern: { geo: fernGeo, mat: MAT.grass(TEX.fern), range: 95, cells: new Map() },
-    flower: { geo: cross(0.7, 0.5, 2), mat: MAT.grass(TEX.flower), range: 60, cells: new Map() },
-    quila: { geo: (() => { const p = []; for (let k = 0; k < 11; k++) { const a = (k / 11) * PI * 2 + (k % 3) * 0.3, L = 3 + (k % 4) * 0.5, ca = Math.cos(a), sa = Math.sin(a), pt = (u) => V(ca * u * L * 0.55, Math.sin(u * 1.7) * L * 0.72, sa * u * L * 0.55); for (let j = 0; j < 3; j++) { const a0 = pt(j / 3), a1 = pt((j + 1) / 3); quad(p, a0.clone().add(a1).multiplyScalar(0.5), V(-sa, 0, ca).multiplyScalar(0.9), a1.clone().sub(a0).multiplyScalar(1.08), UP); } } return mergeGeometries(p); })(), mat: MAT.grass(TEX.quila), range: 120, cells: new Map() },
-    copihue: { geo: cross(0.55, 1.9, 2), mat: MAT.grass(TEX.copihue), range: 70, cells: new Map() },
-    litter: { geo: (() => { const p = []; quad(p, V(0, 0.04, 0), V(1.5, 0, 0), V(0, 0, 1.5), UP); return mergeGeometries(p); })(), mat: new THREE.MeshStandardMaterial({ map: TEX.roble, alphaTest: 0.3, roughness: 1 }), range: 60, cells: new Map() }, // hojarasca
+    grass: { geo: cross(1.0, 0.62), mat: MAT.grass(photo('pasto', { cut: true })), range: 75, cells: new Map() },
+    grass2: { geo: cross(0.8, 1.05), mat: MAT.grass(photo('pasto-espiga', { cut: true })), range: 80, cells: new Map() },
+    reed: { geo: cross(0.9, 1.7), mat: MAT.grass(photo('junco', { cut: true })), range: 110, cells: new Map() },
+    fern: { geo: fernGeo, mat: MAT.grass(photo('helecho', { cut: true })), range: 95, cells: new Map() },
+    flower: { geo: cross(0.7, 0.5, 2), mat: MAT.grass(photo('flores', { cut: true })), range: 60, cells: new Map() },
+    quila: { geo: (() => { const p = []; for (let k = 0; k < 11; k++) { const a = (k / 11) * PI * 2 + (k % 3) * 0.3, L = 3 + (k % 4) * 0.5, ca = Math.cos(a), sa = Math.sin(a), pt = (u) => V(ca * u * L * 0.55, Math.sin(u * 1.7) * L * 0.72, sa * u * L * 0.55); for (let j = 0; j < 3; j++) { const a0 = pt(j / 3), a1 = pt((j + 1) / 3); quad(p, a0.clone().add(a1).multiplyScalar(0.5), V(-sa, 0, ca).multiplyScalar(0.9), a1.clone().sub(a0).multiplyScalar(1.08), UP); } } return mergeGeometries(p); })(), mat: MAT.grass(photo('quila', { cut: true })), range: 120, cells: new Map() },
+    copihue: { geo: cross(0.55, 1.9, 2), mat: MAT.grass(photo('copihue', { cut: true })), range: 70, cells: new Map() },
+    litter: { geo: (() => { const p = []; quad(p, V(0, 0.04, 0), V(1.5, 0, 0), V(0, 0, 1.5), UP); return mergeGeometries(p); })(), mat: new THREE.MeshStandardMaterial({ map: photo('hoja-roble', { cut: true }), alphaTest: 0.3, roughness: 1 }), range: 60, cells: new Map() }, // hojarasca
   };
   function scatter(kind, x, y, z, s = 1, color = 0xffffff) {
     const sc = SCATTER[kind], k = Math.floor(x / CS) + ',' + Math.floor(z / CS);

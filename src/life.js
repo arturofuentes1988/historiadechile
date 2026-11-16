@@ -1,13 +1,13 @@
 // Lo que se mueve: gente, animales, aves y partículas (humo, fuego, hojas, neblina).
 import * as THREE from 'three';
-import { ParticleBatch, TEX } from './gfx.js';
+import { ParticleBatch, photo, TEX } from './gfx.js';
 import { height, POI, CERRO, riverZ, WATER_Y } from './terrain.js';
 import { RUKAS, CORRAL, FOGON } from './village.js';
 
 const mats = new Map();
 const mat = (c) => mats.get(c) || mats.set(c, new THREE.MeshStandardMaterial({ color: c, roughness: 0.88, side: THREE.DoubleSide })).get(c);
-const weave = TEX.grainBump.clone(); weave.repeat.set(7, 7); weave.needsUpdate = true;
-const vmat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, side: THREE.DoubleSide, bumpMap: weave, bumpScale: 1.4 }); // la ropa tiene trama de tejido
+const weave = photo('tejido', { repeat: [5, 5] });
+const vmat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, side: THREE.DoubleSide, map: weave, bumpMap: weave, bumpScale: 2 }); // la ropa tiene trama de tejido
 const shadows = (g) => { g.traverse((o) => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); return g; };
 const mesh = (geo, c, par, x = 0, y = 0, z = 0) => { const m = new THREE.Mesh(geo, mat(c)); m.position.set(x, y, z); par.add(m); return m; };
 const ball = (r, c, par, x, y, z, sx = 1, sy = 1, sz = 1) => { const m = mesh(new THREE.SphereGeometry(r, 12, 10), c, par, x, y, z); m.scale.set(sx, sy, sz); return m; };
@@ -81,7 +81,7 @@ export function animatePerson(p, phase, amp, air = false) {
 // ---------- animales con piel continua ----------
 // Cada parte (tronco, cuello, cabeza, patas) es un tubo de sección ovalada que sigue una línea
 // de puntos [alto, largo, radio horizontal, radio vertical], como el contorno real del animal.
-const furTex = TEX.fur.clone(); furTex.repeat.set(3, 3); furTex.needsUpdate = true;
+const furTex = TEX.fur.clone(); furTex.repeat.set(3, 3); furTex.needsUpdate = true; // pelos cortos dibujados: la foto de pelaje no calza con la forma del cuerpo y se veía a franjas
 const furMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: furTex, bumpMap: furTex, bumpScale: 1.6, roughness: 1 });
 function skin(spine, colorAt, { rings = 18, radial = 14, rough = 0 } = {}) {
   const curve = new THREE.CatmullRomCurve3(spine.map(([y, z]) => new THREE.Vector3(0, y, z))), pos = [], col = [], uv = [], idx = [], c = new THREE.Color(), n = spine.length - 1;

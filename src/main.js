@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
-import { uTime, buildLights, createPost } from './gfx.js';
+import { uTime, buildLights, createPost, assets } from './gfx.js';
 import { buildWorld } from './world.js';
 import { height, inBounds, POI, CERRO } from './terrain.js';
 import { buildPerson, animatePerson } from './life.js';
@@ -27,7 +27,12 @@ const post = createPost(renderer, scene, camera);
 const draw = () => post.render();
 addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); post.resize(); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
 
+// pantalla de carga: primero se arma el mundo, después llegan las texturas
+const bar = (f, txt) => { if (!$('load-bar')) return; $('load-bar').style.width = `${Math.round(f * 100)}%`; $('load-text').textContent = txt; };
+bar(0.12, 'Levantando el bosque…'); await new Promise((r) => setTimeout(r, 60));
 const world = buildWorld(scene, RAPIER, physics);
+assets.onProgress = (l, t) => bar(0.3 + 0.7 * (l / t), `Cargando texturas… ${l} de ${t}`);
+bar(0.3 + 0.7 * (assets.total ? assets.loaded / assets.total : 0), 'Cargando texturas…');
 
 // ---------- Leftraru niño (personaje provisional, hecho de formas pintadas) ----------
 const boy = buildPerson({ kind: 'boy', h: 1.38 }); scene.add(boy.g);
@@ -302,7 +307,7 @@ function updateItems() {
 const ui = createUI({ world, onToast: (t) => hint(t, 5), onClose: () => { if (state === 'play' && !menuOpen) lock(); }, onSkill: () => applySkills() });
 const explorer = createExplorer({ world, ui });
 drawKeys(); applySkills();
-$('loading').remove();
+await assets.whenLoaded(); bar(1, 'Listo'); assets.onProgress = null; $('loading').classList.add('hide'); setTimeout(() => $('loading').remove(), 700);
 window.__g = { ui, explorer, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
   tp(x, y, z) { pBody.setTranslation({ x, y, z }, true); player.vy = 0; },
   view(x, y, z, lx, ly, lz) { camera.position.set(x, y, z); camera.lookAt(lx, ly, lz); world.update(0, time, camera.position, pp()); draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); },
