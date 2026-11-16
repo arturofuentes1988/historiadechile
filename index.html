@@ -117,8 +117,16 @@
   .keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 15px; margin: 0; align-items: center; } .keys dt { color: var(--copper); white-space: nowrap; } .keys dd { margin: 0; color: var(--cream); }
   .mrow { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 22px; } .mrow.top { grid-template-columns: 1fr 1fr 1fr; margin: 0 0 6px; } .mrow .btn { padding: 12px 10px; font-size: 15px; }
   body.en-portada #m-portada { display: none; } body.en-portada .mrow.top { grid-template-columns: 1fr 1fr; }
-  .keybtn { min-width: 150px; padding: 8px 14px; font-size: 15px; } .keybtn.wait { background: var(--copper); color: var(--ink); }
-  #ctl-list .opt { padding: 7px 0; }
+  /* controles: dos columnas, una línea por acción y la tecla como una tecla pequeña */
+  #pg-controles .head h2 { text-align: left; }
+  #ctl-list { columns: 2; column-gap: 36px; } #ctl-list section { break-inside: avoid; margin-bottom: 14px; }
+  #ctl-list h4 { margin: 0 0 4px; font-weight: normal; color: var(--copper); letter-spacing: .14em; text-transform: uppercase; font-size: 12px; }
+  .krow { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 15px; border-bottom: 1px solid #ffffff0e; }
+  .kcap { border: 0; min-width: 38px; padding: 4px 10px; background: #ffffff14; color: var(--cream); font-size: 13.5px; clip-path: var(--step); transition: background .15s, color .15s; }
+  .kcap:hover { background: #ffffff2a; } .kcap.wait { background: var(--copper); color: var(--ink); }
+  .kfoot { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 6px; font-size: 13.5px; }
+  .link { border: 0; background: none; color: var(--copper); font-size: 14px; letter-spacing: .05em; padding: 4px 0; } .link:hover { color: var(--cream); }
+  @media (max-width: 620px) { #ctl-list { columns: 1; } }
   .sec2 { margin: 18px 0 4px; font-weight: normal; color: var(--copper); letter-spacing: .14em; text-transform: uppercase; font-size: 14px; }
   .mis { display: grid; grid-template-columns: 44px 1fr; gap: 14px; padding: 12px 14px; margin-top: 8px; background: #ffffff0d; }
   .mis .mk { width: 40px; height: 40px; display: grid; place-items: center; background: var(--copper); color: var(--ink); font-size: 19px; font-weight: bold; clip-path: var(--step); }
@@ -200,10 +208,9 @@
   <div class="opt"><div><b>Empezar de cero</b><small>Borra el cuaderno, los puntos, los saberes y las misiones.</small></div><button id="o-borrar" class="btn">Borrar</button></div>
  </div>
  <div id="pg-controles" hidden>
-  <h2>Controles</h2><div class="greca"></div>
-  <p class="muted how">Haz clic en una tecla y pulsa la nueva. Si ya estaba en uso, las dos se intercambian. El ratón gira la cámara; Escape siempre suelta el ratón y abre el menú.</p>
+  <div class="head"><h2>Controles</h2><button id="ctl-volver" class="link">← Volver · Esc</button></div><div class="greca"></div>
   <div id="ctl-list"></div>
-  <div class="mrow"><button id="ctl-volver" class="btn main">Volver<small>Al menú</small></button><button id="ctl-reset" class="btn">Restablecer<small>Teclas originales</small></button></div>
+  <div class="kfoot"><span id="ctl-hint" class="muted"></span><button id="ctl-reset" class="link">Restablecer</button></div>
  </div>
 </div></div>
 <script type="module" src="/src/main.js"></script>

@@ -59,18 +59,22 @@ function enter() {
 // ---------- opciones (se guardan en este navegador) ----------
 const opts = Object.assign({ calidad: 'auto', detalle: '1', sens: 1, inv: false, mini: true }, JSON.parse(localStorage.getItem('leftraru.opciones') || '{}'));
 // teclas: cada acción tiene una tecla que se puede cambiar en Menú → Controles
-const ACTIONS = [['adelante', 'Caminar hacia adelante', 'KeyW'], ['atras', 'Caminar hacia atrás', 'KeyS'], ['izquierda', 'Caminar a la izquierda', 'KeyA'], ['derecha', 'Caminar a la derecha', 'KeyD'], ['correr', 'Correr (mantener)', 'ShiftLeft'], ['saltar', 'Saltar', 'Space'],
-  ['observar', 'Observar o hablar', 'KeyE'], ['camIzq', 'Girar la cámara a la izquierda', 'KeyZ'], ['camDer', 'Girar la cámara a la derecha', 'KeyC'], ['cuaderno', 'Abrir el cuaderno', 'KeyN'], ['misiones', 'Abrir las misiones', 'KeyJ'], ['saberes', 'Abrir los saberes', 'KeyK'],
-  ['bolsa', 'Abrir la bolsa', 'KeyB'], ['mapa', 'Abrir el mapa', 'KeyM'], ['pantalla', 'Pantalla completa', 'KeyF'], ['menu', 'Abrir o cerrar el menú', 'KeyP']];
+const ACTIONS = [['adelante', 'Adelante', 'KeyW'], ['atras', 'Atrás', 'KeyS'], ['izquierda', 'Izquierda', 'KeyA'], ['derecha', 'Derecha', 'KeyD'], ['correr', 'Correr', 'ShiftLeft'], ['saltar', 'Saltar', 'Space'],
+  ['observar', 'Observar o hablar', 'KeyE'], ['camIzq', 'Girar a la izquierda', 'KeyZ'], ['camDer', 'Girar a la derecha', 'KeyC'], ['cuaderno', 'Cuaderno', 'KeyN'], ['misiones', 'Misiones', 'KeyJ'], ['saberes', 'Saberes', 'KeyK'],
+  ['bolsa', 'Bolsa', 'KeyB'], ['mapa', 'Mapa', 'KeyM'], ['pantalla', 'Pantalla completa', 'KeyF'], ['menu', 'Menú', 'KeyP']];
 opts.keys = Object.assign(Object.fromEntries(ACTIONS.map(([a, , k]) => [a, k])), opts.keys || {});
 const down = (a) => !!keys[opts.keys[a]], is = (e, a) => e.code === opts.keys[a];
 const keyName = (c) => ({ Space: 'Espacio', ShiftLeft: 'Shift izq.', ShiftRight: 'Shift der.', ControlLeft: 'Ctrl izq.', ControlRight: 'Ctrl der.', AltLeft: 'Alt izq.', AltRight: 'Alt der.', Tab: 'Tab', Enter: 'Enter', Backspace: 'Retroceso', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' }[c] || c.replace(/^Key|^Digit/, '').replace(/^Numpad/, 'Num '));
 let rebinding = null;
+const GROUPS = [['Movimiento', ['adelante', 'atras', 'izquierda', 'derecha', 'correr', 'saltar']], ['Acción y cámara', ['observar', 'camIzq', 'camDer']], ['Paneles', ['cuaderno', 'misiones', 'saberes', 'bolsa', 'mapa']], ['Juego', ['pantalla', 'menu']]];
 function drawKeys() {
-  $('ctl-list').innerHTML = ACTIONS.map(([a, label]) => `<div class="opt"><div><b>${label}</b></div><button class="btn keybtn${rebinding === a ? ' wait' : ''}" data-act="${a}">${rebinding === a ? 'Pulsa una tecla…' : keyName(opts.keys[a])}</button></div>`).join('');
+  const label = Object.fromEntries(ACTIONS.map(([a, l]) => [a, l]));
+  $('ctl-list').innerHTML = GROUPS.map(([g, list]) => `<section><h4>${g}</h4>${list.map((a) => `<div class="krow"><span>${label[a]}</span><button class="kcap${rebinding === a ? ' wait' : ''}" data-act="${a}">${rebinding === a ? '…' : keyName(opts.keys[a])}</button></div>`).join('')}</section>`).join('');
+  $('ctl-hint').textContent = rebinding ? `Pulsa la tecla nueva para «${label[rebinding]}». Escape cancela.` : 'Haz clic en una tecla para cambiarla.';
   document.querySelectorAll('[data-key]').forEach((el) => { el.textContent = keyName(opts.keys[el.dataset.key]); });
 }
-function menuPage(pg) { rebinding = null; $('pg-opciones').hidden = pg !== 'opciones'; $('pg-controles').hidden = pg !== 'controles'; if (pg === 'controles') drawKeys(); }
+let page = 'opciones';
+function menuPage(pg) { rebinding = null; page = pg; $('pg-opciones').hidden = pg !== 'opciones'; $('pg-controles').hidden = pg !== 'controles'; if (pg === 'controles') drawKeys(); }
 const detalleInicial = opts.detalle;
 let menuOpen = false, pr = Math.min(devicePixelRatio, 1.5);
 function applyOpts() {
@@ -179,7 +183,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'Enter') { if (state === 'title') enter(); else if (!talk) cine.skip(); }
   if (is(e, 'pantalla') && !e.repeat) toggleFull();
   if (is(e, 'menu') && !e.repeat && state !== 'cine') { if (ui.open) ui.show(null); setMenu(!menuOpen); return; }
-  if (menuOpen) { if (e.code === 'Escape') setMenu(false); return; }
+  if (menuOpen) { if (e.code === 'Escape') { if (page === 'controles') menuPage('opciones'); else setMenu(false); } return; }
   keys[e.code] = true;
   if (is(e, 'observar') && !e.repeat) interact();
   if (talk) { if (e.code === 'Enter' || e.code === 'Space') interact(); return; }
