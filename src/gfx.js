@@ -9,6 +9,7 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 
 export const SUN = new THREE.Vector3(0.62, 0.4, -0.44).normalize(); // sol bajo y dorado de la mañana, desde el nororiente
 export const uTime = { value: 0 };
+export const uSunView = { value: new THREE.Vector3() }; // dirección del sol vista desde la cámara
 export const FOG = { color: new THREE.Color(0xc9cdc4), density: 0.0038 };
 
 export function mulberry32(a) {
@@ -46,15 +47,39 @@ function noiseCanvas(size, { oct = 5, lo = 150, hi = 255, base = 4 } = {}) {
   x.putImageData(img, 0, 0); return c;
 }
 
-function leafCanvas({ n, len, wid, cols, twig = 5 }) { // ramillete de hojas para una "tarjeta" de follaje
+// Ramillete de hojas para una "tarjeta" de follaje. Cada especie tiene su forma:
+// pow = qué tan puntiaguda es; teeth = dientes del borde; vein = color de los nervios; under = envés claro.
+function leafCanvas({ n, len, wid, cols, twig = 5, pow = 1, teeth = 0, tn = 9, vein = null, side = 0, under = null }) {
   const [c, x] = canvas(256, 256);
   x.strokeStyle = rgb(52, 40, 30); x.lineCap = 'round';
   for (let i = 0; i < twig; i++) { const a = R(0, 6.28), l = R(50, 105); x.lineWidth = R(1.5, 3.5); x.beginPath(); x.moveTo(128, 128); x.quadraticCurveTo(128 + Math.cos(a + 0.4) * l * 0.5, 128 + Math.sin(a + 0.4) * l * 0.5, 128 + Math.cos(a) * l, 128 + Math.sin(a) * l); x.stroke(); }
   for (let i = 0; i < n; i++) {
-    const a = R(0, 6.28), d = Math.sqrt(rnd()) * 108, col = cols[(rnd() * cols.length) | 0], k = R(0.72, 1.12), l = len * R(0.7, 1.25), w = wid * R(0.7, 1.2);
+    const a = R(0, 6.28), d = Math.sqrt(rnd()) * 108, col = under && rnd() < 0.22 ? under : cols[(rnd() * cols.length) | 0], k = R(0.72, 1.12), l = len * R(0.7, 1.25), w = wid * R(0.7, 1.2), N = 14;
     x.save(); x.translate(128 + Math.cos(a) * d, 128 + Math.sin(a) * d); x.rotate(R(0, 6.28));
-    x.fillStyle = rgb(col[0] * k, col[1] * k, col[2] * k); x.beginPath(); x.moveTo(-l, 0); x.quadraticCurveTo(0, -w, l, 0); x.quadraticCurveTo(0, w, -l, 0); x.fill();
-    x.strokeStyle = rgb(col[0] * k * 1.35, col[1] * k * 1.3, col[2] * k * 1.2, 0.55); x.lineWidth = 0.8; x.beginPath(); x.moveTo(-l, 0); x.lineTo(l, 0); x.stroke(); x.restore();
+    const half = (t) => w * Math.pow(Math.sin(Math.PI * t), pow) * (1 + teeth * Math.sin(t * tn * Math.PI * 2));
+    x.fillStyle = rgb(col[0] * k, col[1] * k, col[2] * k); x.beginPath(); x.moveTo(-l, 0);
+    for (let q = 1; q <= N; q++) x.lineTo(-l + (2 * l * q) / N, -half(q / N)); for (let q = N - 1; q >= 0; q--) x.lineTo(-l + (2 * l * q) / N, half(q / N)); x.fill();
+    const v = vein || [col[0] * k * 1.35, col[1] * k * 1.3, col[2] * k * 1.2]; x.strokeStyle = rgb(v[0], v[1], v[2], 0.6); x.lineWidth = 0.8; x.beginPath(); x.moveTo(-l, 0); x.lineTo(l, 0);
+    for (let q = 1; q <= side; q++) { const px = -l + (2 * l * q) / (side + 1), h = half(q / (side + 1)) * 0.85; x.moveTo(px - l * 0.12, 0); x.lineTo(px, -h); x.moveTo(px - l * 0.12, 0); x.lineTo(px, h); } // nervios laterales
+    x.stroke(); x.restore();
+  }
+  return c;
+}
+// Corteza de cada especie: placas (pewen), grietas hondas (roble, quillay), lisa con líquenes (canelo) o escamosa (coigüe)
+function barkCanvas({ base, dark, light, mode }) {
+  const [c, x] = canvas(256, 512); x.fillStyle = rgb(...base); x.fillRect(0, 0, 256, 512);
+  for (let i = 0; i < 1400; i++) { const k = R(0.8, 1.2); x.fillStyle = rgb(base[0] * k, base[1] * k, base[2] * k, 0.5); x.fillRect(R(0, 256), R(0, 512), R(2, 9), R(4, 22)); }
+  if (mode === 'plates') { // placas poligonales, como caparazón de tortuga
+    for (let gy = -1; gy < 14; gy++) for (let gx = -1; gx < 8; gx++) { const cx = gx * 36 + (gy % 2) * 18 + R(-5, 5), cy = gy * 40 + R(-5, 5), k = R(0.85, 1.2); x.fillStyle = rgb(light[0] * k, light[1] * k, light[2] * k); x.beginPath(); for (let q = 0; q < 6; q++) { const a = (q / 6) * 6.283 + 0.5, rr = R(15, 19); x.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr * 1.15); } x.closePath(); x.fill(); x.strokeStyle = rgb(...dark); x.lineWidth = 3.5; x.stroke(); }
+  } else if (mode === 'fissure') { // grietas verticales hondas
+    for (let i = 0; i < 60; i++) { const px = R(0, 256), py = R(-80, 512), l = R(90, 300); x.strokeStyle = rgb(dark[0], dark[1], dark[2], R(0.7, 1)); x.lineWidth = R(3, 8); x.beginPath(); x.moveTo(px, py); x.bezierCurveTo(px + R(-9, 9), py + l * 0.3, px + R(-9, 9), py + l * 0.7, px + R(-6, 6), py + l); x.stroke(); }
+    for (let i = 0; i < 160; i++) { const px = R(0, 256), py = R(0, 512); x.strokeStyle = rgb(light[0], light[1], light[2], 0.5); x.lineWidth = R(1, 3); x.beginPath(); x.moveTo(px, py); x.lineTo(px + R(-3, 3), py + R(30, 90)); x.stroke(); }
+  } else if (mode === 'smooth') { // lisa, con rayas finas y manchas de liquen
+    for (let i = 0; i < 70; i++) { x.strokeStyle = rgb(dark[0], dark[1], dark[2], 0.35); x.lineWidth = R(0.8, 2); const py = R(0, 512), px = R(0, 256); x.beginPath(); x.moveTo(px, py); x.lineTo(px + R(20, 70), py + R(-2, 2)); x.stroke(); }
+    for (let i = 0; i < 26; i++) { const lich = rnd() < 0.5 ? [226, 230, 214] : [150, 170, 120]; x.fillStyle = rgb(lich[0], lich[1], lich[2], R(0.35, 0.7)); x.beginPath(); x.ellipse(R(0, 256), R(0, 512), R(6, 22), R(5, 16), R(0, 3), 0, 6.3); x.fill(); }
+  } else { // escamosa: lenticelas horizontales y grietas cortas
+    for (let i = 0; i < 260; i++) { x.strokeStyle = rgb(dark[0], dark[1], dark[2], R(0.4, 0.8)); x.lineWidth = R(1.5, 3.5); const px = R(0, 256), py = R(0, 512); x.beginPath(); if (rnd() < 0.45) { x.moveTo(px, py); x.lineTo(px + R(8, 26), py + R(-2, 2)); } else { x.moveTo(px, py); x.lineTo(px + R(-4, 4), py + R(18, 60)); } x.stroke(); }
+    for (let i = 0; i < 120; i++) { const k = R(1, 1.25); x.fillStyle = rgb(light[0] * k, light[1] * k, light[2] * k, 0.4); x.fillRect(R(0, 256), R(0, 512), R(6, 16), R(10, 34)); }
   }
   return c;
 }
@@ -83,6 +108,20 @@ function fernCanvas() {
   for (let i = 0; i < 34; i++) { const y = 250 - i * 7.2, l = 44 * Math.sin(Math.min(1, i / 30) * 2.6 + 0.35) * (1 - i / 44), k = R(0.75, 1.15); x.fillStyle = rgb(46 * k, 104 * k, 44 * k); for (const s of [-1, 1]) { x.beginPath(); x.moveTo(48, y); x.quadraticCurveTo(48 + s * l * 0.6, y - 9, 48 + s * l, y - 3); x.quadraticCurveTo(48 + s * l * 0.5, y + 4, 48, y + 3); x.fill(); } }
   return c;
 }
+function quilaCanvas() { // caña de quila: tallo delgado con hojas angostas en ramilletes
+  const [c, x] = canvas(96, 256);
+  x.strokeStyle = rgb(150, 150, 70); x.lineWidth = 4; x.beginPath(); x.moveTo(48, 256); x.lineTo(48, 0); x.stroke();
+  for (let n = 0; n < 9; n++) { const y = 250 - n * 28; x.strokeStyle = rgb(110, 110, 50); x.lineWidth = 2; x.beginPath(); x.moveTo(42, y); x.lineTo(54, y); x.stroke();
+    for (let i = 0; i < 9; i++) { const s = rnd() < 0.5 ? 1 : -1, l = R(22, 42), a = R(0.15, 1.1), k = R(0.75, 1.2); x.save(); x.translate(48, y); x.rotate(-Math.PI / 2 + s * a); x.fillStyle = rgb(86 * k, 128 * k, 50 * k); x.beginPath(); x.moveTo(0, 0); x.quadraticCurveTo(l * 0.5, -4, l, 0); x.quadraticCurveTo(l * 0.5, 4, 0, 0); x.fill(); x.restore(); } }
+  return c;
+}
+function copihueCanvas() { // enredadera con hojas oscuras y flores rojas en campana
+  const [c, x] = canvas(96, 256);
+  x.strokeStyle = rgb(60, 70, 40); x.lineWidth = 2.5; x.beginPath(); x.moveTo(48, 256); for (let y = 256; y > 0; y -= 16) x.lineTo(48 + Math.sin(y * 0.06) * 14, y); x.stroke();
+  for (let i = 0; i < 26; i++) { const y = R(6, 250), px = 48 + Math.sin(y * 0.06) * 14, s = rnd() < 0.5 ? 1 : -1, k = R(0.7, 1.1); x.save(); x.translate(px, y); x.rotate(s * R(0.4, 1.2)); x.fillStyle = rgb(40 * k, 88 * k, 44 * k); x.beginPath(); x.ellipse(s * 11, 0, 12, 5.5, 0, 0, 6.3); x.fill(); x.restore(); }
+  for (let i = 0; i < 7; i++) { const y = R(20, 235), px = 48 + Math.sin(y * 0.06) * 14 + R(-10, 10), k = R(0.85, 1.1), g = x.createLinearGradient(0, y, 0, y + 26); g.addColorStop(0, rgb(150 * k, 20, 34)); g.addColorStop(1, rgb(226 * k, 52, 66)); x.fillStyle = g; x.beginPath(); x.moveTo(px - 3, y); x.quadraticCurveTo(px - 9, y + 16, px - 7, y + 26); x.lineTo(px + 7, y + 26); x.quadraticCurveTo(px + 9, y + 16, px + 3, y); x.fill(); x.fillStyle = rgb(250, 190, 190, 0.5); x.fillRect(px - 2, y + 4, 2, 18); }
+  return c;
+}
 function flowerCanvas() {
   const [c, x] = canvas(128, 128);
   for (let i = 0; i < 9; i++) { const bx = R(14, 114), h = R(50, 112); x.strokeStyle = rgb(70, 110, 50); x.lineWidth = 2; x.beginPath(); x.moveTo(bx, 128); x.lineTo(bx + R(-8, 8), 128 - h); x.stroke(); x.fillStyle = '#fff'; for (let p = 0; p < 5; p++) { const a = p * 1.257; x.beginPath(); x.ellipse(bx + Math.cos(a) * 5, 128 - h + Math.sin(a) * 5, 5, 3.2, a, 0, 6.3); x.fill(); } x.fillStyle = rgb(240, 200, 60); x.beginPath(); x.arc(bx, 128 - h, 2.6, 0, 6.3); x.fill(); }
@@ -105,15 +144,26 @@ function softCanvas() { const [c, x] = canvas(64, 64), g = x.createRadialGradien
 const grain = noiseCanvas(512, { oct: 7, lo: 95, hi: 255, base: 6 });
 export const TEX = {
   grain: tex(grain), grainBump: tex(grain, { srgb: false }),
-  coigue: tex(leafCanvas({ n: 420, len: 8, wid: 4.5, cols: [[52, 104, 44], [68, 124, 52], [40, 84, 40], [90, 140, 58]] }), { wrap: false }),
-  roble: tex(leafCanvas({ n: 260, len: 10, wid: 6, cols: [[196, 138, 40], [220, 170, 58], [170, 100, 32], [150, 120, 50]] }), { wrap: false }),
-  canelo: tex(leafCanvas({ n: 260, len: 13, wid: 5, cols: [[70, 128, 62], [92, 150, 74], [52, 104, 54]] }), { wrap: false }),
-  bush: tex(leafCanvas({ n: 330, len: 9, wid: 5, cols: [[62, 112, 46], [84, 136, 56], [48, 92, 42]], twig: 8 }), { wrap: false }),
+  // hojas (en el juego son más grandes que las reales para que se distingan, pero guardan su forma y su tamaño relativo)
+  coigue: tex(leafCanvas({ n: 520, len: 6.5, wid: 3.6, pow: 0.8, teeth: 0.12, tn: 7, cols: [[46, 98, 44], [60, 116, 50], [36, 80, 40], [80, 132, 56]] }), { wrap: false }),          // chica, ovalada, de borde aserrado
+  roble: tex(leafCanvas({ n: 190, len: 13, wid: 6.5, pow: 0.7, teeth: 0.2, tn: 6, side: 5, cols: [[196, 138, 40], [220, 170, 58], [170, 100, 32], [150, 120, 50]] }), { wrap: false }), // más grande, lobulada y con nervios marcados
+  canelo: tex(leafCanvas({ n: 200, len: 17, wid: 5, pow: 0.55, cols: [[66, 124, 62], [88, 148, 74], [50, 102, 54]], under: [176, 196, 184] }), { wrap: false }),                     // larga y lisa, con el envés blanquecino
+  bush: tex(leafCanvas({ n: 330, len: 9, wid: 5, pow: 0.8, teeth: 0.15, tn: 8, cols: [[62, 112, 46], [84, 136, 56], [48, 92, 42]], twig: 8 }), { wrap: false }),
+  peumo: tex(leafCanvas({ n: 300, len: 10, wid: 5.5, pow: 0.75, teeth: 0.07, tn: 3, vein: [150, 190, 120], cols: [[30, 78, 40], [40, 96, 48], [24, 64, 36]] }), { wrap: false }),       // ovalada, lustrosa, de borde ondulado
+  boldo: tex(leafCanvas({ n: 280, len: 9.5, wid: 6, pow: 0.6, cols: [[52, 86, 46], [64, 100, 52], [44, 74, 42]], under: [120, 140, 100] }), { wrap: false }),                         // ovalada, gruesa y áspera, verde opaco
+  quillay: tex(leafCanvas({ n: 240, len: 9, wid: 4.5, pow: 0.7, teeth: 0.16, tn: 3, cols: [[92, 132, 60], [112, 150, 70], [78, 116, 54]] }), { wrap: false }),                         // elíptica, verde amarillento, con pocos dientes
+  litre: tex(leafCanvas({ n: 260, len: 9, wid: 5.5, pow: 0.65, side: 6, vein: [214, 206, 110], cols: [[40, 84, 44], [52, 98, 50], [34, 70, 40]] }), { wrap: false }),                  // ovalada, con nervios amarillos muy marcados
   pewen: tex(pewenCanvas(), { wrap: false }),
   grass: tex(grassCanvas([[92, 132, 52], [112, 150, 60], [140, 160, 72]]), { wrap: false }),
   reed: tex(grassCanvas([[150, 146, 78], [124, 138, 70], [176, 164, 96]], true), { wrap: false }),
-  fern: tex(fernCanvas(), { wrap: false }), flower: tex(flowerCanvas(), { wrap: false }),
+  fern: tex(fernCanvas(), { wrap: false }), flower: tex(flowerCanvas(), { wrap: false }), quila: tex(quilaCanvas(), { wrap: false }), copihue: tex(copihueCanvas(), { wrap: false }),
   bark: tex(streakCanvas(256, 512, [[150, 140, 130], [110, 100, 92], [190, 180, 168], [70, 62, 56]], 900)),
+  barkPewen: tex(barkCanvas({ base: [70, 60, 56], dark: [38, 30, 28], light: [126, 112, 104], mode: 'plates' })),
+  barkCoigue: tex(barkCanvas({ base: [112, 104, 94], dark: [62, 54, 48], light: [150, 142, 128], mode: 'scaly' })),
+  barkRoble: tex(barkCanvas({ base: [84, 68, 56], dark: [36, 28, 24], light: [128, 108, 90], mode: 'fissure' })),
+  barkCanelo: tex(barkCanvas({ base: [176, 172, 160], dark: [120, 116, 106], light: [200, 196, 184], mode: 'smooth' })),
+  barkGris: tex(barkCanvas({ base: [104, 100, 94], dark: [50, 46, 42], light: [142, 138, 130], mode: 'fissure' })),
+  barkPardo: tex(barkCanvas({ base: [116, 96, 78], dark: [66, 52, 42], light: [150, 128, 104], mode: 'scaly' })),
   thatch: tex(streakCanvas(512, 512, [[176, 150, 92], [208, 184, 118], [140, 116, 66], [108, 88, 50]], 2600, { bands: 5, lw: [1, 2.4] })),
   wood: tex(streakCanvas(128, 256, [[140, 110, 78], [110, 84, 58], [166, 134, 96]], 300)),
   textile: tex(textileCanvas()), soft: tex(softCanvas(), { wrap: false }),
@@ -123,7 +173,7 @@ export const TEX = {
 // viento: mueve las hojas y la punta del pasto
 export function withWind(m, amp, tipOnly = false, roundNormals = false) {
   m.onBeforeCompile = (sh) => {
-    sh.uniforms.uTime = uTime;
+    sh.uniforms.uTime = uTime; sh.uniforms.uSunView = uSunView;
     sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
       #ifdef USE_INSTANCING
         vec4 wPos = modelMatrix * instanceMatrix * vec4(position, 1.);
@@ -135,13 +185,14 @@ export function withWind(m, amp, tipOnly = false, roundNormals = false) {
       transformed.x += (sin(uTime*1.5 + wPos.x*0.4 + wPos.y*0.3) * 0.5 + gust) * ${amp.toFixed(3)} * wMask;
       transformed.z += cos(uTime*1.2 + wPos.z*0.4) * ${(amp * 0.6).toFixed(3)} * wMask;`);
     // el follaje usa normales "redondas" (hacia afuera de la copa) para que la luz lo modele como un volumen
-    if (roundNormals) sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n normal = normalize(vNormal);');
+    if (roundNormals) sh.fragmentShader = 'uniform vec3 uSunView;\n' + sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n normal = normalize(vNormal);')
+      .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += diffuseColor.rgb * pow(max(dot(normalize(-vViewPosition), uSunView), 0.), 3.) * 1.1; // la hoja se enciende a contraluz');
   };
   return m;
 }
 export const MAT = {
   leaf: (map, color = 0xffffff) => withWind(new THREE.MeshStandardMaterial({ map, color, alphaTest: 0.3, alphaToCoverage: true, side: THREE.DoubleSide, roughness: 0.75, metalness: 0, emissiveMap: map, emissive: 0x24301a }), 0.07, false, true),
-  bark: (color) => new THREE.MeshStandardMaterial({ map: TEX.bark, bumpMap: TEX.bark, bumpScale: 1.6, color, roughness: 1 }),
+  bark: (color, map = TEX.bark) => new THREE.MeshStandardMaterial({ map, bumpMap: map, bumpScale: 2.2, color, roughness: 1 }),
   grass: (map, color = 0xffffff) => withWind(new THREE.MeshStandardMaterial({ map, color, alphaTest: 0.3, alphaToCoverage: true, side: THREE.DoubleSide, roughness: 0.9 }), 0.09, true, true),
   rock: () => new THREE.MeshStandardMaterial({ map: TEX.grain, bumpMap: TEX.grainBump, bumpScale: 4, color: 0xffffff, roughness: 0.95 }),
   thatch: () => new THREE.MeshStandardMaterial({ map: TEX.thatch, bumpMap: TEX.thatch, bumpScale: 3, roughness: 1 }),
@@ -211,7 +262,7 @@ export function buildSky(scene) {
         vec3 col = mix(mix(vec3(0.62, 0.72, 0.82), vec3(1.0, 0.82, 0.58), pow(s0, 3.) * 0.75), vec3(0.20, 0.40, 0.72), pow(h, 0.5));   // del horizonte dorado al azul del cenit
         col = mix(col, vec3(0.09, 0.24, 0.58), smoothstep(0.45, 1., h));
         float s = max(dot(d, uSun), 0.);
-        col += vec3(1.0, 0.82, 0.55) * (pow(s, 5.) * 0.3 + pow(s, 50.) * 0.9) + vec3(1.0, 0.95, 0.85) * smoothstep(0.9992, 0.9997, s) * 6.; // resplandor y disco del sol
+        col += vec3(1.0, 0.82, 0.55) * (pow(s, 6.) * 0.16 + pow(s, 60.) * 0.4) + vec3(1.0, 0.95, 0.85) * smoothstep(0.9992, 0.9997, s) * 2.2; // resplandor y disco del sol
         if (d.y < 0.) col = vec3(0.58, 0.61, 0.56);
         gl_FragColor = vec4(col * 1.7, 1.);
         #include <colorspace_fragment>
@@ -298,18 +349,19 @@ export function buildShafts(scene, points) {
   g.setAttribute('iPos', new THREE.InstancedBufferAttribute(new Float32Array(pos), 3)); g.setAttribute('iP', new THREE.InstancedBufferAttribute(new Float32Array(par), 4)); g.instanceCount = points.length;
   const m = new THREE.Mesh(g, new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: { uTime, uSun: { value: SUN } },
-    vertexShader: /* glsl */ `attribute vec3 iPos; attribute vec4 iP; uniform vec3 uSun; varying vec2 vUv; varying float vSeed, vDist;
+    vertexShader: /* glsl */ `attribute vec3 iPos; attribute vec4 iP; uniform vec3 uSun; varying vec2 vUv; varying float vSeed, vDist, vAxis;
       void main(){
         vUv = uv; vSeed = iP.z;
+        vAxis = length(cross(cameraPosition - iPos, uSun)); // distancia de la cámara al eje del rayo: de cerca se apaga, para no encandilar
         vec3 c = iPos + uSun * (uv.y * iP.y);                                   // la lámina sube hacia el sol
         vec3 side = normalize(cross(uSun, normalize(cameraPosition - c)));      // y siempre da la cara a quien mira
         vec4 mv = viewMatrix * vec4(c + side * (uv.x - 0.5) * iP.x, 1.); vDist = -mv.z; gl_Position = projectionMatrix * mv;
       }`,
-    fragmentShader: /* glsl */ `uniform float uTime; varying vec2 vUv; varying float vSeed, vDist;
+    fragmentShader: /* glsl */ `uniform float uTime; varying vec2 vUv; varying float vSeed, vDist, vAxis;
       void main(){
         float across = pow(sin(3.14159 * vUv.x), 2.), along = smoothstep(0., 0.12, vUv.y) * smoothstep(1., 0.45, vUv.y);
         float flick = 0.7 + 0.3 * sin(uTime * (0.3 + vSeed) + vSeed * 40.);
-        float a = across * along * flick * 0.16 * smoothstep(3., 12., vDist) * smoothstep(150., 70., vDist);
+        float a = across * along * flick * 0.16 * smoothstep(3., 12., vDist) * smoothstep(150., 70., vDist) * smoothstep(3., 11., vAxis);
         gl_FragColor = vec4(vec3(1.0, 0.86, 0.6) * a * 2.2, a);
         ${END}
       }`,
@@ -323,7 +375,7 @@ export function createPost(renderer, scene, camera) {
   const rt = new THREE.WebGLRenderTarget(size.x, size.y, { samples: 4, type: THREE.HalfFloatType });
   const composer = new EffectComposer(renderer, rt);
   composer.addPass(new RenderPass(scene, camera));
-  composer.addPass(new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.42, 0.8, 0.92));
+  composer.addPass(new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.26, 0.6, 1.05));
   composer.addPass(new OutputPass());
   composer.addPass(new ShaderPass({
     uniforms: { tDiffuse: { value: null } },
@@ -339,7 +391,7 @@ export function createPost(renderer, scene, camera) {
       }`,
   }));
   return {
-    render: () => composer.render(),
+    render: () => { uSunView.value.copy(SUN).transformDirection(camera.matrixWorldInverse); composer.render(); },
     resize() { const s = renderer.getDrawingBufferSize(new THREE.Vector2()); composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(s.x / renderer.getPixelRatio(), s.y / renderer.getPixelRatio()); },
   };
 }

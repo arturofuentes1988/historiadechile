@@ -57,6 +57,19 @@ function enter() {
 
 // ---------- opciones (se guardan en este navegador) ----------
 const opts = Object.assign({ calidad: 'auto', detalle: '1', sens: 1, inv: false, mini: true }, JSON.parse(localStorage.getItem('leftraru.opciones') || '{}'));
+// teclas: cada acción tiene una tecla que se puede cambiar en Menú → Controles
+const ACTIONS = [['adelante', 'Caminar hacia adelante', 'KeyW'], ['atras', 'Caminar hacia atrás', 'KeyS'], ['izquierda', 'Caminar a la izquierda', 'KeyA'], ['derecha', 'Caminar a la derecha', 'KeyD'], ['correr', 'Correr (mantener)', 'ShiftLeft'], ['saltar', 'Saltar', 'Space'],
+  ['observar', 'Observar o hablar', 'KeyE'], ['camIzq', 'Girar la cámara a la izquierda', 'KeyZ'], ['camDer', 'Girar la cámara a la derecha', 'KeyC'], ['cuaderno', 'Abrir el cuaderno', 'KeyN'], ['misiones', 'Abrir las misiones', 'KeyJ'], ['saberes', 'Abrir los saberes', 'KeyK'],
+  ['bolsa', 'Abrir la bolsa', 'KeyB'], ['mapa', 'Abrir el mapa', 'KeyM'], ['pantalla', 'Pantalla completa', 'KeyF'], ['menu', 'Abrir o cerrar el menú', 'KeyP']];
+opts.keys = Object.assign(Object.fromEntries(ACTIONS.map(([a, , k]) => [a, k])), opts.keys || {});
+const down = (a) => !!keys[opts.keys[a]], is = (e, a) => e.code === opts.keys[a];
+const keyName = (c) => ({ Space: 'Espacio', ShiftLeft: 'Shift izq.', ShiftRight: 'Shift der.', ControlLeft: 'Ctrl izq.', ControlRight: 'Ctrl der.', AltLeft: 'Alt izq.', AltRight: 'Alt der.', Tab: 'Tab', Enter: 'Enter', Backspace: 'Retroceso', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' }[c] || c.replace(/^Key|^Digit/, '').replace(/^Numpad/, 'Num '));
+let rebinding = null;
+function drawKeys() {
+  $('ctl-list').innerHTML = ACTIONS.map(([a, label]) => `<div class="opt"><div><b>${label}</b></div><button class="btn keybtn${rebinding === a ? ' wait' : ''}" data-act="${a}">${rebinding === a ? 'Pulsa una tecla…' : keyName(opts.keys[a])}</button></div>`).join('');
+  document.querySelectorAll('[data-key]').forEach((el) => { el.textContent = keyName(opts.keys[el.dataset.key]); });
+}
+function menuPage(pg) { rebinding = null; $('pg-opciones').hidden = pg !== 'opciones'; $('pg-controles').hidden = pg !== 'controles'; if (pg === 'controles') drawKeys(); }
 const detalleInicial = opts.detalle;
 let menuOpen = false, pr = Math.min(devicePixelRatio, 1.5);
 function applyOpts() {
@@ -66,7 +79,7 @@ function applyOpts() {
   localStorage.setItem('leftraru.opciones', JSON.stringify(opts));
 }
 function setMenu(on) {
-  menuOpen = on; $('menu').classList.toggle('on', on); document.body.classList.toggle('en-portada', state === 'title');
+  menuOpen = on; menuPage('opciones'); $('menu').classList.toggle('on', on); document.body.classList.toggle('en-portada', state === 'title');
   if (on) { ui.show(null); document.exitPointerLock?.(); for (const k in keys) keys[k] = false; } else if (state === 'play') lock();
 }
 $('o-calidad').value = opts.calidad; $('o-detalle').value = opts.detalle; $('o-sens').value = opts.sens; $('o-inv').checked = opts.inv; $('o-mini').checked = opts.mini;
@@ -79,6 +92,9 @@ $('o-recargar').onclick = $('m-portada').onclick = () => location.reload();
 $('m-continuar').onclick = () => setMenu(false);
 $('o-borrar').onclick = () => { if (confirm('¿Borrar todo lo descubierto en el cuaderno?')) { ui.reset(); location.reload(); } };
 $('btn-menu').onclick = () => setMenu(!menuOpen);
+$('o-controles').onclick = () => menuPage('controles'); $('ctl-volver').onclick = () => menuPage('opciones');
+$('ctl-reset').onclick = () => { for (const [a, , k] of ACTIONS) opts.keys[a] = k; applyOpts(); drawKeys(); };
+$('ctl-list').onclick = (e) => { const b = e.target.closest('[data-act]'); if (b) { rebinding = b.dataset.act; drawKeys(); } };
 $('c-entrar').onclick = enter; $('c-opciones').onclick = () => setMenu(true);
 // pantalla completa
 const toggleFull = () => { if (document.fullscreenElement) document.exitFullscreen?.(); else document.documentElement.requestFullscreen?.().catch(() => hint('Este navegador no permitió la pantalla completa', 4)); };
@@ -127,8 +143,9 @@ const viewPhoto = (id) => withCamera(() => { const [from, look, fov] = VIEWS[id]
 const herePhoto = () => { draw(); return grab(); };
 
 // ---------- observar y conversar (tecla E) ----------
-let near = null, scanT = 0, talk = null;
-function say() { document.body.classList.add('talking'); const t = talk; $('dlg-name').textContent = t.name; $('dlg-text').textContent = t.lines[t.i]; $('dlg-more').textContent = t.i < t.lines.length - 1 ? 'E · seguir' : 'E · cerrar'; $('dialogo').classList.add('on'); }
+let near = null, scanT = 0, talk = null, misT = 0, summit = false;
+function applySkills() { explorer.reach = ui.skill('vista') ? 1.7 : 1; world.life.shyR = ui.skill('pudu') ? 3.5 : 9; }
+function say() { document.body.classList.add('talking'); const t = talk; $('dlg-name').textContent = t.name; $('dlg-text').textContent = t.lines[t.i]; $('dlg-more').textContent = `${keyName(opts.keys.observar)} · ${t.i < t.lines.length - 1 ? 'seguir' : 'cerrar'}`; $('dialogo').classList.add('on'); }
 function interact() {
   if (talk) { if (++talk.i < talk.lines.length) return say(); const t = talk; talk = null; $('dialogo').classList.remove('on'); document.body.classList.remove('talking'); if (t.done) t.done(); return; }
   if (!near || state !== 'play' || ui.open) return;
@@ -147,23 +164,27 @@ function outro() {
   cine.play([
     { dur: 6, from: p.clone().addScaledVector(dir, 3.5).add(V3(0, 0.6, 0)), to: p.clone().addScaledVector(dir, 2.6).add(V3(0, 0.3, 0)), lookFrom: p, text: 'El último piñón. Suficientes para todos.' },
     { dur: 10, from: p.clone().addScaledVector(dir, -4).add(V3(0, 2, 0)), to: p.clone().addScaledVector(dir, -8).add(V3(0, 36, 0)), lookFrom: p.clone().add(V3(0, 6, 0)), lookTo: world.volcano, text: 'Desde el cerro, su padre lo llama. Hay algo que quiere mostrarle.' },
-  ], () => { state = 'play'; document.body.classList.add('playing'); $('end').classList.add('on'); });
+  ], () => { state = 'play'; document.body.classList.add('playing'); $('hud').classList.add('on'); lock(); });
 }
 let hintT = 0;
 function hint(txt, secs) { $('hint').textContent = txt; $('hint').classList.add('on'); hintT = secs; }
 
 addEventListener('keydown', (e) => {
+  if (rebinding) { // se está eligiendo una tecla nueva para una acción
+    e.preventDefault();
+    if (e.code !== 'Escape') { const old = opts.keys[rebinding]; for (const a in opts.keys) if (opts.keys[a] === e.code) opts.keys[a] = old; opts.keys[rebinding] = e.code; applyOpts(); } // si ya estaba en uso, se intercambian
+    rebinding = null; drawKeys(); return;
+  }
   if (e.code === 'Enter') { if (state === 'title') enter(); else if (!talk) cine.skip(); }
-  if (e.code === 'KeyF' && !e.repeat) toggleFull();
+  if (is(e, 'pantalla') && !e.repeat) toggleFull();
+  if (is(e, 'menu') && !e.repeat && state !== 'cine') { if (ui.open) ui.show(null); setMenu(!menuOpen); return; }
   if (menuOpen) { if (e.code === 'Escape') setMenu(false); return; }
   keys[e.code] = true;
-  if (e.code === 'KeyE' && !e.repeat) interact();
+  if (is(e, 'observar') && !e.repeat) interact();
   if (talk) { if (e.code === 'Enter' || e.code === 'Space') interact(); return; }
-  if (state === 'play' && e.code === 'KeyN') ui.show('notas');
-  if (state === 'play' && e.code === 'KeyB') ui.show('bolsa');
-  if (state === 'play' && e.code === 'KeyM') ui.show('mapa');
+  if (state === 'play') for (const pn of ['cuaderno', 'misiones', 'saberes', 'bolsa', 'mapa']) if (is(e, pn)) ui.show(pn === 'cuaderno' ? 'notas' : pn);
   if (e.code === 'Escape') { if (ui.open) ui.show(null); else if (state !== 'cine') setMenu(true); }
-  if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
+  if (['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
 });
 addEventListener('keyup', (e) => { keys[e.code] = false; });
 addEventListener('mousemove', (e) => {
@@ -174,16 +195,16 @@ addEventListener('mousemove', (e) => {
 function updatePlayer(dt) {
   let ix = 0, iz = 0;
   if (state === 'play' && !ui.open && !talk) {
-    ix = (keys.KeyD || keys.ArrowRight ? 1 : 0) - (keys.KeyA || keys.ArrowLeft ? 1 : 0);
-    iz = (keys.KeyW || keys.ArrowUp ? 1 : 0) - (keys.KeyS || keys.ArrowDown ? 1 : 0);
-    cam.yaw += ((keys.KeyZ ? 1 : 0) - (keys.KeyC ? 1 : 0)) * dt * 1.8;
+    ix = (down('derecha') || keys.ArrowRight ? 1 : 0) - (down('izquierda') || keys.ArrowLeft ? 1 : 0);
+    iz = (down('adelante') || keys.ArrowUp ? 1 : 0) - (down('atras') || keys.ArrowDown ? 1 : 0);
+    cam.yaw += ((down('camIzq') ? 1 : 0) - (down('camDer') ? 1 : 0)) * dt * 1.8;
   }
-  const run = keys.ShiftLeft || keys.ShiftRight, target = ix || iz ? (run ? 6.2 : 3.3) : 0;
+  const run = down('correr'), target = ix || iz ? (run ? 6.2 * (ui.skill('ligero') ? 1.18 : 1) : 3.3) : 0;
   player.speed += (target - player.speed) * Math.min(1, dt * 10);
   const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw);
   let dx = fx * iz + rx * ix, dz = fz * iz + rz * ix; const l = Math.hypot(dx, dz);
   if (l > 0) { dx /= l; dz /= l; player.dirX = dx; player.dirZ = dz; let d = Math.atan2(dx, dz) - player.facing; d = Math.atan2(Math.sin(d), Math.cos(d)); player.facing += d * Math.min(1, dt * 12); }
-  if (player.grounded && state === 'play' && !ui.open && !talk && keys.Space) { player.vy = 6.6; player.grounded = false; }
+  if (player.grounded && state === 'play' && !ui.open && !talk && down('saltar')) { player.vy = 6.6 * (ui.skill('salto') ? 1.22 : 1); player.grounded = false; }
   player.vy = Math.max(-25, player.vy - 18 * dt);
   if (player.vy > 0) ctrl.disableSnapToGround(); else ctrl.enableSnapToGround(0.3);
   const mvx = (player.dirX || 0) * player.speed * dt, mvz = (player.dirZ || 0) * player.speed * dt;
@@ -201,6 +222,12 @@ function updatePlayer(dt) {
   player.phase += dt * (2.5 + player.speed * 1.9);
   animatePerson(boy, player.phase, Math.min(1, player.speed / 6.2) * 0.9 + (player.speed > 0.2 ? 0.25 : 0), !player.grounded);
   for (const k in POI) if (state === 'play' && Math.hypot(t.x - POI[k].x, t.z - POI[k].z) < 20) { ui.place(k); if (!ui.has('l-' + k) && !talk && player.grounded) ui.discover('l-' + k, herePhoto()); }
+  if (Math.hypot(t.x - CERRO[0], t.z - CERRO[1]) < 10) summit = true;
+  if ((misT -= dt) <= 0 && state === 'play') { // misiones y ayudas de los saberes
+    misT = 0.5; const m = ui.missions({ got, total: world.items.length, summit });
+    $('mis-title').textContent = m ? m.title : 'Explora libremente'; $('mis-prog').textContent = m && m.prog[2] > 1 ? `${m.prog[1]} / ${m.prog[2]}` : '';
+    ui.marks = ui.skill('rastro') ? explorer.hints(t) : [];
+  }
   // ¿hay algo cerca que observar o alguien con quien hablar?
   if ((scanT -= dt) <= 0 && state === 'play') { scanT = 0.2; near = talk || ui.open ? null : explorer.scan(t); $('prompt').classList.toggle('on', !!near); if (near) $('prompt-text').textContent = `${near.verb} ${near.label}`; }
 }
@@ -223,18 +250,17 @@ function updateItems() {
     if (state === 'play' && Math.hypot(t.x - it.base.x, t.y - it.base.y + 0.3, t.z - it.base.z) < 1.25) {
       if (!ui.has('pinon')) ui.discover('pinon', photo({ x: it.base.x, y: it.mesh.position.y, z: it.base.z }, { dist: 1.5, up: 0.25, fov: 34 }));
       it.taken = true; it.mesh.visible = false; got++; ui.addItem('pinon');
-      $('count').textContent = got;
       if (got === world.items.length) outro();
       else if (got === world.items.length - 1) hint('Falta uno. Está sobre las rocas, al fondo del bosque: sube saltando.', 8);
     }
   }
 }
 
-const ui = createUI({ world, onToast: (t) => hint(t, 5), onClose: () => { if (state === 'play' && !menuOpen) lock(); } });
+const ui = createUI({ world, onToast: (t) => hint(t, 5), onClose: () => { if (state === 'play' && !menuOpen) lock(); }, onSkill: () => applySkills() });
 const explorer = createExplorer({ world, ui });
-$('total').textContent = world.items.length;
+drawKeys(); applySkills();
 $('loading').remove();
-window.__g = { ui, explorer, interact, get near() { return near; }, get talk() { return talk; }, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
+window.__g = { ui, explorer, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
   tp(x, y, z) { pBody.setTranslation({ x, y, z }, true); player.vy = 0; },
   view(x, y, z, lx, ly, lz) { camera.position.set(x, y, z); camera.lookAt(lx, ly, lz); world.update(0, time, camera.position, pp()); draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); },
   snap() { draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); } };

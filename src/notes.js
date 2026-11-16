@@ -15,12 +15,20 @@ export const NOTES = [
     text: 'Árbol de tronco recto y copa en forma de paraguas, con ramas que salen en pisos y se curvan hacia arriba. Sus hojas son duras y puntiagudas, y cubren las ramas como escamas. Crece muy lento: puede superar los mil años y los cuarenta metros. Vive en la cordillera de los Andes y en Nahuelbuta. Hay árboles que dan piñas con semillas y otros que solo dan polen.' },
   { id: 'pinon', cat: 'naturaleza', title: 'Piñón', sub: 'Ngülliw · semilla del pewen', hint: 'Recoge uno en el bosque de pewenes.',
     text: 'La semilla del pewen. Madura al final del verano y cae al suelo en otoño. Se come cocido o tostado, se muele para hacer harina y se guarda para pasar el invierno. Es tan importante que la gente que vive junto a estos bosques se llama pewenche: "gente del pewen".' },
-  { id: 'coigue', cat: 'naturaleza', title: 'Coigüe', sub: 'Koywe · Nothofagus dombeyi', hint: 'Árbol de copa verde y densa, común en todo el bosque.',
+  { id: 'coigue', cat: 'naturaleza', title: 'Coigüe', sub: 'Koywe · Nothofagus dombeyi', hint: 'Árbol alto de copa en pisos, común en todo el bosque.',
     text: 'Árbol grande de hoja pequeña y perenne: no la pierde en invierno. Su copa crece en pisos horizontales, como bandejas. Prefiere los lugares húmedos, cerca de ríos y quebradas, y su madera sirve para construir.' },
   { id: 'roble', cat: 'naturaleza', title: 'Roble', sub: 'Koyam · Nothofagus obliqua', hint: 'Es el árbol de hojas doradas.',
     text: 'A diferencia del coigüe, el roble pierde sus hojas: en otoño se ponen doradas y rojizas, y en invierno caen. Su madera es dura y resistente al agua, la preferida para los postes de las rukas. Cuando el árbol es viejo y su madera se vuelve rojiza, se le llama pellín.' },
   { id: 'canelo', cat: 'naturaleza', title: 'Canelo', sub: 'Foye · Drimys winteri', hint: 'Árbol delgado de corteza clara; crece junto al rewe y en lugares húmedos.',
     text: 'Árbol sagrado del pueblo mapuche. De tronco claro y hojas largas y brillantes, crece en suelos húmedos. Sus ramas acompañan al rewe y a las ceremonias, y se levantan como señal de paz. Su corteza y sus hojas se usan como remedio.' },
+  { id: 'peumo', cat: 'naturaleza', title: 'Peumo', sub: 'Pengu · Cryptocarya alba', hint: 'En los manchones soleados de bosque bajo, entre la aldea y el río.',
+    text: 'Árbol de copa redonda y muy densa, de hojas duras, lustrosas y aromáticas que no caen en invierno. Da un fruto rojo que se come después de remojarlo en agua tibia. Es parte del bosque esclerófilo: árboles de hoja dura, hechos para aguantar veranos secos.' },
+  { id: 'boldo', cat: 'naturaleza', title: 'Boldo', sub: 'Folo · Peumus boldus', hint: 'Árbol bajo y ramificado de las laderas soleadas.',
+    text: 'Árbol bajo, que se ramifica desde cerca del suelo. Sus hojas gruesas y ásperas tienen un olor fuerte, y en infusión alivian el estómago y el hígado. También da un fruto pequeño y dulce. Solo crece en estas tierras.' },
+  { id: 'quillay', cat: 'naturaleza', title: 'Quillay', sub: 'Küllay · Quillaja saponaria', hint: 'Árbol de copa rala y corteza gris agrietada, en las laderas soleadas.',
+    text: 'Árbol de copa irregular y corteza gris muy agrietada. Su corteza, machacada en agua, hace espuma: con ella se lava el pelo y la lana antes de teñirla. Resiste bien la sequía y el frío.' },
+  { id: 'litre', cat: 'naturaleza', title: 'Litre', sub: 'Lithi · Lithraea caustica', hint: 'Arbolito ancho de las laderas soleadas. Cuidado.',
+    text: 'Árbol pequeño de hojas duras con nervios amarillos muy marcados. A mucha gente le provoca ronchas y picazón con solo tocarlo o descansar a su sombra. Por eso se le trata con respeto: se le saluda antes de pasar. Su madera es durísima.' },
   { id: 'gigante', cat: 'naturaleza', title: 'El árbol abuelo', sub: 'Coigüe centenario', hint: 'Está al final del sendero del bosque viejo, al norponiente.',
     text: 'En el bosque viejo hay coigües que nadie recuerda haber visto pequeños. El mayor de todos tiene un tronco que varias personas no alcanzan a rodear con los brazos. A árboles así se les trata con respeto, como a un anciano.' },
   { id: 'helecho', cat: 'naturaleza', title: 'Helecho', sub: 'Planta del sotobosque', hint: 'Crece a la sombra, sobre todo en el bosque viejo.',
@@ -31,6 +39,10 @@ export const NOTES = [
     text: 'En los claros donde entra el sol crecen flores pequeñas entre el pasto. Algunas dan tintes para la lana; otras, remedios. Reconocerlas es parte de lo que la machi enseña.' },
   { id: 'maqui', cat: 'naturaleza', title: 'Maqui', sub: 'Maki · Aristotelia chilensis', hint: 'Arbustos del claro al surponiente de la aldea.',
     text: 'Arbusto de ramas rojizas que da un fruto pequeño, negro y dulce al final del verano. Con el fruto se tiñe de morado y se prepara bebida; con las hojas se curan heridas y dolores de garganta.' },
+  { id: 'quila', cat: 'naturaleza', title: 'Quila', sub: 'Küla · Chusquea quila', hint: 'Matas de cañas arqueadas en el bosque.',
+    text: 'Bambú nativo que crece en matas espesas de cañas delgadas y arqueadas. Forma marañas difíciles de cruzar, donde se esconden el pudú y los pájaros. Con sus cañas se hacen lanzas, flautas y canastos. Florece muy rara vez, y cuando lo hace, toda la mata muere.' },
+  { id: 'copihue', cat: 'naturaleza', title: 'Copihue', sub: 'Kopiwe · Lapageria rosea', hint: 'Trepa por algunos troncos del bosque. Busca sus flores rojas.',
+    text: 'Enredadera del bosque húmedo que trepa por los troncos buscando la luz. Sus flores rojas con forma de campana cuelgan desde el final del verano hasta el invierno, cuando casi nada más florece. Su fruto es dulce y se come.' },
   { id: 'weke', cat: 'naturaleza', title: 'Weke', sub: 'Chilihueque', hint: 'En el corral de la aldea.',
     text: 'El animal doméstico del pueblo mapuche antes de la llegada de los caballos y las ovejas. Pariente de la llama y del guanaco, da lana para tejer y es señal de riqueza: se entrega en acuerdos y celebraciones. Es manso con quien lo cuida y arisco con los extraños.' },
   { id: 'pudu', cat: 'naturaleza', title: 'Pudú', sub: 'Püdu · Pudu puda', hint: 'Entre los árboles, lejos de la aldea. Huye si te acercas rápido.',
@@ -98,3 +110,35 @@ export const TALK = {
   machi: { name: 'La machi', da: ['ngen', 'pewma'], lines: ['Leftraru. ¿Qué soñaste anoche?', 'Los sueños se cuentan. Si los guardas, no sabes qué te estaban avisando.', 'Y cuando entres al bosque, saluda. Todo lo que ves tiene dueño: el agua, los árboles, el cerro. Pide antes de tomar, y toma poco.'], again: 'En el menoko no se corre ni se grita. Estás de visita.' },
   namku: { name: 'Ñamku', da: ['incas'], lines: ['Acércate, niño. A los viejos nos gusta que nos escuchen.', 'Mi padre era joven cuando llegaron del norte los hombres del inca, con sus ejércitos y sus caminos. Querían que les sirviéramos.', 'No pasaron. Los detuvimos antes de estas tierras. Te lo cuento para que sepas que puede volver a venir gente así.'], again: 'El que no escucha a los viejos, tropieza con la misma piedra.' },
 };
+
+// ---------- saberes: habilidades que se aprenden gastando puntos de investigación ----------
+// Cada saber lo enseña alguien de la aldea: hay que haber conversado con esa persona.
+export const SKILLS = [
+  { id: 'vista', name: 'Vista de traro', cost: 40, rama: 'El bosque', de: 'curinancu', col: 0, row: 0, text: 'Reconoces las cosas desde más lejos: puedes observar árboles, animales y objetos sin tener que acercarte tanto.' },
+  { id: 'rastro', name: 'Rastreador', cost: 80, rama: 'El bosque', de: 'curinancu', pide: 'vista', col: 0, row: 1, text: 'El minimapa marca con un signo lo que todavía no has descubierto cerca de ti.' },
+  { id: 'pudu', name: 'Paso de pudú', cost: 50, rama: 'El bosque', de: 'machi', col: 1, row: 0, text: 'Te mueves sin espantar: los animales del bosque te dejan acercarte mucho más antes de huir.' },
+  { id: 'ligero', name: 'Paso ligero', cost: 40, rama: 'El cuerpo', de: 'rayen', col: 2, row: 0, text: 'Corres más rápido.' },
+  { id: 'salto', name: 'Salto firme', cost: 60, rama: 'El cuerpo', de: 'rayen', pide: 'ligero', col: 2, row: 1, text: 'Saltas más alto: alcanzas rocas y troncos que antes no.' },
+  { id: 'memoria', name: 'Buena memoria', cost: 60, rama: 'La palabra', de: 'abuela', col: 3, row: 0, text: 'Recuerdas mejor lo que ves y lo que te cuentan: cada descubrimiento nuevo da 5 puntos más.' },
+];
+
+// ---------- misiones ----------
+// check recibe el estado del juego y devuelve [hecho, avance, total]
+const count = (c, ids) => ids.filter((id) => c.has(id)).length;
+const set = (ids) => (c) => { const n = count(c, ids); return [n === ids.length, n, ids.length]; };
+export const MISSIONS = [
+  { id: 'm1', main: true, n: 1, title: 'Los piñones del pewen', who: 'Curiñancu', pts: 40, text: 'Tu padre te encargó reunir los últimos piñones para la celebración. Están en el bosque de pewenes, siguiendo el sendero hacia el norte. Uno quedó sobre unas rocas.', check: (c) => [c.got >= c.total, c.got, c.total] },
+  { id: 'm2', main: true, n: 2, title: 'El traro', who: 'Curiñancu', pts: 40, pide: 'm1', text: 'Tu padre te espera en la cima del cerro Treng Treng, por el sendero del nororiente. Dicen que desde arriba se ve el mundo entero.', check: (c) => [c.summit, c.summit ? 1 : 0, 1] },
+  { id: 'm3', main: true, n: 3, title: 'Las plantas de la machi', soon: true },
+  { id: 'm4', main: true, n: 4, title: 'Los invitados', soon: true },
+  { id: 'm5', main: true, n: 5, title: 'La noche de las historias', soon: true },
+  { id: 'm6', main: true, n: 6, title: 'We Tripantu', soon: true },
+  { id: 's1', title: 'Conoce a tu gente', pts: 30, text: 'Conversa con cada persona de la aldea. Cada una tiene algo que enseñar.', check: set(['curinancu', 'millaray', 'abuela', 'ayelen', 'rayen', 'machi', 'namku']) },
+  { id: 's2', title: 'El bosque tiene nombres', pts: 30, text: 'Observa cada tipo de árbol: pewen, coigüe, roble, canelo y el árbol abuelo.', check: set(['pewen', 'coigue', 'roble', 'canelo', 'gigante']) },
+  { id: 's3', title: 'Los que vuelan y los que corren', pts: 30, text: 'Observa a los animales: el weke, el pudú, el traro, los choroyes y los rayaditos.', check: set(['weke', 'pudu', 'traro', 'choroy', 'rayadito']) },
+  { id: 's4', title: 'Los caminos del valle', pts: 30, text: 'Recorre todos los lugares del territorio.', check: set(['l-aldea', 'l-pewen', 'l-cerro', 'l-menoko', 'l-costa', 'l-poza', 'l-viejo', 'l-antiguos', 'l-maqui', 'l-cancha']) },
+  { id: 's5', title: 'La casa y el fuego', pts: 30, text: 'Observa las cosas de la aldea: la ruka, el fogón, el rewe, el telar y las figuras de madera.', check: set(['ruka', 'kutral', 'rewe', 'witral', 'chemamull']) },
+  { id: 's6', title: 'Lo que se cuenta junto al fuego', pts: 30, text: 'Aprende todas las historias y creencias que la gente tiene para contar.', check: set(['ngen', 'pewen-sagrado', 'trengtreng', 'pillan', 'lafken', 'pewma', 'wetripantu']) },
+  { id: 's8', title: 'El monte soleado', pts: 30, text: 'Observa los árboles de hoja dura de las laderas con sol: peumo, boldo, quillay y litre.', check: set(['peumo', 'boldo', 'quillay', 'litre']) },
+  { id: 's7', title: 'Plantas del suelo', pts: 30, text: 'Observa las plantas pequeñas: helecho, juncos, flores, maqui, quila y copihue.', check: set(['helecho', 'junco', 'flores', 'maqui', 'quila', 'copihue']) },
+];

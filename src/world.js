@@ -83,15 +83,17 @@ export function buildWorld(scene, RAPIER, physics) {
     const zk = zone(x, z, h, normalAt(x, z)[1]), u = rng(); let kind, sp;
     if (zk === 'needles') { kind = u < 0.85 ? 'pewen' : 'coigue'; sp = 8.5; }
     else if (zk === 'moss') { kind = u < 0.28 ? 'giant' : u < 0.72 ? 'coigue' : 'canelo'; sp = 10; }
-    else if (zk === 'forest' || zk === 'grassy') { kind = u < 0.4 ? 'coigue' : u < 0.68 ? 'roble' : u < 0.84 ? 'pewen' : 'canelo'; sp = zk === 'grassy' ? 10.5 : 7.5; }
+    else if (zk === 'forest') { kind = u < 0.4 ? 'coigue' : u < 0.68 ? 'roble' : u < 0.84 ? 'pewen' : 'canelo'; sp = 8.5; }
+    else if (zk === 'grassy') { kind = u < 0.3 ? 'peumo' : u < 0.55 ? 'boldo' : u < 0.8 ? 'quillay' : 'litre'; sp = 8; } // manchones de bosque esclerófilo en lo más soleado
     else if (zk === 'alpine' && h < 40 && u < 0.6) { kind = 'pewen'; sp = 14; }
     else if (zk === 'marsh' && u < 0.5) { kind = 'canelo'; sp = 12; }
     else continue;
     if (near(x, z, sp)) continue;
     const young = kind === 'pewen' && rng() < 0.16;
-    const H = kind === 'pewen' ? (young ? R(4, 8) : zk === 'alpine' ? R(9, 15) : R(14, 24)) : kind === 'giant' ? R(27, 35) : kind === 'canelo' ? R(7, 11) : kind === 'roble' ? R(11, 17) : R(12, 20);
+    const H = kind === 'pewen' ? (young ? R(4, 8) : zk === 'alpine' ? R(12, 18) : R(20, 32)) : { giant: R(30, 40), canelo: R(7, 12), roble: R(16, 25), coigue: R(18, 30), peumo: R(9, 14), boldo: R(6, 10), quillay: R(9, 15), litre: R(4, 7) }[kind]; // alturas reales de cada especie
     const t = { x, z, y: h, H, kind }; trees.push(t); const k = gk(x, z); (grid.get(k) || grid.set(k, []).get(k)).push(t);
     flora.tree(young ? 'pewenYoung' : kind, x, h - 0.1, z, H);
+    if (kind === 'coigue' && rng() < 0.3) { const a = R(0, 6.28), rr = H * 0.0273 * 1.15 + 0.1; flora.scatter('copihue', x + Math.cos(a) * rr, h + R(0.3, 1.2), z + Math.sin(a) * rr, R(0.9, 1.3)); } // copihue trepando por el tronco
   }
 
   // ---------- pasto, flores, helechos, arbustos, rocas y troncos ----------
@@ -114,8 +116,8 @@ export function buildWorld(scene, RAPIER, physics) {
     const x = R(B.x0 + 2, B.x1 - 2), z = R(B.z0 + 2, B.z1 - 2), h = height(x, z);
     if (h < WATER_Y - 0.9 || Math.hypot(x, z) < 34 || pathDist(x, z) < 4 || pin.some((p) => Math.hypot(x - p.x, z - p.z) < 4)) continue;
     const zk = zone(x, z, h, normalAt(x, z)[1]), u = rng();
-    if (zk === 'forest' || zk === 'grassy') { if (u < 0.45) flora.tree('bush', x, h, z, R(0.9, 1.9)); else if (u < 0.6) flora.rock(x, h - 0.1, z, R(0.4, 1.3)); else if (u < 0.66) flora.log(x, h, z, R(3, 6), R(0.25, 0.45), R(0, 3.14)); }
-    else if (zk === 'moss') { if (u < 0.3) flora.tree('bush', x, h, z, R(1.2, 2.2)); else if (u < 0.45) flora.log(x, h, z, R(4, 8), R(0.4, 0.7), R(0, 3.14)); else if (u < 0.65) flora.rock(x, h - 0.1, z, R(0.6, 1.6), { color: 0xa4b094 }); }
+    if (zk === 'forest' || zk === 'grassy') { if (u < 0.3) flora.tree('bush', x, h, z, R(0.9, 1.9)); else if (u < 0.45) flora.scatter('quila', x, h, z, R(0.8, 1.3)); else if (u < 0.6) flora.rock(x, h - 0.1, z, R(0.4, 1.3)); else if (u < 0.66) flora.log(x, h, z, R(3, 6), R(0.25, 0.45), R(0, 3.14)); }
+    else if (zk === 'moss') { if (u < 0.18) flora.tree('bush', x, h, z, R(1.2, 2.2)); else if (u < 0.3) flora.scatter('quila', x, h, z, R(1, 1.5)); else if (u < 0.45) flora.log(x, h, z, R(4, 8), R(0.4, 0.7), R(0, 3.14)); else if (u < 0.65) flora.rock(x, h - 0.1, z, R(0.6, 1.6), { color: 0xa4b094 }); }
     else if (zk === 'needles') { if (u < 0.25) flora.rock(x, h - 0.1, z, R(0.4, 1.1)); }
     else if (zk === 'pebble' || zk === 'bed') { if (u < 0.8) flora.rock(x, h - 0.15, z, R(0.3, 1.0), { squash: 0.6, color: 0xc4c0b4 }); }
     else if (zk === 'meadow') { if (u < 0.5) flora.tree('bush', x, h, z, R(1, 1.8)); }

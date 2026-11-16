@@ -1,21 +1,27 @@
 // Interfaz: minimapa, cuaderno de investigación (notas con foto y puntos), bolsa y mapa.
 import { B, POI, PATHS, height, zone, WATER_Y } from './terrain.js';
 import { RUKAS, CORRAL } from './village.js';
-import { NOTES, CATS, LEVELS } from './notes.js';
+import { NOTES, CATS, LEVELS, SKILLS, MISSIONS } from './notes.js';
 const $ = (id) => document.getElementById(id);
 const BY = Object.fromEntries(NOTES.map((n) => [n.id, n]));
 const SAVE = 'leftraru.cuaderno';
 
-export function createUI({ world, onToast, onClose }) {
+export function createUI({ world, onToast, onClose, onSkill }) {
   // lo descubierto se guarda en este navegador: id -> foto
-  let found = {}; try { found = JSON.parse(localStorage.getItem(SAVE) || '{}'); } catch { found = {}; }
+  let data = {}; try { data = JSON.parse(localStorage.getItem(SAVE) || '{}'); } catch { data = {}; }
+  if (!data.found) data = { found: data }; // formato antiguo: solo las fotos
+  let found = data.found, skills = data.skills || [], done = data.done || {}, extra = data.extra || 0, mctx = null;
   for (const id in found) if (!BY[id]) delete found[id];
+  const SK = Object.fromEntries(SKILLS.map((k) => [k.id, k]));
   const bag = {}; let open = null, cat = 'naturaleza', sel = null;
-  const save = () => { try { localStorage.setItem(SAVE, JSON.stringify(found)); } catch { /* sin espacio: se pierde al recargar */ } };
+  const save = () => { try { localStorage.setItem(SAVE, JSON.stringify({ found, skills, done, extra })); } catch { /* sin espacio: se pierde al recargar */ } };
+  // puntos ganados (cuaderno + misiones + extras) y puntos disponibles (ganados menos lo gastado en saberes)
+  const earned = () => points() + extra + MISSIONS.reduce((t, m) => t + (done[m.id] ? m.pts : 0), 0);
+  const avail = () => earned() - skills.reduce((t, id) => t + SK[id].cost, 0);
   const points = (c) => NOTES.reduce((s, n) => s + (found[n.id] !== undefined && (!c || n.cat === c) ? CATS[n.cat].pts : 0), 0);
   const total = NOTES.reduce((s, n) => s + CATS[n.cat].pts, 0);
   const level = () => { const p = points(); let l = LEVELS[0]; for (const x of LEVELS) if (p >= x[0]) l = x; const nx = LEVELS[LEVELS.indexOf(l) + 1]; return { name: l[1], next: nx ? nx[0] : null }; };
-  const refreshScore = () => { $('score-n').textContent = points(); };
+  const refreshScore = () => { $('score-n').textContent = avail(); };
 
   // ---------- minimapa: se pinta a partir del terreno real ----------
   const cv = $('minimap'), S = cv.width, ctx = cv.getContext('2d'), k = 2; // 2 píxeles por metro
@@ -52,6 +58,7 @@ export function createUI({ world, onToast, onClose }) {
       if (far) { dx *= (R - 20) / d; dy *= (R - 20) / d; } // fuera de vista: se marca en el borde, indicando la dirección
       ctx.fillStyle = far ? '#ffe9a8' : '#f2b441'; ctx.beginPath(); ctx.arc(S / 2 + dx, S / 2 + dy, far ? 7 : 10, 0, 7); ctx.fill(); ctx.stroke();
     }
+    for (const mk of api.marks) { const [x, y] = P(mk.x, mk.z), dx = (x - px) * ZOOM, dy = (y - py) * ZOOM; if (Math.hypot(dx, dy) < R - 14) { ctx.fillStyle = '#14110f'; ctx.beginPath(); ctx.arc(S / 2 + dx, S / 2 + dy, 9, 0, 7); ctx.fill(); ctx.fillStyle = '#e9dfc6'; ctx.font = 'bold 14px Georgia'; ctx.textAlign = 'center'; ctx.fillText('?', S / 2 + dx, S / 2 + dy + 5); } }
     ctx.translate(S / 2, S / 2); ctx.rotate(-facing); // la flecha apunta hacia donde camina
     ctx.fillStyle = '#fff'; ctx.strokeStyle = '#14110f'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(0, 20); ctx.lineTo(12, -13); ctx.lineTo(0, -6); ctx.lineTo(-12, -13); ctx.closePath(); ctx.fill(); ctx.stroke();
@@ -76,6 +83,25 @@ export function createUI({ world, onToast, onClose }) {
       for (const it of world.items) if (!it.taken) { const [x, y] = P(it.base.x, it.base.z); g.fillStyle = '#f2b441'; g.strokeStyle = '#3a2408'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 6, 0, 7); g.fill(); g.stroke(); }
       const [px, py] = P(last.x, last.z); g.translate(px, py); g.rotate(-last.f); g.fillStyle = '#fff'; g.strokeStyle = '#14110f'; g.lineWidth = 3;
       g.beginPath(); g.moveTo(0, 18); g.lineTo(11, -12); g.lineTo(0, -5); g.lineTo(-11, -12); g.closePath(); g.fill(); g.stroke();
+    } else if (open === 'misiones') {
+      $('panel-title').textContent = 'Misiones';
+      const row = (m) => {
+        const r = m.check && mctx ? m.check(mctx) : [false, 0, 1], isDone = !!done[m.id], locked = m.soon || (m.pide && !done[m.pide]);
+        return `<div class="mis${isDone ? ' done' : locked ? ' locked' : ''}"><div class="mk">${isDone ? '✓' : locked ? '·' : m.main ? m.n : '◆'}</div><div><h3>${m.title}${m.who && !locked ? ` <small>· te la encargó ${m.who}</small>` : ''}</h3>` +
+          (m.soon ? '<p class="muted">Próximamente, en los siguientes capítulos.</p>' : locked ? '<p class="muted">Se abre al terminar la misión anterior.</p>' : `<p>${m.text}</p><div class="prog"><i style="width:${(isDone ? 1 : r[1] / r[2]) * 100}%"></i></div><em>${isDone ? 'Completada' : `${r[1]} de ${r[2]}`} · recompensa: ${m.pts} puntos</em>`) + '</div></div>';
+      };
+      body.innerHTML = '<h4 class="sec2">Principales</h4><p class="muted how">Siguen la historia: la preparación del We Tripantu.</p>' + MISSIONS.filter((m) => m.main).map(row).join('') +
+        '<h4 class="sec2">Secundarias</h4><p class="muted how">Se completan explorando y conversando, en el orden que quieras.</p>' + MISSIONS.filter((m) => !m.main).map(row).join('');
+    } else if (open === 'saberes') {
+      $('panel-title').textContent = 'Saberes';
+      const node = (k) => {
+        const have = skills.includes(k.id), teacher = BY[k.de], met = found[k.de] !== undefined, pre = !k.pide || skills.includes(k.pide), can = !have && met && pre && avail() >= k.cost;
+        const why = have ? 'Aprendido' : !met ? `Habla primero con ${teacher.title}` : !pre ? `Requiere ${SK[k.pide].name}` : avail() < k.cost ? `Te faltan ${k.cost - avail()} puntos` : '';
+        return `<div class="skill${have ? ' have' : can ? ' can' : ''}" style="grid-column:${k.col + 1};grid-row:${k.row + 2}"><h3>${k.name}</h3><p>${k.text}</p><small>Lo enseña ${teacher.title} · ${k.cost} puntos</small>${can ? `<button class="btn main" data-skill="${k.id}">Aprender</button>` : `<em>${why}</em>`}</div>`;
+      };
+      const ramas = [['El bosque', '1 / 3'], ['El cuerpo', '3'], ['La palabra', '4']];
+      body.innerHTML = `<div class="score"><div><b>${avail()}</b> puntos para gastar</div><div class="lvl">has ganado ${earned()} en total</div></div><p class="muted how">Los puntos de investigación se convierten en saberes. Cada saber lo enseña alguien de la aldea: primero tienes que haber conversado con esa persona.</p>` +
+        '<div class="tree">' + ramas.map(([n, c]) => `<h4 class="sec2" style="grid-column:${c};grid-row:1">${n}</h4>`).join('') + SKILLS.map(node).join('') + '</div>';
     } else if (open === 'bolsa') {
       const ids = Object.keys(bag);
       $('panel-title').textContent = 'Bolsa';
@@ -98,29 +124,43 @@ export function createUI({ world, onToast, onClose }) {
     open = which; document.exitPointerLock?.(); panel.classList.add('on'); if (which === 'notas') $('btn-notas').classList.remove('new'); render();
   }
   body.addEventListener('click', (e) => {
-    const c = e.target.closest('[data-cat]'), n = e.target.closest('[data-note]');
+    const c = e.target.closest('[data-cat]'), n = e.target.closest('[data-note]'), k = e.target.closest('[data-skill]');
     if (c) { cat = c.dataset.cat; sel = null; render(); } else if (n) { sel = n.dataset.note; render(); }
+    else if (k && avail() >= SK[k.dataset.skill].cost) { skills.push(k.dataset.skill); save(); refreshScore(); onToast(`Aprendiste: ${SK[k.dataset.skill].name}`); onSkill?.(); render(); }
   });
   $('btn-notas').addEventListener('click', () => show('notas'));
   $('btn-bolsa').addEventListener('click', () => show('bolsa'));
   $('btn-mapa').addEventListener('click', () => show('mapa'));
+  $('btn-misiones').addEventListener('click', () => show('misiones'));
+  $('btn-saberes').addEventListener('click', () => show('saberes'));
   $('panel-close').addEventListener('click', () => show(null));
   cv.addEventListener('click', () => show('mapa'));
   refreshScore();
 
-  return {
+  const api = {
     drawMap, show, points,
     get open() { return open; },
     has: (id) => found[id] !== undefined,
     // registra un descubrimiento con su foto; devuelve true si era nuevo
     discover(id, img = '') {
       const n = BY[id]; if (!n || found[id] !== undefined) return false;
+      const bonus = skills.includes('memoria') ? 5 : 0; extra += bonus;
       found[id] = img; save(); cat = n.cat; sel = id; refreshScore();
-      onToast(`${n.title} · +${CATS[n.cat].pts} puntos de investigación`); $('btn-notas').classList.add('new'); if (open) render(); return true;
+      onToast(`${n.title} · +${CATS[n.cat].pts + bonus} puntos de investigación`); $('btn-notas').classList.add('new'); if (open) render(); return true;
     },
     place(key) { places.add(key); },
     addItem(id) { bag[id] = (bag[id] || 0) + 1; if (open) render(); },
-    reset() { found = {}; save(); refreshScore(); },
-    state: { get found() { return found; }, bag },
+    reset() { found = {}; skills = []; done = {}; extra = 0; save(); refreshScore(); },
+    skill: (id) => skills.includes(id), avail, earned,
+    // revisa las misiones con el estado actual; entrega recompensas y devuelve la principal activa
+    missions(c) {
+      mctx = { ...c, has: (id) => found[id] !== undefined };
+      for (const m of MISSIONS) if (m.check && !done[m.id] && (!m.pide || done[m.pide]) && m.check(mctx)[0]) { done[m.id] = 1; save(); refreshScore(); onToast(`Misión completada: ${m.title} · +${m.pts} puntos`); if (open) render(); }
+      const act = MISSIONS.find((m) => m.main && m.check && !done[m.id] && (!m.pide || done[m.pide]));
+      return act ? { title: act.title, prog: act.check(mctx) } : null;
+    },
+    marks: [],
+    state: { get found() { return found; }, bag, get skills() { return skills; }, get done() { return done; } },
   };
+  return api;
 }

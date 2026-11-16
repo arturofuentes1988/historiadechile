@@ -34,6 +34,7 @@ export function buildVillage({ scene, rng, bag, flora, physics, RAPIER, fixed })
     for (const rz of [0.5, -0.5]) bag.add(cyl, M(x, y + 3.6 * s, z, R(0, 3), 0.045, 1.6, 0.045, rz), WOOD2); // palos cruzados en la cumbre
     physics.createCollider(RAPIER.ColliderDesc.cylinder(1.6, r * 0.88).setTranslation(x, y + 1.6, z), fixed);
     if (smoke) emit.smoke.push([x, y + 3.5 * s, z, 0.7]);
+    for (let i = 0; i < 30; i++) { const a = (i / 30) * 6.28 + R(-0.05, 0.05); if (Math.abs(a) < 0.4 || a > 5.9) continue; flora.scatter('reed', x + Math.cos(a) * r * 1.02, y, z + Math.sin(a) * r * 0.84, R(0.35, 0.55), 0xf0dca0); } // flecos de paja en el borde del techo
   }
   RUKAS.forEach(ruka);
 
