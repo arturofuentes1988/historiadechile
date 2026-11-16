@@ -4,7 +4,7 @@ import { PAL, shade, hex } from './strokes.js';
 import { height, POI, CERRO } from './terrain.js';
 
 export const RUKAS = [
-  { x: -16, z: -8, s: 1.15, name: 'familia', smoke: true }, { x: -3, z: -20, s: 1.0 }, { x: 12, z: -16, s: 1.0, smoke: true },
+  { x: -16, z: -8, s: 1.15, name: 'familia', smoke: true }, { x: -10, z: -21, s: 1.0 }, { x: 12, z: -16, s: 1.0, smoke: true },
   { x: 21, z: -2, s: 0.95, name: 'ñamku' }, { x: 15, z: 14, s: 1.05, name: 'machi', smoke: true }, { x: -4, z: 19, s: 1.0 },
 ];
 export const CORRAL = { x: -25, z: 14, r: 6.5 };
@@ -84,14 +84,14 @@ export function buildVillage({ chunks, rng, bag, flora, physics, RAPIER, fixed }
   // ---------- lugar de los antiguos: chemamüll (figuras de madera) entre canelos ----------
   { const { x, z } = POI.antiguos;
     for (const [dx, dz, hh] of [[0, 0, 2.9], [2.2, 1.1, 2.4], [-1.8, 1.6, 2.6]]) { const px = x + dx, pz = z + dz, y = height(px, pz); bag.add(cyl, M(px, y + hh / 2, pz, 0, 0.26, hh, 0.22), WOOD2); bag.add(cyl, M(px, y + hh + 0.25, pz, 0, 0.3, 0.5, 0.27), WOOD); bag.add(cyl, M(px, y + hh + 0.56, pz, 0, 0.36, 0.1, 0.33), WOOD2); physics.createCollider(RAPIER.ColliderDesc.cylinder(hh / 2, 0.3).setTranslation(px, y + hh / 2, pz), fixed); }
-    for (let i = 0; i < 7; i++) { const a = 0.4 + i * 0.9, px = x + Math.cos(a) * 11, pz = z + Math.sin(a) * 11; flora.broadleaf(chunks.at(px, pz), px, height(px, pz), pz, R(7, 10), { leaf: PAL.canelo, bark: PAL.barkPale, clusters: 6, cone: true, spread: 0.2 }); }
+    for (let i = 0; i < 7; i++) { const a = 0.4 + i * 0.9, px = x + Math.cos(a) * 11, pz = z + Math.sin(a) * 11; flora.broadleaf(chunks.at(px, pz), px, height(px, pz), pz, R(7, 10), { leaf: PAL.canelo, bark: PAL.barkPale, cone: true, spread: 0.2 }); }
   }
 
   // ---------- mirador del cerro: rocas planas en la cima ----------
   for (const [dx, dz, s] of [[0, 0, 2.6], [3.4, 1.2, 1.9], [-2.6, 2.4, 1.6], [1.2, -3.2, 1.7], [-3.6, -1.6, 1.3]]) { const x = CERRO[0] + dx, z = CERRO[1] + dz; flora.rock(chunks.at(x, z), x, height(x, z) - 0.2, z, s, { squash: 0.42 }); }
 
   // ---------- el árbol hueco del bosque viejo ----------
-  { const { x, z } = POI.viejo; flora.broadleaf(chunks.at(x, z), x, height(x, z), z, 36, { r0: 2.3, clusters: 13, spread: 0.3, moss: 0.7, hollow: true }); }
+  { const { x, z } = POI.viejo; flora.broadleaf(chunks.at(x, z), x, height(x, z), z, 36, { r0: 2.3, limbs: 7, spread: 0.3, moss: 0.7, hollow: true, dense: 1.2 }); }
 
   return emit;
 }

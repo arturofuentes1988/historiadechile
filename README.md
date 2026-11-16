@@ -1,6 +1,6 @@
 # Leftraru
 
-Videojuego 3D sobre la infancia y el cautiverio de Lautaro (Leftraru), mitad historia real y mitad ficción. El mundo está pintado con pinceladas al óleo generadas por código (Three.js + shaders GLSL) y la física usa Rapier.
+Videojuego 3D sobre la infancia y el cautiverio de Lautaro (Leftraru), mitad historia real y mitad ficción. El mundo está pintado en acuarela por código (Three.js + shaders GLSL), sin modelos ni imágenes externas, y la física usa Rapier.
 
 Estado: mapa del Acto I con la aldea, el bosque, el cerro, el humedal y el río (`docs/acto-1.md`).
 

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
-import { shared } from './strokes.js';
+import { shared, createWatercolor } from './strokes.js';
 import { buildWorld } from './world.js';
 import { height, inBounds, POI, CERRO } from './terrain.js';
 import { buildPerson, animatePerson } from './life.js';
@@ -19,13 +19,15 @@ renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
 renderer.setSize(innerWidth, innerHeight);
 document.body.prepend(renderer.domElement);
 const scene = new THREE.Scene();
+const paper = createWatercolor(renderer); // acabado de acuarela sobre toda la imagen
+const draw = () => paper.render(scene, camera);
 const camera = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.1, 3000);
 addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); });
 
 const world = buildWorld(scene, RAPIER, physics);
 
 // ---------- Leftraru niño (personaje provisional, hecho de formas pintadas) ----------
-const boy = buildPerson(); scene.add(boy.g);
+const boy = buildPerson({ kind: 'boy', h: 1.38 }); scene.add(boy.g);
 const START = [-6, -1];
 
 const RAD = 0.3, HALF = 0.36, FEET = HALF + RAD;
@@ -139,9 +141,7 @@ function updatePlayer(dt) {
   // animación procedural
   const t = pp(); boy.g.position.set(t.x, t.y - FEET, t.z); boy.g.rotation.y = player.facing;
   player.phase += dt * (2.5 + player.speed * 1.9);
-  const amp = Math.min(1, player.speed / 3.3) * (player.speed > 4.5 ? 1.0 : 0.6);
-  animatePerson(boy, player.phase, amp, !player.grounded);
-  if (player.grounded) boy.g.position.y += Math.abs(Math.cos(player.phase)) * 0.04 * amp;
+  animatePerson(boy, player.phase, Math.min(1, player.speed / 6.2) * 0.9 + (player.speed > 0.2 ? 0.25 : 0), !player.grounded);
   for (const k in POI) if (state === 'play' && Math.hypot(t.x - POI[k].x, t.z - POI[k].z) < 20) ui.discover(k);
 }
 
@@ -175,8 +175,8 @@ $('total').textContent = world.items.length;
 $('loading').remove();
 window.__g = { ui, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
   tp(x, y, z) { pBody.setTranslation({ x, y, z }, true); player.vy = 0; },
-  view(x, y, z, lx, ly, lz) { camera.position.set(x, y, z); camera.lookAt(lx, ly, lz); world.update(0, time, camera.position, pp()); renderer.render(scene, camera); return renderer.domElement.toDataURL('image/jpeg', 0.9); },
-  snap() { renderer.render(scene, camera); return renderer.domElement.toDataURL('image/jpeg', 0.9); } };
+  view(x, y, z, lx, ly, lz) { camera.position.set(x, y, z); camera.lookAt(lx, ly, lz); world.update(0, time, camera.position, pp()); draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); },
+  snap() { draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); } };
 
 const clock = new THREE.Clock(); let fpsT = 0, fpsN = 0;
 applyOpts();
@@ -184,7 +184,7 @@ function tick(dt) {
   time += dt; shared.uTime.value = time;
   updatePlayer(dt);
   if (cine.active) cine.update(dt);
-  else if (state === 'title') { const a = time * 0.04 + 2.4; camera.position.set(Math.sin(a) * 48, 15, Math.cos(a) * 48); camera.lookAt(0, 5, 0); }
+  else if (state === 'title') { const a = time * 0.04 + 2.4; camera.position.set(Math.sin(a) * 31, 12, Math.cos(a) * 31); camera.lookAt(0, 4, 0); }
   else updateCamera(dt);
   updateItems();
   world.update(dt, time, camera.position, pp());
@@ -197,7 +197,7 @@ function frame() {
   const dt = Math.min(0.05, clock.getDelta());
   if (window.__g.paused) return;
   if (!menuOpen || state === 'title') tick(dt); // el juego se detiene con el menú abierto
-  renderer.render(scene, camera);
+  draw();
   // si el equipo va lento, baja la resolución de a poco
   fpsT += dt; fpsN++; if (fpsT > 3) { if (opts.calidad === 'auto' && !menuOpen && fpsN / fpsT < 27 && pr > 0.6) { pr = Math.max(0.6, pr - 0.25); renderer.setPixelRatio(pr); } fpsT = fpsN = 0; }
 }

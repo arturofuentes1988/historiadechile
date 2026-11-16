@@ -1,5 +1,5 @@
-// Sistema de pinceladas: cada objeto del mundo se pinta con trazos instanciados.
-// El orden de los trazos NO depende de la cámara: se usa descarte por alfa + buffer
+// Sistema de pintura: cada objeto del mundo se pinta con manchas de acuarela instanciadas.
+// El orden de las manchas NO depende de la cámara: se usa descarte por alfa + buffer
 // de profundidad, así la pintura no "repta" al moverse.
 import * as THREE from 'three';
 
@@ -10,7 +10,7 @@ export const SUN = new THREE.Vector3(0.52, 0.62, -0.38).normalize(); // sol de l
 export const shared = {
   uTime: { value: 0 },
   uSun: { value: SUN },
-  uFogColor: { value: new THREE.Color(0xb9c9c8) },
+  uFogColor: { value: new THREE.Color(0xdde6e4) }, // la lejanía se disuelve en el papel
   uFogDensity: { value: 0.0044 },
 };
 
@@ -18,7 +18,7 @@ export function hex(h) {
   return [((h >> 16) & 255) / 255, ((h >> 8) & 255) / 255, (h & 255) / 255];
 }
 
-// Paletas de 3 colores (sombra, medio, luz) por material
+// Paletas de 3 tonos (sombra, medio, luz) por material
 export const PAL = {
   // suelos
   forest: [0x3f3323, 0x6b5636, 0x9c8450], grassy: [0x35542a, 0x5f8438, 0xa3b150],
@@ -45,7 +45,15 @@ export const PAL = {
   smoke: [0x5a5856, 0x8a8782, 0xc4c0b8], fire: [0xd9441c, 0xf28a1e, 0xffd95a], mist: [0xc9d6d6, 0xdfe8e6, 0xf4f8f4],
   mote: [0xf4e8b0, 0xfff6d0, 0xffffff], leafFall: [0xa86a1c, 0xd99a2c, 0xf0cc5a], fly: [0xe07a1c, 0xf4f0e0, 0xf2c84a],
 };
-for (const k in PAL) PAL[k] = PAL[k].map(hex);
+// Ajuste de acuarela: pigmento algo más diluido, y sombras que tiran al violeta azulado
+const KEEP = new Set(['fire', 'mote', 'fly', 'snow', 'mist', 'flowerW', 'flowerY', 'dark']);
+for (const k in PAL) PAL[k] = PAL[k].map(hex).map((c, i) => {
+  if (KEEP.has(k)) return c;
+  const l = c[0] * 0.3 + c[1] * 0.59 + c[2] * 0.11, s = 0.9, lift = i === 0 ? 0.07 : 0.05;
+  let r = l + (c[0] - l) * s, g = l + (c[1] - l) * s, b = l + (c[2] - l) * s;
+  if (i === 0) { r += (0.3 - r) * 0.16; g += (0.32 - g) * 0.14; b += (0.5 - b) * 0.2; }
+  return [r + (0.96 - r) * lift, g + (0.94 - g) * lift, b + (0.89 - b) * lift];
+});
 
 export function mulberry32(a) {
   return function () {
@@ -56,13 +64,13 @@ export function mulberry32(a) {
   };
 }
 
-// Elige entre los 3 colores según la luz del sol (fija), mezclando un poco con el color
-// vecino como haría un pintor con el pincel sucio. Sombras frías, luces cálidas.
+// Tono según la luz del sol (fija): un degradado continuo entre sombra, medio y luz,
+// con una pizca de azar para que ninguna mancha sea igual a la vecina.
+const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 export function shade(pal, nx, ny, nz, rng, bias = 0) {
-  const t = (nx * SUN.x + ny * SUN.y + nz * SUN.z) * 0.5 + 0.5 + (rng() - 0.5) * 0.34 + bias;
-  const i = t > 0.72 ? 2 : t > 0.4 ? 1 : 0, c = pal[i], o = pal[Math.min(2, Math.max(0, i + (rng() < 0.5 ? -1 : 1)))];
-  const m = rng() * 0.3, j = (rng() - 0.5) * 0.06, w = i === 2 ? 0.02 : i === 0 ? -0.02 : 0;
-  return [c[0] + (o[0] - c[0]) * m + j + w, c[1] + (o[1] - c[1]) * m + j * 0.8, c[2] + (o[2] - c[2]) * m + j * 0.6 - w];
+  const t = (nx * SUN.x + ny * SUN.y + nz * SUN.z) * 0.5 + 0.5 + (rng() - 0.5) * 0.26 + bias;
+  const a = t < 0.52 ? pal[0] : pal[1], b = t < 0.52 ? pal[1] : pal[2], m = t < 0.52 ? sm(0.14, 0.52, t) : sm(0.52, 0.9, t), j = (rng() - 0.5) * 0.045;
+  return [a[0] + (b[0] - a[0]) * m + j, a[1] + (b[1] - a[1]) * m + j * 0.8, a[2] + (b[2] - a[2]) * m + j * 0.6];
 }
 
 export const GLSL_NOISE = /* glsl */ `
@@ -77,7 +85,7 @@ const GLSL_FOG = /* glsl */ `
 uniform vec3 uFogColor; uniform float uFogDensity; uniform float uFogScale; uniform float uFogMax;
 vec3 applyFog(vec3 col, float dist, float sunAmt, float y){
   float f = min(1. - exp(-pow(dist*uFogDensity*uFogScale*mix(1.18, 0.82, clamp(y/45., 0., 1.)), 2.)), uFogMax);
-  return mix(col, mix(uFogColor, vec3(1.0, 0.92, 0.74), pow(sunAmt, 5.)*0.55), f);
+  return mix(col, mix(uFogColor, vec3(1.0, 0.95, 0.82), pow(sunAmt, 5.)*0.55), f);
 }`;
 
 const STROKE_VERT = /* glsl */ `
@@ -86,8 +94,12 @@ attribute vec4 iShape; // ancho, alto, rotación, semilla
 attribute vec4 iColor; // rgb, modo (0 pegado a la superficie, 1 de cara a la cámara)
 uniform float uTime; uniform float uSway; uniform vec3 uSun;
 varying vec2 vUv; varying vec3 vColor; varying float vSeed; varying float vDist; varying float vSunAmt; varying float vY;
+${GLSL_NOISE}
 void main(){
-  vUv = uv; vColor = iColor.rgb; vSeed = iShape.w;
+  vUv = uv; vSeed = iShape.w;
+  // lavado: el color deriva suavemente por el mundo, entre cálido y frío
+  float w1 = vnoise(iPos.xz*0.055 + iPos.y*0.03), w2 = vnoise(iPos.xz*0.021 + 17.);
+  vColor = iColor.rgb * (0.9 + 0.2*w1) + (w2 - 0.5) * vec3(0.05, 0.01, -0.05);
   float c = cos(iShape.z), s = sin(iShape.z);
   vec2 q = position.xy * iShape.xy; q = vec2(c*q.x - s*q.y, s*q.x + c*q.y);
   vec3 center = iPos;
@@ -108,6 +120,8 @@ void main(){
   gl_Position = projectionMatrix * mv;
 }`;
 
+// Cada trazo es una mancha de borde irregular: el pigmento se junta un poco en la orilla
+// y queda más aguado y granulado al centro.
 const STROKE_FRAG = /* glsl */ `
 precision highp float;
 varying vec2 vUv; varying vec3 vColor; varying float vSeed; varying float vDist; varying float vSunAmt; varying float vY;
@@ -115,13 +129,13 @@ ${GLSL_NOISE}
 ${GLSL_FOG}
 void main(){
   vec2 p = vUv - 0.5;
-  float n1 = vnoise(vec2(vUv.x*4. + vSeed*37., vUv.y*26. + vSeed*91.)); // cerdas del pincel
-  float n2 = vnoise(vec2(vUv.x*9. + vSeed*13., vSeed*57.));
-  float ex = abs(p.x)*2. + (n1-.5)*0.45;
-  float ey = abs(p.y)*2. + (n2-.5)*0.35;
-  if (ex > 0.92 || ey > 0.9) discard;
-  // empaste: la pintura es más gruesa al centro y recibe luz por un borde
-  vec3 col = vColor * (0.88 + 0.22*n1) + (1.-ey)*0.03 + p.y*0.05;
+  float ang = atan(p.y, p.x);
+  float edge = length(p)*2. + (vnoise(vec2(ang*1.7 + vSeed*40., vSeed*17.)) - 0.5)*0.42 + (vnoise(p*7. + vSeed*91.) - 0.5)*0.22;
+  if (edge > 0.86) discard;
+  float rim = smoothstep(0.52, 0.86, edge);
+  float wash = vnoise(vUv*2.6 + vSeed*23.);
+  float gran = vnoise(vUv*vec2(30., 30.) + vSeed*53.);
+  vec3 col = vColor * (1.05 - 0.13*rim) * (0.93 + 0.12*wash) - gran*0.03;
   gl_FragColor = vec4(applyFog(col, vDist, vSunAmt, vY), 1.);
 }`;
 
@@ -133,7 +147,14 @@ export class StrokeBatch {
     this.col.push(color[0], color[1], color[2], mode);
     this.n++;
   }
-  build({ fogScale = 1, fogMax = 0.9, sway = 0, sphere = null } = {}) {
+  // Trazo pegado a una superficie de normal n, alargado en la dirección d (ramas, troncos)
+  along(x, y, z, dx, dy, dz, nx, ny, nz, len, wid, color) {
+    let ux = 0, uy = 1, uz = 0; if (Math.abs(ny) >= 0.95) { ux = 1; uy = 0; }
+    let tx = uy * nz - uz * ny, ty = uz * nx - ux * nz, tz = ux * ny - uy * nx; const tl = Math.hypot(tx, ty, tz) || 1; tx /= tl; ty /= tl; tz /= tl;
+    const bx = ny * tz - nz * ty, by = nz * tx - nx * tz, bz = nx * ty - ny * tx;
+    this.add(x, y, z, nx, ny, nz, len, wid, Math.atan2(dx * bx + dy * by + dz * bz, dx * tx + dy * ty + dz * tz), color);
+  }
+  build({ fogScale = 1, fogMax = 0.92, sway = 0, sphere = null } = {}) {
     const g = new THREE.InstancedBufferGeometry();
     const q = new THREE.PlaneGeometry(1, 1);
     g.index = q.index; g.setAttribute('position', q.attributes.position); g.setAttribute('uv', q.attributes.uv);
@@ -152,8 +173,7 @@ export class StrokeBatch {
   }
 }
 
-// Partículas pintadas (humo, fuego, hojas, motas, neblina): trazos que se mueven solos en el
-// shader y se desvanecen como pincel seco.
+// Partículas pintadas (humo, fuego, hojas, motas, neblina): manchas que se mueven solas en el shader
 export class ParticleBatch {
   constructor() { this.pos = []; this.par = []; this.col = []; this.n = 0; }
   add(x, y, z, size, speed, color) { this.pos.push(x, y, z); this.par.push((this.n * 0.754877 + 0.13) % 1, size, speed, 0); this.col.push(color[0], color[1], color[2]); this.n++; }
@@ -165,7 +185,7 @@ export class ParticleBatch {
     g.instanceCount = this.n;
     const m = new THREE.ShaderMaterial({
       side: THREE.DoubleSide, transparent: blend, depthWrite: !blend, defines: blend ? { BLEND: 1 } : {},
-      uniforms: { ...shared, uFogScale: { value: fogScale }, uFogMax: { value: 0.9 }, uDir: { value: new THREE.Vector3(...dir) }, uWind: { value: new THREE.Vector3(...wind) },
+      uniforms: { ...shared, uFogScale: { value: fogScale }, uFogMax: { value: 0.92 }, uDir: { value: new THREE.Vector3(...dir) }, uWind: { value: new THREE.Vector3(...wind) },
         uSpan: { value: span }, uSpeed: { value: speed }, uDrift: { value: drift }, uWob: { value: wob }, uS0: { value: s0 }, uS1: { value: s1 }, uOpacity: { value: opacity }, uAspect: { value: aspect } },
       vertexShader: /* glsl */ `
         attribute vec3 iPos; attribute vec4 iP; attribute vec3 iCol;
@@ -206,12 +226,12 @@ export class ParticleBatch {
   }
 }
 
-// Material "pintado" para mallas sólidas (terreno base, rocas, construcciones, personajes):
-// 3 bandas de color con bordes irregulares, sin degradados.
+// Material de acuarela para mallas sólidas (terreno base, rocas, construcciones, personajes):
+// luz cálida y sombra fría que se funden suavemente, con el borde de la sombra algo irregular.
 export function paintMaterial({ color = 0xffffff, vertexColors = false, fogScale = 1, side = THREE.FrontSide } = {}) {
   return new THREE.ShaderMaterial({
     vertexColors, side,
-    uniforms: { ...shared, uColor: { value: new THREE.Color(color) }, uFogScale: { value: fogScale }, uFogMax: { value: 0.9 } },
+    uniforms: { ...shared, uColor: { value: new THREE.Color(color) }, uFogScale: { value: fogScale }, uFogMax: { value: 0.92 } },
     vertexShader: /* glsl */ `
       uniform vec3 uSun;
       varying vec3 vN; varying vec3 vW; varying float vDist; varying vec3 vC; varying float vSunAmt;
@@ -233,20 +253,23 @@ export function paintMaterial({ color = 0xffffff, vertexColors = false, fogScale
       ${GLSL_NOISE}
       ${GLSL_FOG}
       void main(){
-        vec3 base = uColor * vC;
-        float n = vnoise(vW.xy*7. + vW.z*5.) - 0.5;
-        float d = dot(normalize(vN), uSun) + n*0.35;
-        vec3 col = d > 0.4 ? base*1.2 + vec3(0.05,0.04,0.0) : d > -0.05 ? base : base*vec3(0.58,0.6,0.72);
-        col *= 0.94 + 0.12*vnoise(vW.xz*18. + vW.y*11.);
+        vec3 base = uColor * vC, N = normalize(vN);
+        if (!gl_FrontFacing) N = -N;
+        float n = vnoise(vW.xz*1.4 + vW.y*1.1) - 0.5;
+        float lit = smoothstep(0.36, 0.64, dot(N, uSun)*0.5 + 0.5 + n*0.16);
+        vec3 col = mix(base*vec3(0.6, 0.62, 0.8) + vec3(0.02, 0.02, 0.05), base*1.1 + vec3(0.05, 0.04, 0.0), lit);
+        col *= 0.93 + 0.12*vnoise(vW.xz*0.6 + vW.y*0.8);                                // lavado desparejo
+        float fres = pow(1. - abs(dot(N, normalize(cameraPosition - vW))), 2.5);
+        col = mix(col, col*1.12 + 0.05, fres*0.35);                                     // el contorno se aclara
         gl_FragColor = vec4(applyFog(col, vDist, vSunAmt, vW.y), 1.);
       }`,
   });
 }
 
-// Agua pintada: bandas de color que corren con la corriente, espuma en la orilla y brillos
+// Agua: lavados que corren con la corriente, orilla clara y brillos de papel en blanco
 export function waterMaterial() {
   return new THREE.ShaderMaterial({
-    uniforms: { ...shared, uFogScale: { value: 1 }, uFogMax: { value: 0.9 } },
+    uniforms: { ...shared, uFogScale: { value: 1 }, uFogMax: { value: 0.92 } },
     vertexShader: /* glsl */ `
       attribute float depth; uniform vec3 uSun;
       varying vec3 vW; varying float vDepth; varying float vDist; varying float vSunAmt;
@@ -264,18 +287,19 @@ export function waterMaterial() {
         float n2 = vnoise(vec2((p.x - fl*3.4)*0.85, p.y*3.6) + 7.);
         float n3 = vnoise(vec2((p.x - fl*1.3)*2.4, p.y*9.) + 3.);
         float v = n*0.6 + n2*0.4;
-        vec3 col = v < 0.4 ? vec3(0.20,0.36,0.42) : v < 0.66 ? vec3(0.29,0.48,0.54) : vec3(0.44,0.64,0.68);
-        col = mix(col, vec3(0.42,0.56,0.40), smoothstep(0.75, 0.0, vDepth)*0.55);   // fondo que se trasluce
+        vec3 col = mix(vec3(0.27,0.44,0.52), vec3(0.42,0.61,0.67), smoothstep(0.3, 0.52, v));
+        col = mix(col, vec3(0.66,0.8,0.82), smoothstep(0.6, 0.78, v));
+        col = mix(col, vec3(0.55,0.66,0.5), smoothstep(0.75, 0.0, vDepth)*0.5);        // fondo que se trasluce
         vec3 vd = normalize(cameraPosition - vW);
-        col = mix(col, vec3(0.78,0.87,0.9), pow(1. - max(vd.y, 0.), 3.)*0.65);          // reflejo del cielo
-        if (vDepth < 0.07 + 0.09*n2) col = vec3(0.9,0.94,0.92);                         // espuma de orilla
-        if (n3 > 0.8 && n > 0.45) col = mix(col, vec3(1.), 0.75);                       // brillos
-        col *= 0.94 + 0.1*n3;
+        col = mix(col, vec3(0.84,0.9,0.92), pow(1. - max(vd.y, 0.), 3.)*0.65);          // reflejo del cielo
+        col = mix(col, vec3(0.95,0.96,0.93), smoothstep(0.16 + 0.1*n2, 0.03, vDepth));  // orilla
+        col = mix(col, vec3(0.99,0.98,0.95), smoothstep(0.78, 0.86, n3) * step(0.45, n) * 0.8); // brillos
         gl_FragColor = vec4(applyFog(col, vDist, vSunAmt, vW.y), 1.);
       }`,
   });
 }
 
+// Cielo: un lavado húmedo de azul sobre el papel, con nubes que son papel sin pintar
 export function skyDome() {
   const m = new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false,
@@ -284,17 +308,20 @@ export function skyDome() {
     fragmentShader: /* glsl */ `
       precision highp float; varying vec3 vD; uniform vec3 uSun; uniform float uTime;
       ${GLSL_NOISE}
+      float fbm(vec2 p){ return vnoise(p)*0.5 + vnoise(p*2.03 + 7.)*0.3 + vnoise(p*4.1 + 3.)*0.2; }
       void main(){
         vec3 d = normalize(vD);
         float a = atan(d.z, d.x) + uTime*0.004; // las nubes derivan lentamente
-        float streak = vnoise(vec2(a*6., d.y*40.)) * 0.5 + vnoise(vec2(a*14. + 3., d.y*90.)) * 0.5;
-        float h = clamp(d.y + (streak-.5)*0.12, 0., 1.);
-        vec3 col = mix(vec3(0.95,0.87,0.70), vec3(0.64,0.78,0.84), smoothstep(0., 0.26, h));
-        col = mix(col, vec3(0.34,0.54,0.76), smoothstep(0.22, 0.9, h));
-        float cl = smoothstep(0.55, 0.8, vnoise(vec2(a*2.5, d.y*9.)) * 0.6 + streak*0.4) * smoothstep(0.03, 0.2, d.y);
-        col = mix(col, vec3(0.99,0.95,0.87), cl*0.8);
-        col += vec3(1.,0.86,0.58) * pow(max(dot(d, uSun), 0.), 20.) * 0.55;
-        if (d.y < 0.) col = vec3(0.73,0.79,0.78);
+        float h = clamp(d.y + (fbm(vec2(a*2.2, d.y*5.)) - 0.5)*0.14, 0., 1.);
+        vec3 col = mix(vec3(0.98,0.94,0.84), vec3(0.72,0.84,0.91), smoothstep(0., 0.3, h));
+        col = mix(col, vec3(0.43,0.63,0.83), smoothstep(0.25, 0.95, h));
+        col *= 0.95 + 0.1*fbm(vec2(a*1.1 + 5., d.y*2.5));                               // floraciones del lavado
+        float n = fbm(vec2(a*1.9, d.y*6.5 - 1.));
+        float cl = smoothstep(0.52, 0.7, n) * smoothstep(0.02, 0.22, d.y);
+        col = mix(col, vec3(0.74,0.76,0.85), smoothstep(0.44, 0.56, n) * (1. - cl) * 0.35 * smoothstep(0.02, 0.2, d.y)); // sombra de la nube
+        col = mix(col, vec3(0.985,0.975,0.95), cl*0.9);
+        col += vec3(1.,0.9,0.7) * pow(max(dot(d, uSun), 0.), 14.) * 0.4;
+        if (d.y < 0.) col = vec3(0.86,0.9,0.89);
         gl_FragColor = vec4(col, 1.);
       }`,
   });
@@ -317,4 +344,57 @@ export class GeoBag {
     g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(this.n, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3));
     const m = new THREE.Mesh(g, paintMaterial({ vertexColors: true, side: THREE.DoubleSide })); m.frustumCulled = false; return m;
   }
+}
+
+// Acabado de acuarela sobre toda la imagen: los colores sangran un poco entre sí, el pigmento
+// se acumula donde cambia el color, se nota el grano del papel y las luces son papel en blanco.
+export function createWatercolor(renderer) {
+  const rt = new THREE.WebGLRenderTarget(2, 2, { samples: 2 });
+  const mat = new THREE.ShaderMaterial({
+    depthTest: false, depthWrite: false,
+    uniforms: { tColor: { value: rt.texture }, uRes: { value: new THREE.Vector2(2, 2) } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0., 1.); }`,
+    fragmentShader: /* glsl */ `
+      precision highp float; uniform sampler2D tColor; uniform vec2 uRes; varying vec2 vUv;
+      ${GLSL_NOISE}
+      void main(){
+        vec2 px = 1./uRes, pp = vUv*uRes; float sc = uRes.y/720.;
+        // pulso de la mano: los bordes tiemblan apenas
+        vec2 uv = vUv + (vec2(vnoise(pp/(34.*sc)), vnoise(pp/(34.*sc) + 31.7)) - 0.5) * px * 3.4 * sc;
+        // sangrado: el color se corre un poco hacia los lados
+        vec3 c = texture2D(tColor, uv).rgb * 0.3; float r = 2.1*sc;
+        c += (texture2D(tColor, uv + vec2(r, 0.)*px).rgb + texture2D(tColor, uv - vec2(r, 0.)*px).rgb + texture2D(tColor, uv + vec2(0., r)*px).rgb + texture2D(tColor, uv - vec2(0., r)*px).rgb) * 0.11;
+        c += (texture2D(tColor, uv + vec2(r, r)*0.7*px).rgb + texture2D(tColor, uv - vec2(r, r)*0.7*px).rgb + texture2D(tColor, uv + vec2(r, -r)*0.7*px).rgb + texture2D(tColor, uv - vec2(r, -r)*0.7*px).rgb) * 0.065;
+        // pigmento acumulado en los límites entre colores
+        float e = 2.6*sc;
+        vec3 gx = texture2D(tColor, uv + vec2(e, 0.)*px).rgb - texture2D(tColor, uv - vec2(e, 0.)*px).rgb;
+        vec3 gy = texture2D(tColor, uv + vec2(0., e)*px).rgb - texture2D(tColor, uv - vec2(0., e)*px).rgb;
+        float pool = smoothstep(0.07, 0.5, length(gx) + length(gy));
+        c = mix(c, c*c*1.05, pool*0.42);
+        // grano del papel: el pigmento oscuro granula más
+        float lum = dot(c, vec3(0.299, 0.587, 0.114));
+        float g = vnoise(pp/(1.7*sc))*0.6 + vnoise(pp/(4.3*sc) + 9.)*0.4;
+        c -= (g - 0.5) * 0.13 * (1. - lum*0.65);
+        c *= 0.965 + 0.07*vnoise(pp/(110.*sc) + 3.);
+        // el pigmento es transparente: debajo siempre está el papel
+        vec3 paper = vec3(0.968, 0.948, 0.9);
+        c = paper * mix(vec3(1.), c*1.09, 0.95);
+        c = mix(c, paper, smoothstep(0.8, 1.0, lum)*0.4);
+        // el borde de la hoja queda sin pintar
+        vec2 q = abs(vUv - 0.5)*2.;
+        float b = max(q.x, q.y) + (vnoise(pp/(46.*sc) + 5.) - 0.5)*0.045;
+        c = mix(c, paper*(0.985 + 0.03*g), smoothstep(0.945, 0.995, b)*0.9);
+        gl_FragColor = vec4(c, 1.);
+      }`,
+  });
+  const scene = new THREE.Scene(), cam = new THREE.Camera(), size = new THREE.Vector2();
+  const quad = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mat); quad.frustumCulled = false; scene.add(quad);
+  return {
+    render(worldScene, camera) {
+      renderer.getDrawingBufferSize(size);
+      if (rt.width !== size.x || rt.height !== size.y) { rt.setSize(size.x, size.y); mat.uniforms.uRes.value.copy(size); }
+      renderer.setRenderTarget(rt); renderer.render(worldScene, camera);
+      renderer.setRenderTarget(null); renderer.render(scene, cam);
+    },
+  };
 }

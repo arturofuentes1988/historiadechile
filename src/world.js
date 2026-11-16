@@ -102,7 +102,7 @@ export function buildWorld(scene, RAPIER, physics) {
     else if (zk === 'marsh' && u < 0.5) { kind = 'canelo'; sp = 12; }
     else continue;
     if (near(x, z, sp)) continue;
-    const H = kind === 'pewen' ? (zk === 'alpine' ? R(9, 15) : R(14, 24)) : kind === 'giant' ? R(27, 35) : kind === 'canelo' ? R(7, 11) : kind === 'roble' ? R(11, 17) : R(12, 20);
+    const H = kind === 'pewen' ? (rng() < 0.16 ? R(4, 8) : zk === 'alpine' ? R(9, 15) : R(14, 24)) : kind === 'giant' ? R(27, 35) : kind === 'canelo' ? R(7, 11) : kind === 'roble' ? R(11, 17) : R(12, 20);
     const t = { x, z, y: h, H, kind }; trees.push(t); const k = gk(x, z); (grid.get(k) || grid.set(k, []).get(k)).push(t);
   }
 
@@ -112,13 +112,14 @@ export function buildWorld(scene, RAPIER, physics) {
     for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const l = grid.get(ci + i + ',' + (cj + j)); if (l) for (const t of l) { const k = t.H * 0.19; if (Math.hypot(x - (t.x - SUN.x * k), z - (t.z - SUN.z * k)) < 1.6 + t.H * 0.13) return true; } }
     return false;
   };
+  const underRoble = (x, z) => { const ci = Math.floor(x / 8), cj = Math.floor(z / 8); for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const l = grid.get(ci + i + ',' + (cj + j)); if (l) for (const t of l) if (t.kind === 'roble' && Math.hypot(x - t.x, z - t.z) < 5) return true; } return false; };
   const FLOWERS = [PAL.flowerY, PAL.flowerW, PAL.flowerP];
   for (let i = 0, n = (B.x1 - B.x0) * (B.z1 - B.z0) * 3.4 * Q; i < n; i++) {
     const x = R(B.x0, B.x1), z = R(B.z0, B.z1), h = height(x, z);
     if (h < WATER_Y - 0.3) continue;
-    const nr = normalAt(x, z), zk = zone(x, z, h, nr[1]), c = chunks.at(x, z), fine = zk === 'path' || zk === 'earth' ? 0.75 : 1;
+    const nr = normalAt(x, z), zk = zone(x, z, h, nr[1]), c = chunks.at(x, z), gold = zk !== 'path' && zk !== 'earth' && rng() < 0.5 && underRoble(x, z), fine = zk === 'path' || zk === 'earth' ? 0.75 : 1;
     c.ground.add(x, h, z, nr[0] + R(-0.3, 0.3), nr[1], nr[2] + R(-0.3, 0.3), R(0.8, 1.6) * fine, R(0.3, 0.55) * fine, R(-0.5, 0.5) + vnoise(x * 0.05, z * 0.05) * 2,
-      shade(PAL[zk], nr[0] + R(-0.2, 0.2), nr[1], nr[2] + R(-0.2, 0.2), rng, inShadow(x, z) ? -0.34 : 0.05));
+      shade(gold ? PAL.leafFall : PAL[zk], nr[0] + R(-0.2, 0.2), nr[1], nr[2] + R(-0.2, 0.2), rng, inShadow(x, z) ? -0.34 : 0.05));
     const u = rng();
     if (zk === 'meadow') { if (u < 0.3) flora.tuft(c, x, h, z); else if (u < 0.38) flora.flower(c, x, h, z, FLOWERS[(u * 1000 | 0) % 3]); }
     else if (zk === 'grassy' || zk === 'alpine') { if (u < 0.2) flora.tuft(c, x, h, z, zk === 'alpine' ? PAL.reed : PAL.grass); }
@@ -131,9 +132,9 @@ export function buildWorld(scene, RAPIER, physics) {
   for (const t of trees) {
     const c = chunks.at(t.x, t.z);
     if (t.kind === 'pewen') flora.pewen(c, t.x, t.y, t.z, t.H);
-    else if (t.kind === 'giant') flora.broadleaf(c, t.x, t.y, t.z, t.H, { r0: R(1.0, 1.6), clusters: 11, spread: 0.3, moss: 0.6 });
-    else if (t.kind === 'canelo') flora.broadleaf(c, t.x, t.y, t.z, t.H, { leaf: PAL.canelo, bark: PAL.barkPale, clusters: 6, cone: true, spread: 0.2 });
-    else if (t.kind === 'roble') flora.broadleaf(c, t.x, t.y, t.z, t.H, { leaf: PAL.roble, bark: PAL.trunk, clusters: 6, sparse: 0.7, spread: 0.28 });
+    else if (t.kind === 'giant') flora.broadleaf(c, t.x, t.y, t.z, t.H, { r0: R(1.0, 1.6), limbs: 6, spread: 0.3, moss: 0.6, dense: 1.15 });
+    else if (t.kind === 'canelo') flora.broadleaf(c, t.x, t.y, t.z, t.H, { leaf: PAL.canelo, bark: PAL.barkPale, cone: true, spread: 0.2 });
+    else if (t.kind === 'roble') flora.broadleaf(c, t.x, t.y, t.z, t.H, { leaf: PAL.roble, bark: PAL.trunk, limbs: 4, dense: 0.7, spread: 0.28 });
     else flora.broadleaf(c, t.x, t.y, t.z, t.H, { moss: 0.3, vine: rng() < 0.22 });
   }
 

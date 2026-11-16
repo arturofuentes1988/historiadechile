@@ -78,9 +78,11 @@ export function createUI({ world, onToast }) {
     ctx.fillStyle = '#fff'; ctx.strokeStyle = '#1b1f1a'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(0, 20); ctx.lineTo(12, -13); ctx.lineTo(0, -6); ctx.lineTo(-12, -13); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.restore();
-    ctx.strokeStyle = '#3a2c18'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(S / 2, S / 2, R, 0, 7); ctx.stroke();
-    ctx.fillStyle = '#3a2c18'; ctx.beginPath(); ctx.arc(S / 2, 22, 15, 0, 7); ctx.fill();
-    ctx.fillStyle = '#f6ecd0'; ctx.font = 'bold 20px Georgia'; ctx.textAlign = 'center'; ctx.fillText('N', S / 2, 29);
+    // aro tejido: negro con triángulos rojos y crudos
+    ctx.strokeStyle = '#17151b'; ctx.lineWidth = 16; ctx.beginPath(); ctx.arc(S / 2, S / 2, R - 5, 0, 7); ctx.stroke();
+    for (let i = 0; i < 36; i++) { const a = (i / 36) * Math.PI * 2, c = Math.cos(a), s2 = Math.sin(a), w = 0.06; ctx.fillStyle = i % 2 ? '#a82a2e' : '#f1e7cf'; ctx.beginPath(); ctx.moveTo(S / 2 + c * (R - 12), S / 2 + s2 * (R - 12)); ctx.lineTo(S / 2 + Math.cos(a - w) * (R + 1), S / 2 + Math.sin(a - w) * (R + 1)); ctx.lineTo(S / 2 + Math.cos(a + w) * (R + 1), S / 2 + Math.sin(a + w) * (R + 1)); ctx.fill(); }
+    ctx.fillStyle = '#17151b'; ctx.beginPath(); ctx.arc(S / 2, 22, 16, 0, 7); ctx.fill();
+    ctx.fillStyle = '#f1e7cf'; ctx.font = 'bold 20px Georgia'; ctx.textAlign = 'center'; ctx.fillText('N', S / 2, 29);
   }
 
   // ---------- paneles ----------
