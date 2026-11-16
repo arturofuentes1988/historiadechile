@@ -1,186 +1,197 @@
 # Acto I — El niño del bosque
 
-Guion de trabajo (borrador 1). Duración estimada: 30 a 40 minutos de juego.
+Guion de trabajo (borrador 2). **En este acto no aparecen los españoles.** Todo ocurre dentro del mundo mapuche, antes de la invasión.
 
-**Lugar y fecha:** tierras de Nahuelbuta, verano de 1546.
-**Protagonista:** Leftraru ("traro veloz"), unos 11 años.
+**Lugar y fecha:** tierras de Nahuelbuta, del otoño al invierno de 1545.
+**Protagonista:** Leftraru ("traro veloz"), 11 años.
+**Duración estimada:** 60 a 90 minutos, en cinco capítulos.
 
 ---
 
 ## 1. Qué queremos contar
 
-**En una frase:** el último día de infancia de un niño que mira el mundo con más atención que los demás, y cómo ese mundo se rompe.
+**En una frase:** un niño que no encaja en lo que su padre espera de él descubre que su forma de ser, mirar con paciencia, también tiene un lugar en su pueblo.
 
-**Tema:** la mirada. Leftraru no es el más fuerte ni el más rápido de su aldea. Su don es observar: se queda quieto, mira cómo se mueve un animal y aprende. En este acto eso es un juego de niños. En los actos siguientes será lo que le permita entender a los españoles y derrotarlos.
+**Tema:** la mirada. Leftraru no es el más fuerte ni el más rápido. Su don es observar. Al principio nadie lo valora, ni él mismo. Al final del acto, ese don salva a alguien.
+
+**El conflicto no viene de afuera.** Viene de cosas de la vida: un padre exigente, un rival, una disputa con la comunidad vecina, una tormenta, un invierno que se acerca. Es un mundo completo, con sus propios problemas, que no necesita enemigos extranjeros para ser interesante.
 
 **Arco emocional:**
 
-| Momento | Qué siente el jugador |
+| Capítulo | Qué siente el jugador |
 |---|---|
-| Inicio | Calma, libertad, curiosidad. El bosque es su casa. |
-| Medio | Pertenencia. Tiene familia, amiga, un lugar en la aldea. |
-| Giro | Inquietud. Algo extraño se acerca y los adultos no lo dicen todo. |
-| Final | Pérdida. Lo arrancan de todo lo que el jugador acaba de conocer. |
+| 1 | Libertad y curiosidad: el bosque es su casa. |
+| 2 | Pertenencia: conoce a su gente y sus historias. |
+| 3 | Frustración: no es bueno en lo que se espera de él. |
+| 4 | Miedo y determinación: solo él puede resolver algo. |
+| 5 | Reconocimiento y plenitud: el mundo está entero. |
 
-El acto tiene que lograr que el jugador **quiera** ese mundo, para que perderlo duela y el resto del juego tenga sentido.
-
-**Lo que NO queremos:** una lección de historia con fechas, ni un pueblo mapuche de postal. Queremos una aldea viva, con gente que bromea, discute y tiene miedo.
+El acto termina en su punto más feliz. Eso es deliberado: el jugador debe llegar al Acto II queriendo este mundo.
 
 ---
 
 ## 2. Personajes
 
-| Personaje | Quién es | Real o ficticio |
+### La familia
+
+| Personaje | Quién es | Qué quiere |
 |---|---|---|
-| **Leftraru** | 11 años. Callado, observador, terco. Prefiere el bosque a los juegos de guerra. | Real (su carácter de niño es invención nuestra). |
-| **Curiñancu** | Su padre, lonko (jefe) de la comunidad. Serio, lo quiere, pero le preocupa que su hijo "mire tanto y haga tan poco". | Nombre de la tradición; personalidad inventada. |
-| **Rayen** | 12 años, su amiga. Rápida, burlona, la mejor jugando palin. Es todo lo que él no es. | Ficticia. |
-| **La machi** | Anciana, autoridad espiritual y sanadora. La única que entiende el don de Leftraru. | Ficticia (el rol es real). |
-| **Ñamku** | Un anciano que de joven vio a los primeros españoles en el norte. Nadie le cree mucho. | Ficticio; el hecho que recuerda es real (expedición de Almagro, 1536). |
-| **El traro** | El ave de su nombre. Aparece en momentos clave, como guía. | Recurso narrativo. |
-| **El jinete** | Un soldado español sin nombre. Lo vemos como lo ve un niño: una criatura de metal sobre un animal imposible. | Ficticio. |
+| **Leftraru** | 11 años. Callado, terco, observador. Cuida los weke (llamas) de la familia y los entiende mejor que a la gente. | Que su padre lo vea. |
+| **Curiñancu** | Su padre, lonko (jefe) del lof (comunidad). Justo, pero duro con su hijo. | Un hijo que pueda liderar después de él. |
+| **Millaray** | Su madre. Tejedora; práctica, de humor seco. Media entre padre e hijo sin que ninguno lo note. | Que el invierno no los encuentre mal preparados. |
+| **La abuela (kuku)** | Madre de Curiñancu. Sabe todas las historias y las cuenta mientras teje. | Que las historias no se pierdan. |
+| **Ayelén** | Su hermana menor, 6 años. Lo sigue a todas partes y pregunta por todo. | Estar donde esté su hermano. |
+
+### La aldea
+
+| Personaje | Quién es | Qué quiere |
+|---|---|---|
+| **Rayen** | 12 años, su amiga. Rápida, burlona, la mejor jugando palin. | Ganar. Y que Leftraru deje de quedarse mirando. |
+| **Nahuel** | 13 años. Fuerte, seguro, el favorito de los adultos. Rival de Leftraru. | Ser kona (guerrero) cuanto antes. |
+| **La machi** | Sanadora y autoridad espiritual. Habla poco y entiende mucho. | Un ayudante que sepa encontrar plantas. |
+| **Ñamku** | El más anciano. Guarda la memoria del pueblo; su padre peleó contra los incas en el norte. | Que alguien joven lo escuche. |
+| **Antü** | Werkén (mensajero) que viaja entre comunidades. Trae noticias y chismes. | Llegar antes que la lluvia. |
+
+### Otros
+
+- **Lientur:** lonko del lof vecino, con el que hay una disputa por una zona de recolección de piñones.
+- **El traro:** el ave de su nombre; aparece en momentos clave.
+- **Kürüf ("viento"):** la weke preferida de Leftraru, joven y arisca.
+
+Todos son ficticios salvo Leftraru y el nombre de su padre, que viene de la tradición.
 
 ---
 
-## 3. Guion por escenas
+## 3. Guion por capítulos
 
-### Escena 0 — El pewma (sueño)
-*Cinemática corta, 1 minuto.*
+### Capítulo 1 — El pewen (otoño)
+*20 minutos. Enseña a moverse y a mirar.*
 
-Oscuridad. Un sonido rítmico que no reconocemos (son cascos, pero aún no lo sabemos). Un traro vuela sobre un bosque que arde en pinceladas rojas. Leftraru despierta sobresaltado dentro de la ruka; afuera amanece.
+1. **Los piñones.** Curiñancu le encarga reunir piñones. Antes de tomar el primero, Leftraru pide permiso al dueño espiritual del bosque. *(Prototipo actual.)*
+   > CURIÑANCU: Los que cayeron solos. No sacudas el árbol: él decide cuánto da.
+2. **El traro.** Un traro le roba un piñón y lo guía cerro arriba. En el camino aprende a **mirar**: observa a un pudú y aprende a moverse sin ruido.
+3. **El mirador.** Desde la roca ve todo su mundo: el mar hacia el poniente, los volcanes al oriente, el humo de las rukas abajo. Es la imagen que queremos que el jugador recuerde.
+4. **El regreso.** Llega tarde y con pocos piñones. Nahuel trajo el doble. Su padre no dice nada, y eso es peor.
 
-- **Qué mostramos:** que para los mapuche los sueños (pewma) importan y se comentan al despertar.
-- **Para qué sirve:** siembra el final sin explicarlo.
+### Capítulo 2 — La aldea
+*20 minutos. Recorrido libre. El corazón del acto.*
 
-### Escena 1 — El pewen
-*Jugable, 5 minutos. Es el prototipo actual, ampliado.*
+El jugador explora a su ritmo. Cada personaje ofrece algo:
 
-Curiñancu le encarga reunir piñones para el invierno. Antes de tomar el primero, Leftraru pide permiso al espíritu dueño del bosque: un gesto breve, una frase.
+- **Los weke:** darles de comer y llevarlos al corral. Kürüf no se deja; hay que observarla para entenderla.
+- **Millaray y el telar:** llevarle plantas para teñir lana. Explica qué significan los dibujos del tejido.
+- **La machi:** pide plantas medicinales (lawen) del bosque. Enseña a reconocerlas.
+- **Rayen:** partido de palin entre niños. Leftraru pierde.
+- **Nahuel:** entrena con lanza y honda. Reta a Leftraru; el jugador puede aceptar o no.
+- **Ayelén:** juega a esconderse. Pregunta cosas que sirven para explicar el mundo al jugador.
+- **Antü, el werkén:** llega con noticias de la costa y de la disputa con el lof de Lientur.
 
-- **Qué hace el jugador:** aprende a caminar, correr, saltar y recoger. El último piñón está sobre unas rocas.
-- **Qué mostramos:** el pewen (araucaria) como árbol que alimenta; la costumbre de pedir permiso antes de tomar algo de la naturaleza.
-- **Diálogo de muestra:**
-  > CURIÑANCU: Los que cayeron solos. No sacudas el árbol: él decide cuánto da.
+**La noche: las historias.** Todos junto al fuego. La abuela y Ñamku cuentan relatos, y cada relato se muestra como una secuencia pintada distinta al resto del juego:
 
-### Escena 2 — El traro
-*Jugable, 7 minutos.*
+- **Treng Treng y Kai Kai:** la serpiente del mar que quiso inundarlo todo y la serpiente de la tierra que levantó los cerros para salvar a la gente.
+- **El regalo del pewen:** cómo, en un invierno de hambre, la gente aprendió que el piñón se podía comer.
+- **Un epew (cuento de animales):** el zorro que se cree más listo que todos.
+- **La memoria de Ñamku:** cuando los ejércitos del inca llegaron desde el norte y no pudieron pasar.
 
-Un traro le roba un piñón de la mano y se posa un poco más arriba. Leftraru lo sigue cerro arriba. Aquí aparece la mecánica central: **mirar**. Al quedarse quieto observando a un pudú, aprende a moverse sin ruido. Llega a un mirador de roca. Desde ahí ve, muy lejos, una columna de humo que no es de cocina.
+El jugador elige cuáles escuchar. Son coleccionables: quedan guardados para volver a verlos.
 
-- **Qué hace el jugador:** plataformas de subida, y aprende a mirar (ver sección 4).
-- **Qué mostramos:** los animales del bosque; la inmensidad del territorio desde arriba, con el volcán al fondo.
-- **Para qué sirve:** primer aviso del peligro. Solo él lo ha visto.
+### Capítulo 3 — El palin
+*15 minutos. El punto bajo de Leftraru.*
 
-### Escena 3 — La aldea
-*Jugable y libre, 10 minutos. El corazón del acto.*
+La disputa por la zona de piñones se resolverá como se debe: con un partido de palin entre los dos lof, seguido de comida compartida.
 
-Vuelve corriendo a contar lo del humo. Su padre lo escucha, pero está ocupado; le dice que hablarán en la noche. El jugador queda libre para recorrer la aldea y hacer lo que quiera:
+1. **La preparación.** Curiñancu arma el equipo. Nahuel y Rayen entran entre los jóvenes. Leftraru no.
+2. **El partido.** Leftraru mira desde el borde. El jugador usa **mirar** y descubre un patrón en el mejor jugador rival.
+3. **La decisión.** Puede avisarle a Rayen o callar por orgullo. Si avisa, su lof empata o gana; nadie sabe que fue por él, salvo Rayen.
+4. **La comida.** Los dos lof comen juntos. Lientur y Curiñancu hablan como viejos conocidos. Los rivales de la tarde son los parientes de la noche.
+   > RAYEN: ¿Cómo supiste?
+   > LEFTRARU: Siempre mira a la izquierda antes de golpear.
+   > RAYEN: Yo estaba ahí y no lo vi.
 
-- **Jugar palin con Rayen** (minijuego). Ella gana casi siempre y se burla de él.
-- **Hablar con Ñamku**, que cuenta lo que vio de joven en el norte: hombres con piel de metal, montados en animales más altos que un hombre. Los niños se ríen. Leftraru no.
-- **Ayudar en tareas:** llevar agua, entregar los piñones, acercar leña al fuego.
-- **Visitar a la machi**, que le pregunta por su sueño. Él se lo cuenta.
-  > MACHI: El traro no es el ave más fuerte. Es la que mira más tiempo antes de bajar.
+### Capítulo 4 — La tormenta
+*20 minutos. El clímax.*
 
-- **Qué mostramos:** la vida cotidiana: la ruka, el fuego, el telar, la comida, los juegos, el respeto a los mayores.
-- **Para qué sirve:** que el jugador conozca y quiera a esta gente. Todo lo que pase después depende de esta escena.
+Primera tormenta del invierno. Al contar los animales falta Kürüf, y Ayelén, que salió a buscarla, tampoco está.
 
-### Escena 4 — La noche
-*Cinemática con una decisión pequeña, 3 minutos.*
+1. **La búsqueda.** Los adultos salen por los senderos. Leftraru ve lo que ellos no: huellas pequeñas que se desvían hacia el cerro.
+2. **El rastro.** El jugador usa todo lo aprendido: huellas (zorro), sigilo (pudú), vista lejana (traro). Lluvia, viento, casi sin luz.
+3. **El puma.** Encuentra a Ayelén y a la weke refugiadas bajo una roca. Hay un puma cerca. No se pelea: hay que quedarse quieto, mirarlo y retroceder despacio. Es la primera vez que **mirar** sirve para sobrevivir.
+4. **El amanecer.** Baja con su hermana a la espalda y la weke siguiéndolo sola. Nahuel es el primero en verlo llegar, y no dice nada burlón.
 
-Junto al fuego, los adultos discuten en voz baja. Han llegado mensajeros: hay extranjeros al norte del gran río. Unos quieren ir a pelear; otros, esperar. Leftraru escucha desde la sombra (el jugador debe acercarse sin ser visto, usando lo aprendido del pudú). Su padre lo descubre, pero no lo reta:
+### Capítulo 5 — We Tripantu
+*10 minutos. Cierre.*
 
-> CURIÑANCU: ¿Qué viste hoy desde la roca?
-> LEFTRARU: Humo. Y no subía como el nuestro.
-> CURIÑANCU: (silencio) Mañana no vayas lejos.
+La noche más larga del año. La comunidad espera despierta el regreso del sol.
 
-- **Qué mostramos:** que las decisiones se discutían en conjunto; que nadie sabía realmente a qué se enfrentaba.
+1. **La víspera.** Fuego, comida, las últimas historias. La machi le pide a Leftraru que la acompañe: ya tiene ayudante.
+2. **El río.** Antes del alba, todos bajan a bañarse al río para recibir el año nuevo.
+3. **El padre.** Curiñancu se sienta a su lado. No se disculpa; no es su estilo.
+   > CURIÑANCU: Yo busqué donde buscaría un hombre. Tú buscaste donde iría una niña.
+   > (silencio)
+   > CURIÑANCU: Eso no se enseña.
+4. **El sol.** Amanece sobre el volcán. Toda la aldea, de pie, mirando. El traro cruza el cielo.
 
-### Escena 5 — Los cascos
-*Jugable, 8 minutos. El clímax.*
-
-Amanecer. Leftraru y Rayen están en el río. El agua tiembla. El sonido del sueño vuelve, y ahora sabemos qué es. Aparecen jinetes entre los árboles.
-
-1. **Huida:** correr por el bosque, saltar troncos, esquivar.
-2. **Escondite:** quedarse inmóvil mientras un jinete pasa a metros. La cámara muestra al caballo como lo ve un niño: enorme, resoplando, incomprensible.
-3. **La elección:** Rayen cae y queda expuesta. Leftraru hace ruido a propósito para atraer al jinete y que ella escape. No es una opción del jugador: es quién es él.
-4. **Captura.**
-
-- **Qué mostramos:** el terror del primer encuentro, sin sangre explícita. El miedo viene del sonido y del tamaño.
-
-### Escena 6 — "Felipe"
-*Cinemática final, 2 minutos.*
-
-Atado, en el campamento español. Otros cautivos lloran o miran al suelo. Leftraru mira a un caballo. Ve cómo un soldado desmonta: jinete y animal se separan. Son dos. El hombre camina con torpeza bajo el metal.
-
-Un español le pregunta el nombre, no lo entiende y le pone otro.
-
-Texto en pantalla: ***"Lo llamaron Felipe."***
-
-Corte a negro. El traro grita, lejos.
-
-- **Para qué sirve:** cierra el tema. Mientras todos sienten terror, él ya está aprendiendo. Abre el Acto II.
+**Final:** la cámara se aleja sobre el bosque. El mundo está entero.
 
 ---
 
 ## 4. Qué se puede hacer en el mundo
 
-| Acción | Cómo funciona | Dónde se aprende |
-|---|---|---|
-| **Moverse** | Caminar, correr, saltar. | Escena 1 |
-| **Recoger** | Piñones, leña, agua, objetos de encargo. | Escena 1 |
-| **Mirar** (mecánica central) | Mantener un botón: Leftraru se queda quieto, el mundo se silencia y se resalta lo que se puede aprender. Si observa lo suficiente, aprende algo. | Escena 2 |
-| **Sigilo** | Agacharse y moverse sin ruido. Se aprende mirando al pudú. | Escena 2 |
-| **Trepar** | Subir rocas y troncos. | Escena 2 |
-| **Hablar** | Conversaciones cortas, sin árboles de diálogo complejos. | Escena 3 |
-| **Jugar palin** | Minijuego de reflejos con Rayen. | Escena 3 |
-| **Esconderse** | Quedarse inmóvil tras un tronco o entre helechos. | Escena 5 |
+| Acción | Cómo funciona |
+|---|---|
+| **Moverse** | Caminar, correr, saltar, trepar. |
+| **Mirar** (mecánica central) | Mantener un botón: Leftraru se queda quieto, el sonido baja y se resalta lo que puede aprender. Si observa lo suficiente, aprende algo. |
+| **Sigilo** | Moverse sin ruido. Se aprende mirando al pudú. |
+| **Rastrear** | Seguir huellas. Se aprende mirando al zorro. |
+| **Recoger** | Piñones, leña, agua, plantas para teñir y para sanar. |
+| **Cuidar animales** | Alimentar y guiar a los weke; ganarse la confianza de Kürüf. |
+| **Hablar** | Conversaciones cortas; algunos personajes dan encargos. |
+| **Escuchar historias** | Relatos junto al fuego, coleccionables. |
+| **Jugar palin** | Minijuego de reflejos. |
+| **Entrenar** | Honda y lanza contra blancos, sin combate real. |
 
-**Lo que se aprende mirando** (cada animal enseña algo y deja una entrada en un cuaderno de dibujos pintados):
+**La memoria de Leftraru:** como su pueblo no usaba escritura, lo aprendido se guarda como imágenes pintadas (animales, plantas, historias, personas) que se van completando.
 
-- **Pudú:** moverse sin ruido.
-- **Traro:** vista lejana; marca lugares de interés.
-- **Zorro:** encontrar senderos ocultos.
-- **Puma (solo huellas, nunca se ve):** reconocer el peligro antes de que llegue.
-- **Caballo (escena final):** no da habilidad todavía. Queda como una página en blanco del cuaderno: la promesa del Acto II.
-
-**Lo que no hay en este acto:** combate. Leftraru es un niño. La primera pelea del juego debe llegar mucho después y pesar.
+**Sin combate en este acto.** El único peligro es la naturaleza, y se resuelve mirando.
 
 ---
 
 ## 5. Qué queremos mostrar
 
-**Naturaleza:** pewenes, helechos, copihues, el río, el volcán, la niebla de la mañana, la luz dorada de la tarde. Animales: traro, pudú, zorro, chucao, huellas de puma.
+**Naturaleza:** pewenes, canelos, helechos, copihues, el río, el mar a lo lejos, los volcanes. Animales: traro, pudú, zorro, chucao, puma.
 
-**Vida cotidiana:** la ruka y su fuego central, el telar, la preparación del piñón, el palin, los niños aprendiendo de los mayores, la machi y su kultrún, la conversación sobre los sueños.
+**Vida cotidiana:** la ruka y su fuego, el telar y sus dibujos, la cosecha y el guardado del piñón, los weke, las plantas que curan, los juegos, los encargos de los niños.
 
-**Ideas:** que el bosque tiene dueños espirituales y se le pide permiso; que las decisiones se discuten entre todos; que este pueblo no era una masa de guerreros sino familias.
+**Cómo se organiza la gente:** el lof, el lonko, la machi, el werkén, los ancianos que guardan la memoria. Las disputas se resuelven con palin y con comida compartida.
 
-**El paso del día como estructura:** el acto ocurre en un día y medio. La luz cuenta la historia: amanecer (sueño), mañana clara (bosque), tarde dorada (aldea), noche de fuego (asamblea), amanecer gris (ataque).
+**Lo que se cree:** el bosque tiene dueños a los que se pide permiso; los sueños se cuentan al despertar; las historias explican por qué el mundo es como es.
+
+**El paso del tiempo:** el acto va del otoño dorado al invierno. La luz y el clima cambian en cada capítulo.
+
+**Lo que no existía todavía** (cuidado de época): caballos, ovejas, trigo, hierro y platería. Los animales domésticos son el weke y el perro; se cultiva maíz, papa y quínoa.
 
 ---
 
 ## 6. Real y ficción
 
-| Real (documentado o tradición) | Ficción (nuestro relleno del vacío) |
+| Real (documentado o tradición) | Ficción |
 |---|---|
-| Leftraru nació hacia 1534; la tradición lo hace hijo del lonko Curiñancu. | Su carácter de niño y su don de observar. |
-| En 1536 la expedición de Almagro tuvo el primer choque con los mapuche, en el norte de su territorio. | Ñamku, el anciano que estuvo allí. |
-| En 1546 la primera expedición de Valdivia al sur llegó hasta el Biobío. | Que una avanzada alcance su aldea ese día. |
-| Fue capturado siendo niño y sirvió a Valdivia, que lo llamaba Felipe. | Cómo fue la captura: no hay registro. |
-| El piñón, el palin, la ruka, la machi, el valor de los sueños. | Rayen, la machi como personaje, las escenas concretas. |
+| Leftraru nació hacia 1534; la tradición lo hace hijo del lonko Curiñancu. | Su carácter, su don de observar, su familia. |
+| El weke, el piñón, el palin, la ruka, el telar, la machi, el werkén. | Los personajes de la aldea y sus historias personales. |
+| Los incas avanzaron desde el norte en el siglo XV y no dominaron el territorio mapuche. | El padre de Ñamku como testigo. |
+| Treng Treng y Kai Kai, los epew, el We Tripantu. | Cómo los contamos y mostramos aquí. |
 
-**Pendiente importante:** antes de dar por cerrado el guion conviene que alguien con conocimiento de la cultura mapuche revise los nombres, las palabras en mapudungun y cómo mostramos lo espiritual.
+**Pendiente importante:** antes de cerrar el guion conviene que alguien con conocimiento de la cultura mapuche revise nombres, palabras en mapudungun, los relatos y cómo mostramos lo espiritual. Varias costumbres las conocemos por descripciones posteriores, no de 1545.
 
 ---
 
 ## 7. Decisiones abiertas
 
-1. **Idioma:** ¿los personajes hablan en español con algunas palabras en mapudungun, o en mapudungun con subtítulos?
-2. **Rayen:** ¿escapa y reaparece en actos futuros, o su destino queda sin saberse?
-3. **Tono del ataque:** ¿sugerido (sonido, sombras, huida) o más directo?
-4. **Lo sobrenatural:** ¿el sueño y el traro son solo símbolos, o hay algo realmente mágico en el mundo?
-5. **Duración:** ¿30–40 minutos está bien, o prefieres un acto más corto y concentrado?
+1. **Idioma:** ¿español con palabras en mapudungun, o mapudungun con subtítulos?
+2. **Última línea:** ¿el acto termina solo con el amanecer, o con un texto final como *"Fue el último We Tripantu que Leftraru pasó en su casa"*? No muestra a los españoles, pero avisa lo que viene.
+3. **Lo sobrenatural:** ¿el traro y los relatos son solo símbolos, o hay algo mágico de verdad?
+4. **Tamaño:** cinco capítulos es mucho trabajo. ¿Lo hacemos completo, o partimos por los capítulos 1 y 2?
+5. **El viaje al mar:** podría agregarse un capítulo de intercambio con la gente de la costa. ¿Te interesa, o es demasiado?
 
 ## Cinemáticas (nota técnica)
 
