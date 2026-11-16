@@ -93,7 +93,8 @@ $('o-detalle').onchange = (e) => { opts.detalle = e.target.value; applyOpts(); }
 $('o-sens').oninput = (e) => { opts.sens = parseFloat(e.target.value); applyOpts(); };
 $('o-inv').onchange = (e) => { opts.inv = e.target.checked; applyOpts(); };
 $('o-mini').onchange = (e) => { opts.mini = e.target.checked; applyOpts(); };
-$('o-recargar').onclick = $('m-portada').onclick = () => location.reload();
+$('o-recargar').onclick = () => location.reload();
+$('m-portada').onclick = () => { try { if (document.fullscreenElement) document.exitFullscreen(); } catch { /* nada */ } location.reload(); }; // salir del juego: vuelve a la portada
 $('m-continuar').onclick = () => setMenu(false);
 $('o-borrar').onclick = () => { if (confirm('¿Borrar todo lo descubierto en el cuaderno?')) { ui.reset(); location.reload(); } };
 $('btn-menu').onclick = () => setMenu(!menuOpen);
@@ -104,7 +105,9 @@ $('c-entrar').onclick = enter; $('c-opciones').onclick = () => setMenu(true);
 // pantalla completa
 const toggleFull = () => { if (document.fullscreenElement) document.exitFullscreen?.(); else document.documentElement.requestFullscreen?.().catch(() => hint('Este navegador no permitió la pantalla completa', 4)); };
 $('btn-full').onclick = toggleFull; $('o-full').onchange = toggleFull;
-document.addEventListener('fullscreenchange', () => { const on = !!document.fullscreenElement; if (on && state === 'play' && !menuOpen && !ui.open) lock(); $('o-full').checked = on; $('full-label').textContent = on ? 'Salir de pantalla completa' : 'Pantalla completa'; });
+// En pantalla completa se le pide al navegador que Escape llegue al juego en vez de sacarte de ella
+// (funciona en Chrome y Edge; en otros navegadores Escape sigue saliendo de la pantalla completa).
+document.addEventListener('fullscreenchange', () => { const on = !!document.fullscreenElement; try { if (on) navigator.keyboard?.lock?.(['Escape'])?.catch?.(() => {}); else navigator.keyboard?.unlock?.(); } catch { /* sin soporte */ } if (on && state === 'play' && !menuOpen && !ui.open) lock(); $('o-full').checked = on; $('full-label').textContent = on ? 'Salir de pantalla completa' : 'Pantalla completa'; });
 if (!document.documentElement.requestFullscreen) { $('btn-full').style.display = 'none'; $('o-full').parentElement.style.display = 'none'; }
 // al soltar el ratón con Escape durante el juego, se abre el menú
 // El ratón: al entrar al mundo queda tomado para girar la cámara. Escape lo suelta y abre el menú.
@@ -252,11 +255,22 @@ let focus = null;
 const lamp = new THREE.PointLight(0xfff2dc, 0, 9, 1.4); scene.add(lamp);
 const ease = (k) => k * k * (3 - 2 * k);
 function startFocus(c) {
-  const t = pp(), T = c.live ? c.live() : c.target, sh = c.shot, pos = V3();
-  if (sh.fromPlayer) pos.set(t.x, t.y + 0.95, t.z); // las aves se miran desde donde estás, con mucho acercamiento
-  else { let dx = t.x - T.x, dz = t.z - T.z; const l = Math.hypot(dx, dz) || 1; pos.set(T.x + (dx / l) * sh.dist, T.y + sh.up, T.z + (dz / l) * sh.dist); pos.y = Math.max(pos.y, height(pos.x, pos.z) + 0.35); }
+  const t = pp(), T = c.live ? c.live() : c.target, sh = c.shot, pos = V3(), tv = V3(T.x, T.y, T.z);
+  let dx = t.x - T.x, dz = t.z - T.z; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
+  const place = (ax, az) => { pos.set(T.x + ax * sh.dist, T.y + sh.up, T.z + az * sh.dist); pos.y = Math.max(pos.y, height(pos.x, pos.z) + (sh.tree ? 1.6 : 0.3)); return pos; };
+  if (sh.fromPlayer) pos.set(t.x, t.y + 0.95, t.z);             // las aves se miran desde donde estás, con mucho acercamiento
+  else if (sh.tree) {                                            // árbol: se busca alrededor el lado desde donde menos lo tapan otros
+    let best = null; const a0 = Math.atan2(dz, dx);
+    for (let k = 0; k < 12; k++) { const a = a0 + (k % 2 ? 1 : -1) * Math.ceil(k / 2) * (Math.PI / 6), p2 = place(Math.cos(a), Math.sin(a)).clone();
+      let score = world.blockers(p2, tv, c.rec).length + Math.ceil(k / 2) * 0.15;
+      for (let u = 0.15; u < 0.9; u += 0.15) if (height(p2.x + (T.x - p2.x) * u, p2.z + (T.z - p2.z) * u) > p2.y + (T.y - p2.y) * u - 1) score += 4; // un cerro tapa la vista
+      if (!best || score < best.score) best = { score, p2 }; }
+    pos.copy(best.p2);
+  } else if (sh.face && c.rec) { const nx = Math.sin(c.rec.yaw), nz = Math.cos(c.rec.yaw), sg = nx * dx + nz * dz >= 0 ? 1 : -1; place(nx * sg, nz * sg); } // planta plana: de frente
+  else place(dx, dz);
+  if (!sh.fromPlayer) world.clearView(pos, tv, c.rec, !sh.tree);  // lo que queda entre la cámara y el objeto se oculta mientras dura la observación
   lamp.userData.on = !sh.fromPlayer && sh.dist < 6;
-  focus = { c, pos, fov: sh.fov, t: 0, stage: 0, hold: 0, sp: camera.position.clone(), sf: camera.fov, look: V3(t.x, t.y + 0.75, t.z), done: false };
+  focus = { c, pos: pos.clone(), fov: sh.fov, t: 0, stage: 0, hold: 0, sp: camera.position.clone(), sf: camera.fov, look: V3(t.x, t.y + 0.75, t.z), done: false };
   $('prompt').classList.remove('on'); $('focus').textContent = `Observando ${c.label}…`; $('focus').classList.add('on'); document.body.classList.add('talking');
 }
 function updateFocus(dt) {
@@ -265,7 +279,7 @@ function updateFocus(dt) {
   else if (f.stage === 1) {
     camera.position.copy(f.pos); camera.lookAt(tv); f.hold += dt;
     if (f.hold > 0.45 && !f.done) { f.done = true; camera.updateProjectionMatrix(); world.update(0, time, camera.position, pp(), 0); draw(); const img = grab(); if (f.c.known) ui.retake(f.c.id, img); else ui.discover(f.c.id, img); }
-    if (f.hold > 1.7) { f.stage = 2; f.t = 0; $('focus').classList.remove('on'); }
+    if (f.hold > 1.7) { f.stage = 2; f.t = 0; $('focus').classList.remove('on'); world.restoreView(); }
   } else { f.t = Math.min(1, f.t + dt / 0.7); const k = ease(f.t), [pos, look] = chase(); camera.position.lerpVectors(f.pos, pos, k); camera.fov = f.fov + (f.sf - f.fov) * k; camera.lookAt(tv.lerp(look, k)); if (k > 0.5) boy.g.visible = true; if (f.t >= 1) { camera.fov = f.sf; focus = null; document.body.classList.remove('talking'); } }
   lamp.position.copy(camera.position); lamp.intensity = lamp.userData.on && focus ? (f.stage === 1 ? 7 : f.stage === 0 ? 7 * f.t : 7 * (1 - f.t)) : 0;
   camera.updateProjectionMatrix();

@@ -96,7 +96,7 @@ export function buildWorld(scene, RAPIER, physics) {
     const young = kind === 'pewen' && rng() < 0.16;
     const H = kind === 'pewen' ? (young ? R(4, 8) : zk === 'alpine' ? R(12, 18) : R(20, 32)) : { giant: R(30, 40), canelo: R(7, 12), roble: R(16, 25), coigue: R(18, 30), peumo: R(9, 14), boldo: R(6, 10), quillay: R(9, 15), litre: R(4, 7) }[kind]; // alturas reales de cada especie
     const t = { x, z, y: h, H, kind }; trees.push(t); const k = gk(x, z); (grid.get(k) || grid.set(k, []).get(k)).push(t);
-    flora.tree(young ? 'pewenYoung' : kind, x, h - 0.1, z, H);
+    t.rec = flora.tree(young ? 'pewenYoung' : kind, x, h - 0.1, z, H);
     if (kind === 'coigue' && rng() < 0.3) { const a = R(0, 6.28), rr = H * 0.0273 * 1.15 + 0.1; flora.scatter('copihue', x + Math.cos(a) * rr, h + R(0.3, 1.2), z + Math.sin(a) * rr, R(0.9, 1.3)); } // copihue trepando por el tronco
   }
 
@@ -151,7 +151,7 @@ export function buildWorld(scene, RAPIER, physics) {
   return {
     items, trees, life, strokes: Math.round(tris),
     nearTree(x, z, r) { const ci = Math.floor(x / 8), cj = Math.floor(z / 8); let best = null; for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const l = grid.get(ci + i + ',' + (cj + j)); if (l) for (const t of l) { const d = Math.hypot(t.x - x, t.z - z); if (d < r && (!best || d < best.d)) best = { ...t, d }; } } return best; },
-    nearPlant: flora.nearScatter, nearBush: flora.nearBush, volcano: new THREE.Vector3(VOL.x, 380, VOL.z),
+    nearPlant: flora.nearScatter, nearBush: flora.nearBush, blockers: flora.blockers, clearView: flora.clearView, restoreView: flora.restoreView, volcano: new THREE.Vector3(VOL.x, 380, VOL.z),
     update(dt, t, camPos, playerPos, speed) { flora.update(camPos); life.update(dt, t, playerPos, speed); if (emit.glow) { emit.glow.intensity = 12 + Math.sin(t * 11) * 2.5 + Math.sin(t * 23.7) * 1.5; emit.ember.emissiveIntensity = 1.8 + Math.sin(t * 3.1) * 0.5 + Math.sin(t * 7.3) * 0.25; } },
   };
 }

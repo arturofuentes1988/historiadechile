@@ -93,9 +93,11 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
 
   function tree(kind, x, y, z, H, tint, solid = true) {
     const sp = SPEC[kind], v = (rng() * sp.n) | 0, s = H / sp.models[v].H;
-    (solid ? sp.inst : sp.far)[v].push({ x, y, z, s, yaw: R(0, 6.28), tint: tint ?? 0.82 + rng() * 0.3 });
+    const rec = { x, y, z, s, yaw: R(0, 6.28), tint: tint ?? 0.82 + rng() * 0.3, kind, tree: true, rad: kind === 'bush' ? s : Math.max(1.2, sp.models[v].H * s * 0.24) };
+    (solid ? sp.inst : sp.far)[v].push(rec);
     const r = kind === 'bush' ? 0 : ({ giant: 1.3, pewen: 0.48, pewenYoung: 0.16, coigue: 0.6, roble: 0.5, canelo: 0.2, peumo: 0.34, boldo: 0.26, quillay: 0.36, litre: 0.2 }[kind]) * s;
     if (solid && r > 0.08) physics.createCollider(RAPIER.ColliderDesc.cylinder(H * 0.3, r).setTranslation(x, y + H * 0.3 - 0.5, z), fixed);
+    return rec;
   }
 
   // ---------- pasto, helechos, juncos y flores: por trozos de mapa, los lejanos no se dibujan ----------
@@ -142,13 +144,13 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
     for (const k in SPEC) for (const far of [false, true]) SPEC[k].models.forEach((mdl, v) => { // los árboles de fuera del mapa no proyectan sombra
       const list = (far ? SPEC[k].far : SPEC[k].inst)[v]; if (!list.length) return;
       const wood = new THREE.InstancedMesh(mdl.wood, SPEC[k].bark, list.length), leaf = new THREE.InstancedMesh(mdl.leaves, SPEC[k].leaf, list.length);
-      list.forEach((t, i) => { M.compose(V(t.x, t.y, t.z), q.setFromAxisAngle(UP, t.yaw), V(t.s, t.s, t.s)); wood.setMatrixAt(i, M); leaf.setMatrixAt(i, M); leaf.setColorAt(i, c.setScalar(t.tint)); });
+      list.forEach((t, i) => { M.compose(V(t.x, t.y, t.z), q.setFromAxisAngle(UP, t.yaw), V(t.s, t.s, t.s)); wood.setMatrixAt(i, M); leaf.setMatrixAt(i, M); leaf.setColorAt(i, c.setScalar(t.tint)); t.meshes = [wood, leaf]; t.i = i; });
       for (const m of [wood, leaf]) { m.castShadow = !far; m.receiveShadow = m === wood && !far; m.frustumCulled = false; scene.add(m); } // la copa no se sombrea a sí misma: se vería negra
       tris += (mdl.wood.index.count + mdl.leaves.index.count) / 3 * list.length;
     });
     for (const k in SCATTER) for (const [key, list] of SCATTER[k].cells) {
       const m = new THREE.InstancedMesh(SCATTER[k].geo, SCATTER[k].mat, list.length), [ci, cj] = key.split(',').map(Number);
-      list.forEach((t, i) => { M.compose(V(t.x, t.y - 0.03, t.z), q.setFromAxisAngle(UP, rng() * 6.28), V(t.s, t.s * (0.8 + rng() * 0.5), t.s)); m.setMatrixAt(i, M); m.setColorAt(i, c.set(t.color).multiplyScalar(0.62 + rng() * 0.34)); });
+      list.forEach((t, i) => { t.yaw = rng() * 6.28; t.sy = 0.8 + rng() * 0.5; t.meshes = [m]; t.i = i; M.compose(V(t.x, t.y - 0.03, t.z), q.setFromAxisAngle(UP, t.yaw), V(t.s, t.s * t.sy, t.s)); m.setMatrixAt(i, M); m.setColorAt(i, c.set(t.color).multiplyScalar(0.62 + rng() * 0.34)); });
       m.receiveShadow = true; m.frustumCulled = false; scene.add(m); chunks.push({ m, cx: (ci + 0.5) * CS, cz: (cj + 0.5) * CS, range: SCATTER[k].range });
     }
     const rm = MAT.rock();
@@ -158,13 +160,33 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
   }
   function update(p) { for (const c of chunks) c.m.visible = Math.hypot(p.x - c.cx, p.z - c.cz) < c.range + 30; }
 
+  // ---------- despejar la vista: al observar algo, lo que tapa el encuadre se oculta un momento ----------
+  const hidden = [], ZERO = new THREE.Matrix4().makeScale(0, 0, 0), TM = new THREE.Matrix4(), TQ = new THREE.Quaternion();
+  const segDist = (px, pz, a, b) => { const dx = b.x - a.x, dz = b.z - a.z, t = Math.min(1, Math.max(0, ((px - a.x) * dx + (pz - a.z) * dz) / (dx * dx + dz * dz || 1))); return [Math.hypot(px - a.x - dx * t, pz - a.z - dz * t), t]; };
+  // cuántos árboles estorban entre la cámara (a) y el objeto (b)
+  function blockers(a, b, except) {
+    const out = [];
+    for (const k in SPEC) for (const l of SPEC[k].inst) for (const t of l) { if (t === except) continue; const [d, u] = segDist(t.x, t.z, a, b); if (d < t.rad && (u < 0.92 || d < t.rad * 0.5)) out.push(t); }
+    return out;
+  }
+  function clearView(a, b, except, plants = true) {
+    const list = blockers(a, b, except);
+    if (plants) for (const k in SCATTER) { const i0 = Math.floor(Math.min(a.x, b.x) / CS) - 1, i1 = Math.floor(Math.max(a.x, b.x) / CS) + 1, j0 = Math.floor(Math.min(a.z, b.z) / CS) - 1, j1 = Math.floor(Math.max(a.z, b.z) / CS) + 1;
+      for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const l = SCATTER[k].cells.get(i + ',' + j); if (l) for (const t of l) if (t !== except && k !== 'litter' && segDist(t.x, t.z, a, b)[0] < 0.75) list.push(t); } }
+    for (const t of list) { for (const m of t.meshes) { m.setMatrixAt(t.i, ZERO); m.instanceMatrix.needsUpdate = true; } hidden.push(t); }
+  }
+  function restoreView() {
+    for (const t of hidden) { if (t.tree) TM.compose(V(t.x, t.y, t.z), TQ.setFromAxisAngle(UP, t.yaw), V(t.s, t.s, t.s)); else TM.compose(V(t.x, t.y - 0.03, t.z), TQ.setFromAxisAngle(UP, t.yaw), V(t.s, t.s * t.sy, t.s)); for (const m of t.meshes) { m.setMatrixAt(t.i, TM); m.instanceMatrix.needsUpdate = true; } }
+    hidden.length = 0;
+  }
+
   // búsquedas para la exploración: ¿hay una planta de este tipo cerca?
   function nearScatter(kind, x, z, r) {
     const ci = Math.floor(x / CS), cj = Math.floor(z / CS); let best = null;
-    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const l = SCATTER[kind].cells.get(ci + i + ',' + (cj + j)); if (l) for (const t of l) { const d = Math.hypot(t.x - x, t.z - z); if (d < r && (!best || d < best.d)) best = { x: t.x, y: t.y, z: t.z, d }; } }
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const l = SCATTER[kind].cells.get(ci + i + ',' + (cj + j)); if (l) for (const t of l) { const d = Math.hypot(t.x - x, t.z - z); if (d < r && (!best || d < best.d)) best = { x: t.x, y: t.y, z: t.z, d, s: t.s, rec: t }; } }
     return best;
   }
-  function nearBush(x, z, r) { let best = null; for (const l of SPEC.bush.inst) for (const t of l) { const d = Math.hypot(t.x - x, t.z - z); if (d < r && (!best || d < best.d)) best = { x: t.x, y: t.y, z: t.z, d }; } return best; }
+  function nearBush(x, z, r) { let best = null; for (const l of SPEC.bush.inst) for (const t of l) { const d = Math.hypot(t.x - x, t.z - z); if (d < r && (!best || d < best.d)) best = { x: t.x, y: t.y, z: t.z, d, s: t.s, rec: t }; } return best; }
 
-  return { tree, scatter, rock, log, build, update, nearScatter, nearBush };
+  return { tree, scatter, rock, log, build, update, nearScatter, nearBush, blockers, clearView, restoreView };
 }

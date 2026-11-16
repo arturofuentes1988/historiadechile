@@ -26,11 +26,13 @@ export function createExplorer({ world, ui }) {
     fix('chemamull', 'las figuras de madera', POI.antiguos.x, POI.antiguos.z, 8, 1.6, { dist: 8.5, up: 0.8, fov: 46 });
     if (d2(p, CERRO[0], CERRO[1]) < 11) { add('pillan', 'Mirar', 'el volcán', 1, null, { view: 'pillan' }); add('lafken', 'Mirar', 'el mar', 1.5, null, { view: 'lafken' }); }
     const rz = riverZ(p.x); if (Math.abs(p.z - rz) < 9) add('rio', 'Observar', 'el río', Math.abs(p.z - rz), { x: p.x + 4, y: -1.3, z: rz }, { dist: 11, up: 3.2, fov: 55 });
-    const t = world.nearTree(p.x, p.z, 3.6 * k); if (t) { const [id, label] = TREE[t.kind]; add(id, 'Observar', label, t.d, { x: t.x, y: t.y + t.H * 0.52, z: t.z }, { dist: t.H * 1.25 + 4, up: -t.H * 0.3, fov: 56 }); } // el árbol entero, en plano general
-    for (const [kind, id, label, r, y, shot] of [['fern', 'helecho', 'el helecho', 1.8, 0.4, { dist: 1.25, up: 0.75, fov: 44 }], ['reed', 'junco', 'los juncos', 2, 0.9, { dist: 1.9, up: 0.15, fov: 42 }], ['flower', 'flores', 'las flores', 1.6, 0.25, { dist: 0.7, up: 0.4, fov: 40 }], ['quila', 'quila', 'la quila', 3, 1.5, { dist: 3.6, up: 0.2, fov: 46 }], ['copihue', 'copihue', 'el copihue', 2.4, 1.15, { dist: 1.15, up: 0.1, fov: 40 }]]) {
-      const s = world.nearPlant(kind, p.x, p.z, r * k); if (s) add(id, 'Observar', label, s.d, { x: s.x, y: s.y + y, z: s.z }, shot);
+    // el árbol entero, en plano general
+    const t = world.nearTree(p.x, p.z, 3.6 * k); if (t) { const [id, label] = TREE[t.kind]; add(id, 'Observar', label, t.d, { x: t.x, y: t.y + t.H * 0.5, z: t.z }, { dist: t.H * 1.12 + 3, up: -t.H * 0.28, fov: 56, tree: true }, { rec: t.rec }); }
+    // las plantas, de cerca: se calcula su centro y su tamaño reales, y las planas se miran de frente
+    for (const [kind, id, label, r, cy, dist, up, fov, face] of [['fern', 'helecho', 'el helecho', 1.8, 0.42, 1.25, 0.75, 44, false], ['reed', 'junco', 'los juncos', 2, 0.85, 2.3, 0.05, 42, true], ['flower', 'flores', 'las flores', 1.6, 0.26, 0.85, 0.04, 40, true], ['quila', 'quila', 'la quila', 3, 1.3, 5, 0.3, 46, false], ['copihue', 'copihue', 'el copihue', 2.4, 0.95, 2.5, 0, 42, true]]) {
+      const s = world.nearPlant(kind, p.x, p.z, r * k); if (s) add(id, 'Observar', label, s.d, { x: s.x, y: s.y + cy * s.s * (face ? s.rec.sy || 1 : 1), z: s.z }, { dist: dist * s.s, up: up * s.s, fov, face }, { rec: s.rec });
     }
-    if (d2(p, POI.maqui.x, POI.maqui.z) < 28) { const s = world.nearBush(p.x, p.z, 2.6 * k); if (s) add('maqui', 'Observar', 'el maqui', s.d, { x: s.x, y: s.y + 1, z: s.z }, { dist: 1.9, up: 0.15, fov: 42 }); }
+    if (d2(p, POI.maqui.x, POI.maqui.z) < 28) { const s = world.nearBush(p.x, p.z, 2.6 * k); if (s) add('maqui', 'Observar', 'el maqui', s.d, { x: s.x, y: s.y + 1.0 * s.s, z: s.z }, { dist: 3.3 * s.s, up: 0.1, fov: 44 }, { rec: s.rec }); }
     const fresh = c.filter((x) => !x.known).sort((a, b) => a.d - b.d)[0];
     if (fresh) return fresh;
     const who = c.filter((x) => x.person).sort((a, b) => a.d - b.d)[0]; if (who) return who;
