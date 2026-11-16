@@ -20,7 +20,8 @@ export function buildVillage({ scene, rng, bag, flora, physics, RAPIER, fixed })
   // ---------- ruka: casa de paja con la puerta hacia el oriente ----------
   const thatch = MAT.thatch(), prof = [[1, 0], [1.03, 0.9], [0.86, 1.8], [0.5, 2.8], [0.1, 3.55]];
   thatch.map = photo('paja', { repeat: [4, 1.25] }); thatch.bumpMap = thatch.map; thatch.bumpScale = 4; // paja fotográfica, en hileras alrededor de la ruka
-  const darkMat = new THREE.MeshStandardMaterial({ color: 0x0c0a08, roughness: 1 });
+  const darkMat = new THREE.MeshBasicMaterial({ color: 0x0a0806, side: THREE.DoubleSide });
+  const porch = thatch.clone(); porch.side = THREE.DoubleSide; porch.map = photo('paja', { repeat: [1, 1] }); porch.bumpMap = porch.map;
   function ruka({ x, z, s, smoke }) {
     const y = height(x, z) - 0.05, r = 3.3 * s;
     // perfil ondulado para que la paja no se vea lisa
@@ -28,16 +29,24 @@ export function buildVillage({ scene, rng, bag, flora, physics, RAPIER, fixed })
     const g = new THREE.LatheGeometry(pts, 28), P = g.attributes.position;
     for (let i = 0; i < P.count; i++) { const k = 1 + Math.sin(P.getX(i) * 9 + P.getZ(i) * 7) * 0.012; P.setX(i, P.getX(i) * k); P.setZ(i, P.getZ(i) * k * 0.82); }
     g.computeVertexNormals(); add(g, thatch, x, y, z);
-    add(new THREE.BoxGeometry(0.3, 1.9 * s, 1.5 * s), darkMat, x + r * 0.95, y + 0.95 * s, z).castShadow = false; // vano oscuro de la puerta
-    for (const dz of [-0.85, 0.85]) bag.add(cyl, M(x + r * 1.02, y + 1.05 * s, z + dz * s, 0, 0.09, 2.1 * s, 0.09), WOOD);
-    bag.add(cyl, M(x + r * 1.02, y + 2.1 * s, z, PI / 2, 0.09, 2.0 * s, 0.09, PI / 2), WOOD);
+    // entrada: un zaguán de paja en arco que sale hacia el oriente, con marco de varas curvadas,
+    // el fondo en penumbra y un cuero recogido a un lado
+    { const w = 0.82 * s, h = 1.9 * s, x0 = x + r * 0.7, x1 = x + r * 1.03 + 0.75 * s, N = 14, P = [], U = [], I = [];
+      for (let k = 0; k <= 1; k++) for (let n = 0; n <= N; n++) { const a = PI * n / N, sag = 1 + Math.sin(a * 5 + k) * 0.015; P.push(k ? x1 : x0, y + Math.sin(a) * h * sag * (k ? 0.96 : 1), z + Math.cos(a) * w * (k ? 0.96 : 1)); U.push(k * 0.45, Math.abs(n / N - 0.5) * 1.6); }
+      for (let n = 0; n < N; n++) I.push(n, n + N + 1, n + 1, n + 1, n + N + 1, n + N + 2);
+      const ag = new THREE.BufferGeometry(); ag.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); ag.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); ag.setIndex(I); ag.computeVertexNormals();
+      const zm = new THREE.Mesh(ag, porch); zm.castShadow = zm.receiveShadow = true; scene.add(zm);
+      const fondo = new THREE.Mesh(new THREE.CircleGeometry(1, 16, 0, PI), darkMat); fondo.scale.set(w * 0.98, h * 0.98, 1); fondo.rotation.y = PI / 2; fondo.position.set(x + r * 1.07, y, z); scene.add(fondo);
+      for (const [xx, tube, col] of [[x1 - 0.02, 0.06, WOOD], [x1 - 0.4 * s, 0.035, WOOD2]]) { const arc = new THREE.TorusGeometry(1, tube / w, 6, 18, PI); arc.rotateY(PI / 2); bag.add(arc, M(xx, y, z, 0, 1, h * 0.985, w * 0.985), col); } // varas curvadas del marco
+      for (const dz of [-1, 1]) bag.add(cyl, M(x1 - 0.02, y + 0.5 * s, z + dz * w * 1.0, 0, 0.07, 1.0 * s, 0.07), WOOD); // horcones a los lados
+      const cu = new THREE.PlaneGeometry(0.62 * s, 1.55 * s, 4, 1), CP = cu.attributes.position; for (let n = 0; n < CP.count; n++) CP.setZ(n, Math.sin(CP.getX(n) * 14) * 0.05); // el cuero cae en pliegues
+      bag.add(cu, M(x1 - 0.12, y + 0.8 * s, z - w * 0.62, PI / 2 - 0.12, 0.7, 1, 1), 0x4a3424, 'cuero');
+    }
     for (const rz of [0.5, -0.5]) bag.add(cyl, M(x, y + 3.6 * s, z, R(0, 3), 0.045, 1.6, 0.045, rz), WOOD2); // palos cruzados en la cumbre
     // amarras de fibra que sujetan la paja, a tres alturas
     for (const [f, hh] of [[1.035, 0.85], [0.9, 1.75], [0.56, 2.7]]) { const tor = new THREE.TorusGeometry(r * f, 0.035, 5, 28); tor.rotateX(PI / 2); bag.add(tor, M(x, y + hh * s, z, 0, 1, 1, 0.82), 0x6e5a34, 'otros'); }
-    // cuero que cierra la puerta, recogido a un lado, y la estera de la entrada
-    bag.add(new THREE.PlaneGeometry(0.75 * s, 1.75 * s), M(x + r * 1.03, y + 0.95 * s, z - 0.5 * s, PI / 2 - 0.25), 0x6a4a30, 'cuero');
-    bag.add(new THREE.PlaneGeometry(0.5 * s, 0.5 * s), M(x + r * 1.05, y + 1.95 * s, z + 0.55 * s, PI / 2 + 0.1), 0x5a4030, 'cuero'); // un cuero chico colgado del dintel
-    bag.add(new THREE.BoxGeometry(1.3, 0.03, 1.5), M(x + r * 1.03 + 0.8, y + 0.03, z, R(-0.1, 0.1)), 0xb89c5e, 'estera');
+    // la estera de la entrada
+    bag.add(new THREE.BoxGeometry(1.3, 0.03, 1.5), M(x + r * 1.03 + 1.5 * s, y + 0.03, z, R(-0.1, 0.1)), 0xb89c5e, 'estera');
     // cosas de todos los días junto a la pared: varas apoyadas, un canasto y la piedra de moler
     const a0 = R(1.2, 2.2) * (rng() < 0.5 ? 1 : -1), wx = x + Math.cos(a0) * r * 1.08, wz = z + Math.sin(a0) * r * 0.9;
     for (let i = 0; i < 3; i++) bag.add(cyl, M(wx + i * 0.16, y + 1.05, wz + i * 0.05, 0, 0.025, 2.3 + i * 0.2, 0.025, 0.2 * (Math.cos(a0) > 0 ? -1 : 1)), i % 2 ? WOOD : 0x8a7a50);

@@ -33,6 +33,7 @@ export function createExplorer({ world, ui }) {
       const s = world.nearPlant(kind, p.x, p.z, r * k); if (s) add(id, 'Observar', label, s.d, { x: s.x, y: s.y + cy * s.s * (face ? s.rec.sy || 1 : 1), z: s.z }, { dist: dist * s.s, up: up * s.s, fov, face }, { rec: s.rec });
     }
     if (d2(p, POI.maqui.x, POI.maqui.z) < 28) { const s = world.nearBush(p.x, p.z, 2.6 * k); if (s) add('maqui', 'Observar', 'el maqui', s.d, { x: s.x, y: s.y + 1.0 * s.s, z: s.z }, { dist: 3.3 * s.s, up: 0.1, fov: 44 }, { rec: s.rec }); }
+    const urgent = c.filter((x) => x.person && api.urgent && api.urgent(x.id)).sort((a, b) => a.d - b.d)[0]; if (urgent) return urgent; // quien tiene un encargo pendiente va primero
     const fresh = c.filter((x) => !x.known).sort((a, b) => a.d - b.d)[0];
     if (fresh) return fresh;
     const who = c.filter((x) => x.person).sort((a, b) => a.d - b.d)[0]; if (who) return who;
@@ -48,5 +49,6 @@ export function createExplorer({ world, ui }) {
     for (const key in POI) add('l-' + key, POI[key].x, POI[key].z);
     return out;
   }
-  return { scan, hints, set reach(v) { reach = v; } };
+  const api = { scan, hints, urgent: null, set reach(v) { reach = v; } };
+  return api;
 }

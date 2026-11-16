@@ -159,6 +159,7 @@ export function createUI({ world, onToast, onClose, onSkill }) {
     retake(id, img) { if (found[id] === undefined) return; found[id] = img; save(); onToast(`Foto actualizada: ${BY[id].title}`); if (open) render(); },
     place(key) { places.add(key); },
     addItem(id) { bag[id] = (bag[id] || 0) + 1; if (open) render(); },
+    takeItem(id, n = 1) { bag[id] = (bag[id] || 0) - n; if (bag[id] <= 0) delete bag[id]; if (open) render(); },
     reset() { found = {}; skills = []; done = {}; extra = 0; save(); refreshScore(); },
     skill: (id) => skills.includes(id), avail, earned,
     // revisa las misiones con el estado actual; entrega recompensas y devuelve la principal activa

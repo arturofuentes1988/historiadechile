@@ -62,8 +62,9 @@
   .tool:hover { background: #c98a4a; color: var(--ink); } .tool:hover svg, .tool:hover kbd { color: var(--ink); }
   .tool.row { flex-direction: row; min-width: 0; padding: 10px 14px; gap: 8px; } .tool.row kbd { margin-left: 2px; } .tool.row svg { width: 18px; height: 18px; }
   .tool.new::after { content: ''; position: absolute; top: 7px; right: 9px; width: 9px; height: 9px; background: #e9b03a; transform: rotate(45deg); }
-  #prompt { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; background: var(--panel); clip-path: var(--step); padding: 10px 22px 10px 12px; font-size: 17px; opacity: 0; transition: opacity .2s; pointer-events: none; }
-  #prompt.on { opacity: 1; }
+  #prompt2 { bottom: 150px !important; }
+  #prompt, #prompt2 { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; background: var(--panel); clip-path: var(--step); padding: 10px 22px 10px 12px; font-size: 17px; opacity: 0; transition: opacity .2s; pointer-events: none; }
+  #prompt.on, #prompt2.on { opacity: 1; }
   .key { display: inline-grid; place-items: center; width: 30px; height: 30px; background: var(--copper); color: var(--ink); font-weight: bold; font-size: 16px; clip-path: polygon(6px 0, calc(100% - 6px) 0, calc(100% - 6px) 3px, calc(100% - 3px) 3px, calc(100% - 3px) 6px, 100% 6px, 100% calc(100% - 6px), calc(100% - 3px) calc(100% - 6px), calc(100% - 3px) calc(100% - 3px), calc(100% - 6px) calc(100% - 3px), calc(100% - 6px) 100%, 6px 100%, 6px calc(100% - 3px), 3px calc(100% - 3px), 3px calc(100% - 6px), 0 calc(100% - 6px), 0 6px, 3px 6px, 3px 3px, 6px 3px); font-family: Georgia, serif; }
   #focus { position: fixed; left: 50%; bottom: 60px; transform: translateX(-50%); background: var(--panel); clip-path: var(--step); padding: 10px 24px; font-size: 17px; font-style: italic; opacity: 0; transition: opacity .4s; pointer-events: none; box-shadow: inset 0 -2px 0 var(--copper); z-index: 3; }
   #focus.on { opacity: 1; }
@@ -99,7 +100,7 @@
   .card .q { background: #00000040; color: #ffffff30; font-size: 30px; } .card span { padding: 6px 4px 7px; }
   .card.locked span { color: #ffffff55; font-style: italic; } .card:hover { background: #ffffff22; } .card.on { background: var(--copper); color: var(--ink); } .card.on span { color: var(--ink); }
   article img { width: 100%; display: block; max-height: 250px; object-fit: cover; }
-  body.talking #btns, body.talking #minimap, body.talking #prompt { opacity: 0 !important; pointer-events: none; } article h3 { margin: 14px 0 2px; font-size: 26px; font-weight: normal; color: var(--cream); }
+  body.talking #btns, body.talking #minimap, body.talking #prompt, body.talking #prompt2 { opacity: 0 !important; pointer-events: none; } article h3 { margin: 14px 0 2px; font-size: 26px; font-weight: normal; color: var(--cream); }
   article h4 { margin: 0 0 10px; font-weight: normal; font-style: italic; color: var(--copper); font-size: 15px; letter-spacing: .04em; }
   article p { margin: 0; font-size: 16.5px; line-height: 1.6; } article em { display: block; margin-top: 12px; color: var(--copper); font-size: 14px; }
   article.unknown { background: #ffffff0a; padding: 26px 22px; text-align: center; color: var(--dim); } .big-q { font-size: 70px; color: #ffffff25; line-height: 1; }
@@ -177,6 +178,7 @@
 <div id="skip">ENTER · saltar</div>
 <div id="end">Fin del prototipo — continuará…</div>
 <canvas id="minimap" width="340" height="340" title="Abrir el mapa (M)"></canvas>
+<div id="prompt2" class="shadow"><span class="key" data-key="accion">R</span><span id="prompt2-text"></span></div>
 <div id="prompt" class="shadow"><span class="key" data-key="observar">E</span><span id="prompt-text"></span></div>
 <div id="focus"></div>
 <div id="mousehint">Haz clic en el juego para girar la cámara con el ratón</div>
