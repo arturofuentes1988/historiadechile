@@ -200,7 +200,7 @@ addEventListener('keydown', (e) => {
   keys[e.code] = true;
   if (is(e, 'observar') && !e.repeat) interact();
   if (talk) { if (e.code === 'Enter' || e.code === 'Space') interact(); return; }
-  if (state === 'play') for (const pn of ['cuaderno', 'misiones', 'saberes', 'bolsa', 'mapa']) if (is(e, pn)) { snd.play({ cuaderno: 'ui-cuaderno', bolsa: 'ui-bolsa', mapa: 'ui-mapa' }[pn] || 'ui-clic', 0.6); ui.show(pn === 'cuaderno' ? 'notas' : pn); }
+  if (state === 'play') for (const pn of ['cuaderno', 'misiones', 'saberes', 'bolsa', 'mapa']) if (is(e, pn)) { snd.play('ui-cuaderno', 0.6); ui.show(pn === 'cuaderno' ? 'notas' : pn); }
   if (e.code === 'Escape') { if (ui.open) ui.show(null); else if (state !== 'cine') setMenu(true); }
   if (['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
 });
@@ -357,8 +357,8 @@ function updateSound(dt) {
   const p = pp(), play = state === 'play', d0 = Math.hypot(p.x, p.z), moved = lastP ? Math.hypot(p.x - lastP.x, p.z - lastP.z) : 0; lastP = { x: p.x, z: p.z };
   if (play && player.grounded && moved > 0.001 && moved < 1) {
     stepD += moved; const stride = player.speed > 4.5 ? 1.25 : 0.8;
-    if (stepD > stride) { stepD = 0; const s = player.wade > 0.05 ? 'agua' : SUELO[zone(p.x, p.z, height(p.x, p.z), normalAt(p.x, p.z)[1])] || 'tierra'; snd.play(`paso-${s}-${Math.random() < 0.5 ? 1 : 2}`, (s === 'agua' ? 0.55 : 0.4) * (player.speed > 4.5 ? 1.25 : 1), 0.88 + Math.random() * 0.24); }
-    roceT -= dt; if (roceT <= 0 && (world.nearBush(p.x, p.z, 1.0) || ROCE.some((k) => world.nearPlant(k, p.x, p.z, 0.6)))) { roceT = 0.55; snd.play(`arbusto-${Math.random() < 0.5 ? 1 : 2}`, 0.45, 0.85 + Math.random() * 0.3); } // roce al pasar entre las plantas
+    if (stepD > stride) { stepD = 0; const s = player.wade > 0.05 ? 'agua' : SUELO[zone(p.x, p.z, height(p.x, p.z), normalAt(p.x, p.z)[1])] || 'tierra'; snd.play(`paso-${s}-${Math.random() < 0.5 ? 1 : 2}`, (s === 'agua' ? 0.16 : 0.1) * (player.speed > 4.5 ? 1.2 : 1), 0.9 + Math.random() * 0.2); // los pasos van por debajo del ambiente }
+    roceT -= dt; if (roceT <= 0 && (world.nearBush(p.x, p.z, 1.0) || ROCE.some((k) => world.nearPlant(k, p.x, p.z, 0.6)))) { roceT = 0.55; snd.play(`arbusto-${Math.random() < 0.5 ? 1 : 2}`, 0.16, 0.85 + Math.random() * 0.3); } // roce al pasar entre las plantas
   }
   const k = play || state === 'cine' ? 1 : 0, bosque = Math.min(1, Math.max(0, (d0 - 30) / 40));
   snd.loop('rio', k * 0.75 * Math.max(0, 1 - Math.abs(p.z - riverZ(p.x)) / 32) ** 2);
@@ -367,7 +367,7 @@ function updateSound(dt) {
   snd.loop('fuego', k * 0.6 * Math.max(0, 1 - d0 / 13) ** 2);
 }
 // toque al abrir el cuaderno, la bolsa, el mapa y al pulsar cualquier botón
-addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; const id = b.id || ''; snd.play(id === 'btn-notas' ? 'ui-cuaderno' : id === 'btn-bolsa' ? 'ui-bolsa' : id === 'btn-mapa' ? 'ui-mapa' : 'ui-clic', 0.6); }, true);
+addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; const id = b.id || ''; snd.play(['btn-notas', 'btn-misiones', 'btn-saberes', 'btn-bolsa', 'btn-mapa'].includes(id) ? 'ui-cuaderno' : 'ui-clic', 0.6); // cuaderno, misiones, saberes, bolsa y mapa suenan igual }, true);
 function frame() {
   requestAnimationFrame(frame); updateMusic(1 / 60); updateSound(1 / 60);
   const dt = Math.min(0.05, clock.getDelta());

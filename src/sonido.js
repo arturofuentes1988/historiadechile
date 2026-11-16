@@ -16,11 +16,11 @@ export function createSound() {
   function build() {
     // pasos: en tierra, un golpe sordo; en hojas, crujidos; en pasto, un roce; en agua, un chapoteo
     for (const v of [1, 2]) {
-      buf[`paso-tierra-${v}`] = make(0.16, (d, sr) => { noise(d); lp(d, sr, 500 + v * 150); env(d, sr, 0.004, 0.035); tone(d, sr, 0, 0.09, 110, 55, 0.5); });
-      buf[`paso-hojas-${v}`] = make(0.26, (d, sr) => { grains(d, sr, 26 + v * 6, 0.02, 1); hp(d, sr, 1400); env(d, sr, 0.005, 0.09); tone(d, sr, 0, 0.07, 90, 50, 0.15); });
-      buf[`paso-pasto-${v}`] = make(0.2, (d, sr) => { noise(d); hp(d, sr, 2200); lp(d, sr, 6000); env(d, sr, 0.02, 0.05); tone(d, sr, 0, 0.07, 80, 50, 0.1); });
-      buf[`paso-agua-${v}`] = make(0.5, (d, sr) => { noise(d); lp(d, sr, 1800); hp(d, sr, 300); env(d, sr, 0.01, 0.12); for (let k = 0; k < 7; k++) tone(d, sr, R(0.03, 0.3), R(0.02, 0.05), R(500, 1400), R(900, 2200), 0.12); });
-      buf[`arbusto-${v}`] = make(0.6, (d, sr) => { grains(d, sr, 60, 0.03, 1); hp(d, sr, 1800); for (let i = 0; i < d.length; i++) { const t = i / sr; d[i] *= Math.sin(Math.PI * t / 0.6) ** 1.5 * (0.6 + 0.4 * Math.sin(t * 40 + v)); } });
+      buf[`paso-tierra-${v}`] = make(0.16, (d, sr) => { noise(d); lp(d, sr, 260 + v * 60); env(d, sr, 0.012, 0.04); tone(d, sr, 0, 0.09, 85, 50, 0.2); }); // apagado y redondo, sin golpe seco
+      buf[`paso-hojas-${v}`] = make(0.26, (d, sr) => { grains(d, sr, 14 + v * 4, 0.03, 1); hp(d, sr, 900); lp(d, sr, 3200); env(d, sr, 0.015, 0.08); });
+      buf[`paso-pasto-${v}`] = make(0.2, (d, sr) => { noise(d); hp(d, sr, 1500); lp(d, sr, 3500); env(d, sr, 0.03, 0.05); });
+      buf[`paso-agua-${v}`] = make(0.5, (d, sr) => { noise(d); lp(d, sr, 1200); hp(d, sr, 300); env(d, sr, 0.03, 0.12); for (let k = 0; k < 7; k++) tone(d, sr, R(0.03, 0.3), R(0.02, 0.05), R(500, 1400), R(900, 2200), 0.12); });
+      buf[`arbusto-${v}`] = make(0.6, (d, sr) => { grains(d, sr, 40, 0.04, 1); hp(d, sr, 1200); lp(d, sr, 3800); for (let i = 0; i < d.length; i++) { const t = i / sr; d[i] *= Math.sin(Math.PI * t / 0.6) ** 1.5 * (0.6 + 0.4 * Math.sin(t * 40 + v)); } });
     }
     // sonidos continuos
     buf.rio = make(6, (d, sr) => { noise(d); lp(d, sr, 2600); hp(d, sr, 350); for (let i = 0; i < d.length; i++) { const t = i / sr; d[i] *= 0.7 + 0.2 * Math.sin(t * 1.9) + 0.1 * Math.sin(t * 5.3 + 1); } for (let k = 0; k < 140; k++) tone(d, sr, R(0, 5.9), R(0.02, 0.06), R(400, 1500), R(700, 2400), 0.02); seamless(d, sr); });
