@@ -13,7 +13,7 @@ export function createUI({ world, onToast, onClose, onSkill }) {
   let found = data.found, skills = data.skills || [], done = data.done || {}, extra = data.extra || 0, mctx = null;
   for (const id in found) if (!BY[id]) delete found[id];
   const SK = Object.fromEntries(SKILLS.map((k) => [k.id, k]));
-  const bag = {}; let open = null, cat = 'naturaleza', sel = null, selM = null, selK = null;
+  const bag = {}; let open = null, cat = 'flora', sel = null, selM = null, selK = null;
   const save = () => { try { localStorage.setItem(SAVE, JSON.stringify({ found, skills, done, extra })); } catch { /* sin espacio: se pierde al recargar */ } };
   // puntos ganados (cuaderno + misiones + extras) y puntos disponibles (ganados menos lo gastado en saberes)
   const earned = () => points() + extra + MISSIONS.reduce((t, m) => t + (done[m.id] ? m.pts : 0), 0);

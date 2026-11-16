@@ -8,7 +8,8 @@ import { Cinematic } from './cinematic.js';
 import { createUI } from './ui.js';
 import { createExplorer, PERSON } from './explore.js';
 import { TALK } from './notes.js';
-import { riverZ, WATER_Y } from './terrain.js';
+import { riverZ, WATER_Y, zone, normalAt } from './terrain.js';
+import { createSound } from './sonido.js';
 
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 const $ = (id) => document.getElementById(id);
@@ -62,7 +63,8 @@ function enter() {
 }
 
 // ---------- opciones (se guardan en este navegador) ----------
-const opts = Object.assign({ calidad: 'auto', detalle: '1', sens: 1, inv: false, mini: true, musica: 0.6 }, JSON.parse(localStorage.getItem('leftraru.opciones') || '{}'));
+const snd = createSound();
+const opts = Object.assign({ calidad: 'auto', detalle: '1', sens: 1, inv: false, mini: true, musica: 0.6, efectos: 0.7 }, JSON.parse(localStorage.getItem('leftraru.opciones') || '{}')); snd.volume = opts.efectos;
 // teclas: cada acción tiene una tecla que se puede cambiar en Menú → Controles
 const ACTIONS = [['adelante', 'Adelante', 'KeyW'], ['atras', 'Atrás', 'KeyS'], ['izquierda', 'Izquierda', 'KeyA'], ['derecha', 'Derecha', 'KeyD'], ['correr', 'Correr', 'ShiftLeft'], ['saltar', 'Saltar', 'Space'],
   ['observar', 'Observar o hablar', 'KeyE'], ['camIzq', 'Girar a la izquierda', 'KeyZ'], ['camDer', 'Girar a la derecha', 'KeyC'], ['cuaderno', 'Cuaderno', 'KeyN'], ['misiones', 'Misiones', 'KeyJ'], ['saberes', 'Saberes', 'KeyK'],
@@ -89,11 +91,13 @@ function applyOpts() {
   localStorage.setItem('leftraru.opciones', JSON.stringify(opts));
 }
 function setMenu(on) {
+  if (on !== menuOpen) snd.play('ui-menu', 0.7);
   menuOpen = on; menuPage('opciones'); $('menu').classList.toggle('on', on); document.body.classList.toggle('en-portada', state === 'title');
   if (on) { ui.show(null); document.exitPointerLock?.(); for (const k in keys) keys[k] = false; } else if (state === 'play') lock();
 }
 $('o-calidad').value = opts.calidad; $('o-detalle').value = opts.detalle; $('o-sens').value = opts.sens; $('o-inv').checked = opts.inv; $('o-mini').checked = opts.mini;
 $('o-calidad').onchange = (e) => { opts.calidad = e.target.value; applyOpts(); };
+$('o-efectos').value = opts.efectos; $('o-efectos').oninput = (e) => { opts.efectos = +e.target.value; snd.volume = opts.efectos; applyOpts(); };
 $('o-musica').value = opts.musica; $('o-musica').oninput = (e) => { opts.musica = +e.target.value; applyOpts(); };
 $('o-detalle').onchange = (e) => { opts.detalle = e.target.value; applyOpts(); };
 $('o-sens').oninput = (e) => { opts.sens = parseFloat(e.target.value); applyOpts(); };
@@ -159,7 +163,7 @@ const herePhoto = () => { draw(); return grab(); };
 // ---------- observar y conversar (tecla E) ----------
 let near = null, scanT = 0, talk = null, misT = 0, summit = false, still = 0;
 function applySkills() { explorer.reach = ui.skill('vista') ? 1.7 : 1; world.life.shyR = ui.skill('pudu') ? 3.5 : 9; }
-function say() { document.body.classList.add('talking'); const t = talk; $('dlg-name').textContent = t.name; $('dlg-text').textContent = t.lines[t.i]; $('dlg-more').textContent = `${keyName(opts.keys.observar)} · ${t.i < t.lines.length - 1 ? 'seguir' : 'cerrar'}`; $('dialogo').classList.add('on'); }
+function say() { snd.play(talk.i ? 'hablar-sigue' : 'hablar', talk.i ? 0.5 : 0.6, 0.95 + Math.random() * 0.1); document.body.classList.add('talking'); const t = talk; $('dlg-name').textContent = t.name; $('dlg-text').textContent = t.lines[t.i]; $('dlg-more').textContent = `${keyName(opts.keys.observar)} · ${t.i < t.lines.length - 1 ? 'seguir' : 'cerrar'}`; $('dialogo').classList.add('on'); }
 function interact() {
   if (talk) { if (++talk.i < talk.lines.length) return say(); const t = talk; talk = null; $('dialogo').classList.remove('on'); document.body.classList.remove('talking'); if (t.done) t.done(); return; }
   if (!near || state !== 'play' || ui.open || focus) return;
@@ -196,7 +200,7 @@ addEventListener('keydown', (e) => {
   keys[e.code] = true;
   if (is(e, 'observar') && !e.repeat) interact();
   if (talk) { if (e.code === 'Enter' || e.code === 'Space') interact(); return; }
-  if (state === 'play') for (const pn of ['cuaderno', 'misiones', 'saberes', 'bolsa', 'mapa']) if (is(e, pn)) ui.show(pn === 'cuaderno' ? 'notas' : pn);
+  if (state === 'play') for (const pn of ['cuaderno', 'misiones', 'saberes', 'bolsa', 'mapa']) if (is(e, pn)) { snd.play({ cuaderno: 'ui-cuaderno', bolsa: 'ui-bolsa', mapa: 'ui-mapa' }[pn] || 'ui-clic', 0.6); ui.show(pn === 'cuaderno' ? 'notas' : pn); }
   if (e.code === 'Escape') { if (ui.open) ui.show(null); else if (state !== 'cine') setMenu(true); }
   if (['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
 });
@@ -308,11 +312,11 @@ function updateItems() {
   }
 }
 
-const ui = createUI({ world, onToast: (t) => hint(t, 5), onClose: () => { if (state === 'play' && !menuOpen) lock(); }, onSkill: () => applySkills() });
+const ui = createUI({ world, onToast: (t) => { hint(t, 5); snd.play('ui-hallazgo', 0.5); }, onClose: () => { if (state === 'play' && !menuOpen) lock(); }, onSkill: () => applySkills() });
 const explorer = createExplorer({ world, ui });
 drawKeys(); applySkills();
 await assets.whenLoaded(); bar(1, 'Listo'); assets.onProgress = null; $('loading').classList.add('hide'); setTimeout(() => $('loading').remove(), 700);
-window.__g = { height, ui, explorer, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
+window.__g = { snd, height, ui, explorer, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
   tp(x, y, z) { pBody.setTranslation({ x, y, z }, true); player.vy = 0; },
   view(x, y, z, lx, ly, lz) { camera.position.set(x, y, z); camera.lookAt(lx, ly, lz); world.update(0, time, camera.position, pp()); draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); },
   snap() { draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); } };
@@ -338,15 +342,34 @@ function tick(dt) {
 }
 window.__g.advance = (secs) => { for (let t = 0; t < secs; t += 1 / 60) tick(1 / 60); }; // para pruebas automáticas
 // ---------- música: una melodía en la portada y otra al estar en la aldea; se cruzan suavemente ----------
-const tracks = {}; for (const k of ['portada', 'aldea']) { const a = new Audio(`assets/musica/${k}.mp3`); a.loop = true; a.volume = 0; a.preload = k === 'portada' ? 'auto' : 'none'; tracks[k] = a; }
+const tracks = {}; for (const k of ['portada', 'aldea', 'bosque']) { const a = new Audio(`assets/musica/${k}.mp3`); a.loop = true; a.volume = 0; a.preload = k === 'portada' ? 'auto' : 'none'; tracks[k] = a; }
 let audioOK = false; for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { audioOK = true; }, { once: true }); // el navegador solo deja sonar después del primer gesto
 function updateMusic(dt) {
-  const p = pp(), want = state === 'title' ? 'portada' : Math.hypot(p.x, p.z) < 50 ? 'aldea' : null;
+  const p = pp(), want = state === 'title' ? 'portada' : Math.hypot(p.x, p.z) < 50 ? 'aldea' : 'bosque';
   for (const k in tracks) { const a = tracks[k], goal = k === want ? opts.musica : 0, v = a.volume + Math.sign(goal - a.volume) * Math.min(Math.abs(goal - a.volume), dt * 0.25);
     a.volume = Math.min(1, Math.max(0, v)); if (goal > 0 && a.paused && audioOK) a.play().catch(() => {}); if (goal === 0 && a.volume === 0 && !a.paused) a.pause(); }
 }
+// ---------- sonidos del mundo ----------
+const SUELO = { earth: 'tierra', path: 'tierra', pebble: 'tierra', rock: 'tierra', bed: 'tierra', alpine: 'tierra', forest: 'hojas', moss: 'hojas', needles: 'hojas', meadow: 'pasto', grassy: 'pasto', marsh: 'pasto' };
+const ROCE = ['fern', 'murtilla', 'michay', 'chilco', 'nalca', 'quila', 'reed'];
+let stepD = 0, roceT = 0, lastP = null;
+function updateSound(dt) {
+  const p = pp(), play = state === 'play', d0 = Math.hypot(p.x, p.z), moved = lastP ? Math.hypot(p.x - lastP.x, p.z - lastP.z) : 0; lastP = { x: p.x, z: p.z };
+  if (play && player.grounded && moved > 0.001 && moved < 1) {
+    stepD += moved; const stride = player.speed > 4.5 ? 1.25 : 0.8;
+    if (stepD > stride) { stepD = 0; const s = player.wade > 0.05 ? 'agua' : SUELO[zone(p.x, p.z, height(p.x, p.z), normalAt(p.x, p.z)[1])] || 'tierra'; snd.play(`paso-${s}-${Math.random() < 0.5 ? 1 : 2}`, (s === 'agua' ? 0.55 : 0.4) * (player.speed > 4.5 ? 1.25 : 1), 0.88 + Math.random() * 0.24); }
+    roceT -= dt; if (roceT <= 0 && (world.nearBush(p.x, p.z, 1.0) || ROCE.some((k) => world.nearPlant(k, p.x, p.z, 0.6)))) { roceT = 0.55; snd.play(`arbusto-${Math.random() < 0.5 ? 1 : 2}`, 0.45, 0.85 + Math.random() * 0.3); } // roce al pasar entre las plantas
+  }
+  const k = play || state === 'cine' ? 1 : 0, bosque = Math.min(1, Math.max(0, (d0 - 30) / 40));
+  snd.loop('rio', k * 0.75 * Math.max(0, 1 - Math.abs(p.z - riverZ(p.x)) / 32) ** 2);
+  snd.loop('viento', k * (0.1 + bosque * 0.22));
+  snd.loop('pajaros', k * (0.12 + bosque * 0.3));
+  snd.loop('fuego', k * 0.6 * Math.max(0, 1 - d0 / 13) ** 2);
+}
+// toque al abrir el cuaderno, la bolsa, el mapa y al pulsar cualquier botón
+addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; const id = b.id || ''; snd.play(id === 'btn-notas' ? 'ui-cuaderno' : id === 'btn-bolsa' ? 'ui-bolsa' : id === 'btn-mapa' ? 'ui-mapa' : 'ui-clic', 0.6); }, true);
 function frame() {
-  requestAnimationFrame(frame); updateMusic(1 / 60);
+  requestAnimationFrame(frame); updateMusic(1 / 60); updateSound(1 / 60);
   const dt = Math.min(0.05, clock.getDelta());
   if (window.__g.paused) return;
   if (!menuOpen || state === 'title') tick(dt); // el juego se detiene con el menú abierto
