@@ -45,6 +45,16 @@ export function createUI({ world, onToast, onClose, onSkill }) {
 
   const places = new Set(); let last = { x: 0, z: 0, f: 0 };
   const ZOOM = 1.5; // el mapa sigue al jugador, que queda siempre al centro
+  // símbolos del mapa: la aldea (una ruka), misión principal (estrella dorada), encargo (rombo celeste), persona sin conocer (círculo)
+  function sym(g, x, y, kind, k = 1) {
+    g.save(); g.translate(x, y); g.lineWidth = 2.5 * k; g.strokeStyle = '#14110f';
+    const poly = (n, r0, r1) => { g.beginPath(); for (let i = 0; i < n; i++) { const a = (i / n) * 6.283, r = i % 2 ? r1 : r0; g.lineTo(Math.sin(a) * r * k, -Math.cos(a) * r * k); } g.closePath(); g.fill(); g.stroke(); };
+    if (kind === 'main') { g.fillStyle = '#f2b441'; poly(16, 13, 6.5); }
+    else if (kind === 'sec') { g.fillStyle = '#8fd0e0'; poly(4, 11, 11); }
+    else if (kind === 'nuevo') { g.fillStyle = '#f1e4c4'; g.beginPath(); g.arc(0, 0, 6 * k, 0, 7); g.fill(); g.stroke(); }
+    else { g.fillStyle = '#c89a4a'; g.beginPath(); g.arc(0, 3 * k, 12 * k, Math.PI, 0); g.lineTo(12 * k, 8 * k); g.lineTo(-12 * k, 8 * k); g.closePath(); g.fill(); g.stroke(); g.fillStyle = '#14110f'; g.fillRect(-3 * k, 0, 6 * k, 8 * k); g.beginPath(); g.moveTo(-3 * k, -12 * k); g.lineTo(3 * k, -6 * k); g.moveTo(3 * k, -12 * k); g.lineTo(-3 * k, -6 * k); g.stroke(); }
+    g.restore();
+  }
   function drawMap(pos, facing) {
     last = { x: pos.x, z: pos.z, f: facing };
     const [px, py] = P(pos.x, pos.z), R = S / 2 - 3;
@@ -58,6 +68,8 @@ export function createUI({ world, onToast, onClose, onSkill }) {
       if (far) { dx *= (R - 20) / d; dy *= (R - 20) / d; } // fuera de vista: se marca en el borde, indicando la dirección
       ctx.fillStyle = far ? '#ffe9a8' : '#f2b441'; ctx.beginPath(); ctx.arc(S / 2 + dx, S / 2 + dy, far ? 7 : 10, 0, 7); ctx.fill(); ctx.stroke();
     }
+    // la aldea y la gente con algo pendiente: si quedan fuera de la vista, se dibujan en el borde, en su dirección
+    for (const mk of [{ x: 0, z: 0, kind: 'aldea' }, ...api.people]) { const [x, y] = P(mk.x, mk.z); let dx = (x - px) * ZOOM, dy = (y - py) * ZOOM; const d = Math.hypot(dx, dy), far = d > R - 18; if (far && mk.kind === 'nuevo') continue; if (far) { dx *= (R - 18) / d; dy *= (R - 18) / d; } sym(ctx, S / 2 + dx, S / 2 + dy, mk.kind, far ? 0.75 : 1); }
     for (const mk of api.marks) { const [x, y] = P(mk.x, mk.z), dx = (x - px) * ZOOM, dy = (y - py) * ZOOM; if (Math.hypot(dx, dy) < R - 14) { ctx.fillStyle = '#14110f'; ctx.beginPath(); ctx.arc(S / 2 + dx, S / 2 + dy, 9, 0, 7); ctx.fill(); ctx.fillStyle = '#e9dfc6'; ctx.font = 'bold 14px Georgia'; ctx.textAlign = 'center'; ctx.fillText('?', S / 2 + dx, S / 2 + dy + 5); } }
     ctx.translate(S / 2, S / 2); ctx.rotate(-facing); // la flecha apunta hacia donde camina
     ctx.fillStyle = '#fff'; ctx.strokeStyle = '#14110f'; ctx.lineWidth = 3;
@@ -77,11 +89,12 @@ export function createUI({ world, onToast, onClose, onSkill }) {
     panel.dataset.kind = open;
     if (open === 'mapa') {
       $('panel-title').textContent = 'Mapa del territorio';
-      body.innerHTML = '<canvas id="bigmap"></canvas><p class="muted">Los lugares muestran su nombre cuando los visitas. Los puntos dorados son los piñones que faltan.</p>';
+      body.innerHTML = '<canvas id="bigmap"></canvas><p class="muted">Los lugares muestran su nombre cuando los visitas. Los puntos dorados son los piñones que faltan. La ruka marca la aldea; la estrella dorada, una misión principal; el rombo celeste, un encargo; el círculo, alguien que aún no conoces.</p>';
       const c = $('bigmap'); c.width = base.width; c.height = base.height; const g = c.getContext('2d'); g.drawImage(base, 0, 0);
       g.textAlign = 'center'; g.font = 'italic bold 19px Georgia'; g.lineWidth = 5; g.strokeStyle = '#efe6cf'; g.fillStyle = '#2a2018';
       for (const key in POI) { const [x, y] = P(POI[key].x, POI[key].z), t = places.has(key) ? POI[key].name : '?'; g.strokeText(t, x, y - 14); g.fillText(t, x, y - 14); }
       for (const it of world.items) if (!it.taken) { const [x, y] = P(it.base.x, it.base.z); g.fillStyle = '#f2b441'; g.strokeStyle = '#3a2408'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 6, 0, 7); g.fill(); g.stroke(); }
+      { const [x, y] = P(0, 0); sym(g, x, y + 6, 'aldea', 1.2); } for (const mk of api.people) { const [x, y] = P(mk.x, mk.z); sym(g, x, y, mk.kind, 1.1); }
       const [px, py] = P(last.x, last.z); g.translate(px, py); g.rotate(-last.f); g.fillStyle = '#fff'; g.strokeStyle = '#14110f'; g.lineWidth = 3;
       g.beginPath(); g.moveTo(0, 18); g.lineTo(11, -12); g.lineTo(0, -5); g.lineTo(-11, -12); g.closePath(); g.fill(); g.stroke();
     } else if (open === 'misiones') {
@@ -169,7 +182,7 @@ export function createUI({ world, onToast, onClose, onSkill }) {
       const act = MISSIONS.find((m) => m.main && m.check && !done[m.id] && (!m.pide || done[m.pide]));
       return act ? { title: act.title, prog: act.check(mctx) } : null;
     },
-    marks: [],
+    marks: [], people: [],
     state: { get found() { return found; }, bag, get skills() { return skills; }, get done() { return done; } },
   };
   return api;

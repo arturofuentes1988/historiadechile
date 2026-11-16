@@ -13,11 +13,12 @@ export function createExplorer({ world, ui }) {
   // Devuelve lo más interesante al alcance: primero lo que falta descubrir
   // still: si Leftraru lleva un rato quieto, también ofrece volver a observar lo ya conocido (para actualizar su foto)
   function scan(p, still = false) {
-    const k = reach, c = [], add = (id, verb, label, d, target, shot, extra) => c.push({ id, verb, label, d, target, shot, known: ui.has(id), ...extra });
-    for (const a of world.life.actors) { const id = PERSON[a.name], d = d2(p, a.x, a.z); if (id && d < 3) add(id, 'Hablar con', TALK[id].name, d - 10, { x: a.x, y: H(a.x, a.z) + a.h * 0.78, z: a.z }, { dist: 2.1, up: 0.1, fov: 40 }, { person: a }); }
+    const k = reach * 0.7, c = [], // hay que acercarse bastante a las cosas para observarlas
+          add = (id, verb, label, d, target, shot, extra) => c.push({ id, verb, label, d, target, shot, known: ui.has(id), ...extra });
+    for (const a of world.life.actors) { const id = PERSON[a.name], d = d2(p, a.x, a.z); if (id && d < 2.1) add(id, 'Hablar con', TALK[id].name, d - 10, { x: a.x, y: H(a.x, a.z) + a.h * 0.78, z: a.z }, { dist: 2.1, up: 0.1, fov: 40 }, { person: a }); }
     for (const q of world.life.quads) { const d = d2(p, q.x, q.z), w = q.kind === 'weke'; if (d < (w ? 5 : 5.5) * k) add(w ? 'weke' : 'pudu', 'Observar', w ? 'el weke' : 'el pudú', d, null, { dist: w ? 2.7 : 1.25, up: w ? 0.2 : 0.12, fov: w ? 42 : 34 }, { live: () => ({ x: q.x, y: H(q.x, q.z) + (w ? 0.95 : 0.3) * (q.g.scale.x), z: q.z }) }); }
     for (const b of world.life.birds) { const [id, label, r, fov] = BIRD[b.type], bp = b.g.position, d = d2(p, bp.x, bp.z); if (d < r) add(id, 'Observar', label, 3 + d / 6, null, { fromPlayer: true, fov }, { live: () => b.g.position }); }
-    let rk = null; for (const r of RUKAS) { const d = d2(p, r.x, r.z); if (d < 8 && (!rk || d < rk.d)) rk = { ...r, d }; }
+    let rk = null; for (const r of RUKAS) { const d = d2(p, r.x, r.z); if (d < 6 && (!rk || d < rk.d)) rk = { ...r, d }; }
     if (rk) add('ruka', 'Observar', 'la ruka', rk.d, { x: rk.x, y: H(rk.x, rk.z) + 1.7, z: rk.z }, { dist: 9.5, up: 1.2, fov: 48 });
     const fix = (id, label, x, z, r, y, shot) => { const d = d2(p, x, z); if (d < r * k) add(id, 'Observar', label, d, { x, y: H(x, z) + y, z }, shot); };
     fix('kutral', 'el fogón', FOGON.x, FOGON.z, 4.2, 0.5, { dist: 4.6, up: 1.3, fov: 45 });
@@ -25,7 +26,7 @@ export function createExplorer({ world, ui }) {
     fix('witral', 'el telar', -10.6, -4.2, 3.2, 1.1, { dist: 3.6, up: 0.3, fov: 42 });
     fix('chemamull', 'las figuras de madera', POI.antiguos.x, POI.antiguos.z, 8, 1.6, { dist: 8.5, up: 0.8, fov: 46 });
     if (d2(p, CERRO[0], CERRO[1]) < 11) { add('pillan', 'Mirar', 'el volcán', 1, null, { view: 'pillan' }); add('lafken', 'Mirar', 'el mar', 1.5, null, { view: 'lafken' }); }
-    const rz = riverZ(p.x); if (Math.abs(p.z - rz) < 9) add('rio', 'Observar', 'el río', Math.abs(p.z - rz), { x: p.x + 4, y: -1.3, z: rz }, { dist: 11, up: 3.2, fov: 55 });
+    const rz = riverZ(p.x); if (Math.abs(p.z - rz) < 6) add('rio', 'Observar', 'el río', Math.abs(p.z - rz), { x: p.x + 4, y: -1.3, z: rz }, { dist: 11, up: 3.2, fov: 55 });
     // el árbol entero, en plano general
     const t = world.nearTree(p.x, p.z, 3.6 * k); if (t) { const [id, label] = TREE[t.kind]; add(id, 'Observar', label, t.d, { x: t.x, y: t.y + t.H * 0.5, z: t.z }, { dist: t.H * 1.12 + 3, up: -t.H * 0.28, fov: 56, tree: true }, { rec: t.rec }); }
     // las plantas, de cerca: se calcula su centro y su tamaño reales, y las planas se miran de frente

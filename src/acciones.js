@@ -20,7 +20,8 @@ const FUEGO = [
 const LUGARES = { viejo: 'el bosque viejo', menoko: 'el menoko', antiguos: 'el lugar de los antiguos' };
 const HUELLAS = [[-70, -70], [40, -52], [-60, 66]];
 
-export function createActions({ world, ui, snd, scene, hint, speak, ripple, player }) {
+export function createActions({ world, ui, snd, scene, hint, speak, ripple, player, place }) {
+  const TRONCOS = [0, 1, 2, 3, 4].map((i) => { const a = 0.6 + i * 1.2; return { x: FOGON.x + Math.cos(a) * 2.9, z: FOGON.z + Math.sin(a) * 2.9, a }; }); // los troncos alrededor del fogón
   const S = Object.assign({ f: {}, inv: {} }, JSON.parse(localStorage.getItem(KEY) || '{}')), save = () => localStorage.setItem(KEY, JSON.stringify(S));
   const f = S.f, inv = S.inv, have = (id) => inv[id] || 0, d2 = (p, x, z) => Math.hypot(p.x - x, p.z - z), actor = (name) => world.life.actors.find((a) => a.name === name);
   for (const id in inv) if (ITEMS[id]) for (let i = 0; i < inv[id]; i++) ui.addItem(id);
@@ -73,7 +74,12 @@ export function createActions({ world, ui, snd, scene, hint, speak, ripple, play
     }
     return null;
   }
-  const wants = (id) => !!({ machi: !f.m3 || (f.m3 === 1 && listo(['canelo', 'quillay', 'maqui'])), namku: f.m3 === 2, abuela: !f.ab || (f.ab === 1 && listo(['murtilla'])), millaray: !f.mi || (f.mi === 1 && listo(['michay'])), curinancu: ui.has('nalca') && (!f.na || (f.na === 1 && listo(['nalca']))), rayen: !f.palin }[id]);
+  // ¿esta persona tiene algo pendiente contigo? 'main' = misión principal, 'sec' = encargo secundario
+  const wants = (id) => {
+    if ((id === 'machi' && (!f.m3 || (f.m3 === 1 && listo(['canelo', 'quillay', 'maqui'])))) || (id === 'namku' && f.m3 === 2)) return 'main';
+    const sec = { abuela: !f.ab || (f.ab === 1 && listo(['murtilla'])), millaray: !f.mi || (f.mi === 1 && listo(['michay'])), curinancu: ui.has('nalca') && (!f.na || (f.na === 1 && listo(['nalca']))), rayen: !f.palin }[id];
+    return sec ? 'sec' : null;
+  };
 
   // ---------- recoger ----------
   function source(id, p) {
@@ -118,13 +124,14 @@ export function createActions({ world, ui, snd, scene, hint, speak, ripple, play
   const piedra = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshStandardMaterial({ color: 0x8a8880, roughness: 1 })); piedra.visible = false; scene.add(piedra); let tiro = null;
 
   // ---------- qué se puede hacer aquí ----------
-  let sitting = false, fuegoI = 0;
+  let sitting = null, fuegoI = 0;
   function scan(p) {
-    if (sitting) return { label: 'Levantarse', run: () => { sitting = false; } };
+    if (sitting) return { label: 'Levantarse', run: () => { sitting = null; } };
     const out = [], add = (d, label, run) => out.push({ d, label, run }), n = needs();
     for (const id in n) if (n[id] > 0) { const s = source(id, p); if (s) add(s.d - 5, `Recoger ${ITEMS[id].uno}`, () => pick(id, s.rec)); }
     const df = d2(p, FOGON.x, FOGON.z);
-    if (df > 2.2 && df < 3.8) add(df, 'Sentarse junto al fuego', () => { sitting = true; const [who, line] = FUEGO[fuegoI++ % FUEGO.length]; const ab = actor('la abuela'); if (ab && d2(ab, FOGON.x, FOGON.z) < 6) speak(who, [line]); else hint('El fuego crepita. Se está bien aquí.', 5); if (!f.fogon) set('fogon', 1); });
+    const tr = TRONCOS.map((l) => ({ l, d: d2(p, l.x, l.z) })).sort((a, b) => a.d - b.d)[0];
+    if (tr.d < 1.5) add(tr.d, 'Sentarse en el tronco', () => { const l = tr.l; sitting = l; place(l.x - Math.cos(l.a) * 0.62, l.z - Math.sin(l.a) * 0.62, Math.atan2(-Math.cos(l.a), -Math.sin(l.a))); const [who, line] = FUEGO[fuegoI++ % FUEGO.length]; const ab = actor('la abuela'); if (ab && d2(ab, FOGON.x, FOGON.z) < 6) speak(who, [line]); else hint('El fuego crepita. Se está bien aquí.', 5); if (!f.fogon) set('fogon', 1); });
     // tareas de la aldea
     if (ui.has('millaray') && !f.lana && d2(p, -10.6, -4.2) < 3) add(1, 'Alcanzarle la lana a Millaray', () => { set('lana', 1); speak('Millaray', ['Gracias, hijo. La roja primero… esa. Así no tengo que soltar el hilo.']); });
     const rz = riverZ(p.x), dr = Math.abs(p.z - rz);
@@ -151,9 +158,10 @@ export function createActions({ world, ui, snd, scene, hint, speak, ripple, play
     if (tiro) { tiro.t += dt / 0.9; const u = tiro.t, x = tiro.x0 + (tiro.x1 - tiro.x0) * u, z = tiro.z0 + (tiro.z1 - tiro.z0) * u, y = tiro.y0 + (WATER_Y - tiro.y0) * u + Math.sin(Math.PI * u) * 2.2; piedra.position.set(x, y, z); if (u >= 1) { piedra.visible = false; ripple(tiro.x1, tiro.z1); snd.play('paso-agua-1', 0.6, 0.8); tiro = null; } }
   }
   // postura sentado: se dobla por la cadera y las rodillas
-  function pose(boy) { if (!sitting) return; boy.g.position.y -= 0.38; boy.legL.rotation.x = boy.legR.rotation.x = -1.45; boy.shinL.rotation.x = boy.shinR.rotation.x = 1.5; boy.armL.rotation.x = boy.armR.rotation.x = -0.5; boy.foreL.rotation.x = boy.foreR.rotation.x = -0.6; }
+  function pose(boy) { if (!sitting) return; const l = sitting; boy.g.position.set(l.x - Math.cos(l.a) * 0.05, height(l.x, l.z) + 0.47 - (boy.h || 1.38) * 0.52, l.z - Math.sin(l.a) * 0.05); boy.g.rotation.y = Math.atan2(-Math.cos(l.a), -Math.sin(l.a)); // la cadera sobre el tronco, mirando al fuego
+    boy.legL.rotation.x = boy.legR.rotation.x = -1.45; boy.shinL.rotation.x = boy.shinR.rotation.x = 1.5; boy.armL.rotation.x = boy.armR.rotation.x = -0.5; boy.foreL.rotation.x = boy.foreR.rotation.x = -0.6; }
 
-  return { scan, talk, wants, update, pose, get sitting() { return sitting; }, stand() { sitting = false; },
+  return { scan, talk, wants, update, pose, get sitting() { return !!sitting; }, stand() { sitting = null; },
     ctx: () => ({ f, hierbas: Math.min(2, have('canelo')) + Math.min(1, have('quillay')) + Math.min(2, have('maqui')) }),
     reset() { localStorage.removeItem(KEY); } };
 }

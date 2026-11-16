@@ -24,38 +24,46 @@ export function buildVillage({ scene, rng, bag, flora, physics, RAPIER, fixed })
   const porch = thatch.clone(); porch.side = THREE.DoubleSide; porch.map = photo('paja', { repeat: [1, 1] }); porch.bumpMap = porch.map;
   function ruka({ x, z, s, smoke }) {
     const y = height(x, z) - 0.05, r = 3.3 * s;
+    // la ruka se arma mirando al oriente y luego se gira entera para que la entrada dé al fogón
+    const th = Math.atan2(z - FOGON.z, FOGON.x - x), ct = Math.cos(th), st = Math.sin(th), ROT = new THREE.Matrix4().makeTranslation(x, 0, z).multiply(new THREE.Matrix4().makeRotationY(th)).multiply(new THREE.Matrix4().makeTranslation(-x, 0, -z));
+    const rp = (px, pz) => [x + (px - x) * ct + (pz - z) * st, z - (px - x) * st + (pz - z) * ct], spin = (m) => { m.applyMatrix4(ROT); return m; }, qy = new THREE.Quaternion().setFromAxisAngle(UP, th);
+    const rb = { add: (geo, m, color, kind) => bag.add(geo, ROT.clone().multiply(m), color, kind) };
+    const fl = { scatter: (k, px, py, pz, ...rest) => { const [qx, qz] = rp(px, pz); flora.scatter(k, qx, py, qz, ...rest); }, rock: (px, py, pz, ...rest) => { const [qx, qz] = rp(px, pz); flora.rock(qx, py, qz, ...rest); } };
+    const wall = (px, pz, hx, hy, hz) => { const [qx, qz] = rp(px, pz); physics.createCollider(RAPIER.ColliderDesc.cuboid(hx, hy, hz).setTranslation(qx, y + hy, qz).setRotation(qy), fixed); };
     // perfil ondulado para que la paja no se vea lisa
     const pts = []; for (let i = 0; i <= 28; i++) { const f = (i / 28) * 4, k = Math.min(3, Math.floor(f)), u = f - k, rr = prof[k][0] + (prof[k + 1][0] - prof[k][0]) * u, yy = prof[k][1] + (prof[k + 1][1] - prof[k][1]) * u; pts.push(new THREE.Vector2(rr * r * (1 + (i % 4 === 0 ? 0.03 : 0)), yy * s)); }
     const g = new THREE.LatheGeometry(pts, 28), P = g.attributes.position;
     for (let i = 0; i < P.count; i++) { const k = 1 + Math.sin(P.getX(i) * 9 + P.getZ(i) * 7) * 0.012; P.setX(i, P.getX(i) * k); P.setZ(i, P.getZ(i) * k * 0.82); }
-    g.computeVertexNormals(); add(g, thatch, x, y, z);
+    g.computeVertexNormals(); spin(add(g, thatch, x, y, z));
     // entrada: un zaguán de paja en arco que sale hacia el oriente, con marco de varas curvadas,
     // el fondo en penumbra y un cuero recogido a un lado
     { const w = 0.82 * s, h = 1.9 * s, x0 = x + r * 0.7, x1 = x + r * 1.03 + 0.75 * s, N = 14, P = [], U = [], I = [];
       for (let k = 0; k <= 1; k++) for (let n = 0; n <= N; n++) { const a = PI * n / N, sag = 1 + Math.sin(a * 5 + k) * 0.015; P.push(k ? x1 : x0, y + Math.sin(a) * h * sag * (k ? 0.96 : 1), z + Math.cos(a) * w * (k ? 0.96 : 1)); U.push(k * 0.45, Math.abs(n / N - 0.5) * 1.6); }
       for (let n = 0; n < N; n++) I.push(n, n + N + 1, n + 1, n + 1, n + N + 1, n + N + 2);
       const ag = new THREE.BufferGeometry(); ag.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); ag.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); ag.setIndex(I); ag.computeVertexNormals();
-      const zm = new THREE.Mesh(ag, porch); zm.castShadow = zm.receiveShadow = true; scene.add(zm);
-      const fondo = new THREE.Mesh(new THREE.CircleGeometry(1, 16, 0, PI), darkMat); fondo.scale.set(w * 0.98, h * 0.98, 1); fondo.rotation.y = PI / 2; fondo.position.set(x + r * 1.07, y, z); scene.add(fondo);
-      for (const [xx, tube, col] of [[x1 - 0.02, 0.06, WOOD], [x1 - 0.4 * s, 0.035, WOOD2]]) { const arc = new THREE.TorusGeometry(1, tube / w, 6, 18, PI); arc.rotateY(PI / 2); bag.add(arc, M(xx, y, z, 0, 1, h * 0.985, w * 0.985), col); } // varas curvadas del marco
-      for (const dz of [-1, 1]) bag.add(cyl, M(x1 - 0.02, y + 0.5 * s, z + dz * w * 1.0, 0, 0.07, 1.0 * s, 0.07), WOOD); // horcones a los lados
+      const zm = new THREE.Mesh(ag, porch); zm.castShadow = zm.receiveShadow = true; scene.add(spin(zm));
+      const fondo = new THREE.Mesh(new THREE.CircleGeometry(1, 16, 0, PI), darkMat); fondo.scale.set(w * 0.98, h * 0.98, 1); fondo.rotation.y = PI / 2; fondo.position.set(x + r * 1.07, y, z); scene.add(spin(fondo));
+      // paredes del zaguán y fondo: no se atraviesan
+      for (const dz of [-1, 1]) wall((x + r * 0.9 + x1) / 2, z + dz * (w + 0.06), (x1 - x - r * 0.9) / 2, 0.85 * s, 0.1); wall(x + r * 1.07 - 0.1, z, 0.1, 0.95 * s, w);
+      for (const [xx, tube, col] of [[x1 - 0.02, 0.06, WOOD], [x1 - 0.4 * s, 0.035, WOOD2]]) { const arc = new THREE.TorusGeometry(1, tube / w, 6, 18, PI); arc.rotateY(PI / 2); rb.add(arc, M(xx, y, z, 0, 1, h * 0.985, w * 0.985), col); } // varas curvadas del marco
+      for (const dz of [-1, 1]) rb.add(cyl, M(x1 - 0.02, y + 0.5 * s, z + dz * w * 1.0, 0, 0.07, 1.0 * s, 0.07), WOOD); // horcones a los lados
       const cu = new THREE.PlaneGeometry(0.62 * s, 1.55 * s, 4, 1), CP = cu.attributes.position; for (let n = 0; n < CP.count; n++) CP.setZ(n, Math.sin(CP.getX(n) * 14) * 0.05); // el cuero cae en pliegues
-      bag.add(cu, M(x1 - 0.12, y + 0.8 * s, z - w * 0.62, PI / 2 - 0.12, 0.7, 1, 1), 0x4a3424, 'cuero');
+      rb.add(cu, M(x1 - 0.12, y + 0.8 * s, z - w * 0.62, PI / 2 - 0.12, 0.7, 1, 1), 0x4a3424, 'cuero');
     }
-    for (const rz of [0.5, -0.5]) bag.add(cyl, M(x, y + 3.6 * s, z, R(0, 3), 0.045, 1.6, 0.045, rz), WOOD2); // palos cruzados en la cumbre
+    for (const rz of [0.5, -0.5]) rb.add(cyl, M(x, y + 3.6 * s, z, R(0, 3), 0.045, 1.6, 0.045, rz), WOOD2); // palos cruzados en la cumbre
     // amarras de fibra que sujetan la paja, a tres alturas
-    for (const [f, hh] of [[1.035, 0.85], [0.9, 1.75], [0.56, 2.7]]) { const tor = new THREE.TorusGeometry(r * f, 0.035, 5, 28); tor.rotateX(PI / 2); bag.add(tor, M(x, y + hh * s, z, 0, 1, 1, 0.82), 0x6e5a34, 'otros'); }
+    for (const [f, hh] of [[1.035, 0.85], [0.9, 1.75], [0.56, 2.7]]) { const tor = new THREE.TorusGeometry(r * f, 0.035, 5, 28); tor.rotateX(PI / 2); rb.add(tor, M(x, y + hh * s, z, 0, 1, 1, 0.82), 0x6e5a34, 'otros'); }
     // la estera de la entrada
-    bag.add(new THREE.BoxGeometry(1.3, 0.03, 1.5), M(x + r * 1.03 + 1.5 * s, y + 0.03, z, R(-0.1, 0.1)), 0xb89c5e, 'estera');
+    rb.add(new THREE.BoxGeometry(1.3, 0.03, 1.5), M(x + r * 1.03 + 1.5 * s, y + 0.03, z, R(-0.1, 0.1)), 0xb89c5e, 'estera');
     // cosas de todos los días junto a la pared: varas apoyadas, un canasto y la piedra de moler
     const a0 = R(1.2, 2.2) * (rng() < 0.5 ? 1 : -1), wx = x + Math.cos(a0) * r * 1.08, wz = z + Math.sin(a0) * r * 0.9;
-    for (let i = 0; i < 3; i++) bag.add(cyl, M(wx + i * 0.16, y + 1.05, wz + i * 0.05, 0, 0.025, 2.3 + i * 0.2, 0.025, 0.2 * (Math.cos(a0) > 0 ? -1 : 1)), i % 2 ? WOOD : 0x8a7a50);
-    bag.add(new THREE.CylinderGeometry(0.3, 0.22, 0.34, 10, 1, true), M(wx - 0.6, y + 0.17, wz + 0.5), 0xb09a5a, 'estera'); bag.add(new THREE.TorusGeometry(0.3, 0.03, 5, 12).rotateX(PI / 2), M(wx - 0.6, y + 0.34, wz + 0.5), 0x8a743e, 'otros');
-    physics.createCollider(RAPIER.ColliderDesc.cylinder(0.2, 0.3).setTranslation(wx - 0.6, y + 0.2, wz + 0.5), fixed);
-    flora.rock(wx + 0.9, y - 0.06, wz - 0.4, 0.42, { squash: 0.3, color: 0xa8a49a }); flora.rock(wx + 0.9, y + 0.1, wz - 0.4, 0.13, { squash: 0.7, color: 0x8e8a80 });
+    for (let i = 0; i < 3; i++) rb.add(cyl, M(wx + i * 0.16, y + 1.05, wz + i * 0.05, 0, 0.025, 2.3 + i * 0.2, 0.025, 0.2 * (Math.cos(a0) > 0 ? -1 : 1)), i % 2 ? WOOD : 0x8a7a50);
+    rb.add(new THREE.CylinderGeometry(0.3, 0.22, 0.34, 10, 1, true), M(wx - 0.6, y + 0.17, wz + 0.5), 0xb09a5a, 'estera'); rb.add(new THREE.TorusGeometry(0.3, 0.03, 5, 12).rotateX(PI / 2), M(wx - 0.6, y + 0.34, wz + 0.5), 0x8a743e, 'otros');
+    { const [qx, qz] = rp(wx - 0.6, wz + 0.5); physics.createCollider(RAPIER.ColliderDesc.cylinder(0.2, 0.3).setTranslation(qx, y + 0.2, qz), fixed); }
+    fl.rock(wx + 0.9, y - 0.06, wz - 0.4, 0.42, { squash: 0.3, color: 0xa8a49a }); fl.rock(wx + 0.9, y + 0.1, wz - 0.4, 0.13, { squash: 0.7, color: 0x8e8a80 });
     physics.createCollider(RAPIER.ColliderDesc.cylinder(1.6, r * 0.88).setTranslation(x, y + 1.6, z), fixed);
     if (smoke) emit.smoke.push([x, y + 3.5 * s, z, 0.7]);
-    for (let i = 0; i < 30; i++) { const a = (i / 30) * 6.28 + R(-0.05, 0.05); if (Math.abs(a) < 0.4 || a > 5.9) continue; flora.scatter('reed', x + Math.cos(a) * r * 1.02, y, z + Math.sin(a) * r * 0.84, R(0.35, 0.55), 0xf0dca0); } // flecos de paja en el borde del techo
+    for (let i = 0; i < 30; i++) { const a = (i / 30) * 6.28 + R(-0.05, 0.05); if (Math.abs(a) < 0.4 || a > 5.9) continue; fl.scatter('reed', x + Math.cos(a) * r * 1.02, y, z + Math.sin(a) * r * 0.84, R(0.35, 0.55), 0xf0dca0); } // flecos de paja en el borde del techo
   }
   RUKAS.forEach(ruka);
 

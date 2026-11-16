@@ -215,22 +215,25 @@ function buildBird(type) {
   return { g, wl, wr, wlo, wro };
 }
 
-// Símbolo que flota sobre quien tiene algo que contar: una estrella de ocho puntas como las del kultrun
-function markTexture() {
+// Símbolos que flotan sobre la gente: estrella dorada de ocho puntas = misión principal,
+// rombo escalonado celeste = encargo secundario, círculo claro = alguien que aún no conoces.
+function markTexture(kind) {
   const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'); x.translate(64, 64);
-  const star = (r0, r1, col) => { x.fillStyle = col; x.beginPath(); for (let i = 0; i < 16; i++) { const a = (i / 16) * 6.283, r = i % 2 ? r1 : r0; x.lineTo(Math.sin(a) * r, -Math.cos(a) * r); } x.closePath(); x.fill(); };
-  star(60, 30, '#1c1410'); star(52, 25, '#f1e4c4'); star(34, 17, '#b3262e'); star(15, 8, '#f1e4c4');
+  const star = (r0, r1, col, n = 16) => { x.fillStyle = col; x.beginPath(); for (let i = 0; i < n; i++) { const a = (i / n) * 6.283, r = i % 2 ? r1 : r0; x.lineTo(Math.sin(a) * r, -Math.cos(a) * r); } x.closePath(); x.fill(); };
+  if (kind === 'main') { star(60, 30, '#1c1410'); star(52, 25, '#f2b441'); star(34, 17, '#b3262e'); star(15, 8, '#f8e6b0'); }
+  else if (kind === 'sec') { star(56, 56, '#1c1410', 4); star(47, 47, '#8fd0e0', 4); star(30, 30, '#1f5a70', 4); star(13, 13, '#e8f6fa', 4); }
+  else { x.fillStyle = '#1c1410'; x.beginPath(); x.arc(0, 0, 34, 0, 7); x.fill(); x.fillStyle = '#f1e4c4'; x.beginPath(); x.arc(0, 0, 26, 0, 7); x.fill(); x.fillStyle = '#1c1410'; for (const dx of [-11, 0, 11]) { x.beginPath(); x.arc(dx, 0, 4, 0, 7); x.fill(); } }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
 export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
   const R = (a, b) => a + (b - a) * rng(), actors = [], quads = [], birds = [];
   // personas y animales tienen cuerpo: ya no se los atraviesa
   const solid = (o, r, hh, cy) => { o.rb = physics.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(o.x, height(o.x, o.z) + cy, o.z)); physics.createCollider(RAPIER.ColliderDesc.capsule(hh, r), o.rb); o.cy = cy; };
-  const markMat = new THREE.SpriteMaterial({ map: markTexture(), fog: false, toneMapped: false, depthWrite: false });
+  const markMats = Object.fromEntries(['main', 'sec', 'nuevo'].map((k) => [k, new THREE.SpriteMaterial({ map: markTexture(k), fog: false, toneMapped: false, depthWrite: false })]));
 
   // ---------- gente de la aldea ----------
   const person = (opts, x, z, beh) => { const p = buildPerson(opts); p.x = x; p.z = z; p.face = beh.face ?? 0; p.phase = R(0, 6); p.speed = 0; p.wait = R(0, 3); p.i = 0; Object.assign(p, beh); p.g.position.set(x, height(x, z), z); scene.add(p.g); actors.push(p); solid(p, 0.26, p.h * 0.5 - 0.26, p.h * 0.5);
-    if (p.name) { p.mark = new THREE.Sprite(markMat); p.mark.scale.setScalar(0.3); p.mark.visible = false; p.mark.renderOrder = 5; scene.add(p.mark); }
+    if (p.name) { p.mark = new THREE.Sprite(markMats.nuevo); p.mark.scale.setScalar(0.3); p.mark.visible = false; p.mark.renderOrder = 5; scene.add(p.mark); }
     return p; };
   const man = { kind: 'man', h: 1.66, skin: 0x96603c, cloth: 0x2a2630 }, woman = { kind: 'woman', h: 1.56, skin: 0xa0683f, cloth: 0x1f1c26, trim: 0xb3262e, band: 0xc23a36 };
   person({ ...man, band: 0xe9dcb8, trim: 0xb3262e }, 2, -9, { name: 'Curiñancu', mode: 'idle', face: Math.PI });
@@ -315,6 +318,6 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
       const fl = Math.sin(t * fq + b.o) * amp; b.wl.rotation.z = fl; b.wr.rotation.z = -fl; b.wlo.rotation.z = fl * 0.7 + Math.cos(t * fq + b.o) * amp * 0.3; b.wro.rotation.z = -b.wlo.rotation.z;
     }
   }
-  const api = { update, actors, quads, birds, shyR: 9 }; // shyR: a qué distancia huyen los animales tímidos
+  const api = { update, actors, quads, birds, markMats, shyR: 9 }; // shyR: a qué distancia huyen los animales tímidos
   return api;
 }

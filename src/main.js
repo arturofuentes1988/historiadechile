@@ -319,6 +319,7 @@ function updateItems() {
 
 const ui = createUI({ world, onToast: (t) => { hint(t, 5); snd.play('ui-hallazgo', 0.5); }, onClose: () => { if (state === 'play' && !menuOpen) lock(); }, onSkill: () => applySkills() });
 const acc = createActions({ world, ui, snd, scene, hint, player,
+  place: (x, z, facing) => { pBody.setTranslation({ x, y: height(x, z) + FEET + 0.05, z }, true); player.vy = 0; player.speed = 0; player.facing = facing; },
   speak: (name, lines, done) => { talk = { name, lines, i: 0, done: done || null }; say(); },
   ripple: (x, z) => { const r = ripples[ripI++ % ripples.length]; r.position.set(x, WATER_Y + 0.03, z); r.userData.t = 0; r.visible = true; } });
 const explorer = createExplorer({ world, ui }); explorer.urgent = (id) => acc.wants(id);
@@ -340,7 +341,9 @@ function tick(dt) {
   else updateCamera(dt);
   updateItems();
   { const p = pp(); uPlayer.value.set(p.x, p.y - FEET, p.z); // las plantas se apartan al paso
-    for (const a of world.life.actors) if (a.mark) a.mark.visible = state === 'play' && (!ui.has(PERSON[a.name]) || acc.wants(PERSON[a.name]));
+    ui.people.length = 0;
+    for (const a of world.life.actors) if (a.mark) { const id = PERSON[a.name], known = ui.has(id), kind = known ? acc.wants(id) : (id === 'curinancu' || id === 'machi' ? 'main' : 'nuevo'); // estrella: misión principal; rombo: encargo; círculo: aún no lo conoces
+      a.mark.visible = state === 'play' && !!kind; if (kind) { a.mark.material = world.life.markMats[kind]; ui.people.push({ x: a.x, z: a.z, kind }); } }
     acc.update(dt, time, p); acc.pose(boy);
     if ((actT -= dt) <= 0) { actT = 0.2; doable = state === 'play' && !talk && !ui.open && !focus ? acc.scan(p) : null; $('prompt2').classList.toggle('on', !!doable); if (doable) $('prompt2-text').textContent = doable.label; } // estrella sobre quien aún tiene algo que contarte
     // ondas en el agua al vadear
