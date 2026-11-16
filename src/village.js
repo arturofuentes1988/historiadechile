@@ -1,6 +1,6 @@
 // La aldea y los lugares construidos: rukas, fogón, rewe, corral, telar y otros detalles.
 import * as THREE from 'three';
-import { TEX, MAT } from './gfx.js';
+import { TEX, MAT, flameMaterial } from './gfx.js';
 import { height, POI, CERRO } from './terrain.js';
 
 export const RUKAS = [
@@ -32,6 +32,16 @@ export function buildVillage({ scene, rng, bag, flora, physics, RAPIER, fixed })
     for (const dz of [-0.85, 0.85]) bag.add(cyl, M(x + r * 1.02, y + 1.05 * s, z + dz * s, 0, 0.09, 2.1 * s, 0.09), WOOD);
     bag.add(cyl, M(x + r * 1.02, y + 2.1 * s, z, PI / 2, 0.09, 2.0 * s, 0.09, PI / 2), WOOD);
     for (const rz of [0.5, -0.5]) bag.add(cyl, M(x, y + 3.6 * s, z, R(0, 3), 0.045, 1.6, 0.045, rz), WOOD2); // palos cruzados en la cumbre
+    // amarras de fibra que sujetan la paja, a tres alturas
+    for (const [f, hh] of [[1.035, 0.85], [0.9, 1.75], [0.56, 2.7]]) { const tor = new THREE.TorusGeometry(r * f, 0.035, 5, 28); tor.rotateX(PI / 2); bag.add(tor, M(x, y + hh * s, z, 0, 1, 1, 0.82), 0x6e5a34); }
+    // cuero que cierra la puerta, recogido a un lado, y la estera de la entrada
+    bag.add(new THREE.PlaneGeometry(0.75 * s, 1.75 * s), M(x + r * 1.03, y + 0.95 * s, z - 0.5 * s, PI / 2 - 0.25), 0x6a4a30);
+    bag.add(new THREE.BoxGeometry(1.3, 0.03, 1.5), M(x + r * 1.03 + 0.8, y + 0.03, z, R(-0.1, 0.1)), 0xb89c5e);
+    // cosas de todos los días junto a la pared: varas apoyadas, un canasto y la piedra de moler
+    const a0 = R(1.2, 2.2) * (rng() < 0.5 ? 1 : -1), wx = x + Math.cos(a0) * r * 1.08, wz = z + Math.sin(a0) * r * 0.9;
+    for (let i = 0; i < 3; i++) bag.add(cyl, M(wx + i * 0.16, y + 1.05, wz + i * 0.05, 0, 0.025, 2.3 + i * 0.2, 0.025, 0.2 * (Math.cos(a0) > 0 ? -1 : 1)), i % 2 ? WOOD : 0x8a7a50);
+    bag.add(new THREE.CylinderGeometry(0.3, 0.22, 0.34, 10, 1, true), M(wx - 0.6, y + 0.17, wz + 0.5), 0xb09a5a); bag.add(new THREE.TorusGeometry(0.3, 0.03, 5, 12).rotateX(PI / 2), M(wx - 0.6, y + 0.34, wz + 0.5), 0x8a743e);
+    flora.rock(wx + 0.9, y - 0.06, wz - 0.4, 0.42, { squash: 0.3, color: 0xa8a49a }); flora.rock(wx + 0.9, y + 0.1, wz - 0.4, 0.13, { squash: 0.7, color: 0x8e8a80 });
     physics.createCollider(RAPIER.ColliderDesc.cylinder(1.6, r * 0.88).setTranslation(x, y + 1.6, z), fixed);
     if (smoke) emit.smoke.push([x, y + 3.5 * s, z, 0.7]);
     for (let i = 0; i < 30; i++) { const a = (i / 30) * 6.28 + R(-0.05, 0.05); if (Math.abs(a) < 0.4 || a > 5.9) continue; flora.scatter('reed', x + Math.cos(a) * r * 1.02, y, z + Math.sin(a) * r * 0.84, R(0.35, 0.55), 0xf0dca0); } // flecos de paja en el borde del techo
@@ -45,6 +55,12 @@ export function buildVillage({ scene, rng, bag, flora, physics, RAPIER, fixed })
     for (let i = 0; i < 5; i++) { const a = 0.6 + i * 1.2; bag.add(cyl, M(x + Math.cos(a) * 2.9, y + 0.2, z + Math.sin(a) * 2.9, PI / 2 - a, 0.22, 1.7, 0.22, PI / 2), WOOD); } // troncos para sentarse
     const ash = add(new THREE.CircleGeometry(1.5, 20), new THREE.MeshStandardMaterial({ color: 0x2a2622, roughness: 1 }), x, y + 0.03, z); ash.rotation.x = -PI / 2; ash.castShadow = false;
     emit.fire.push([x, y + 0.2, z]); emit.smoke.push([x, y + 0.9, z, 1]);
+    // llamas, brasas que brillan y una olla de greda sobre tres piedras
+    const fm = flameMaterial(); for (let i = 0; i < 3; i++) { const f = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.45), fm); f.position.set(x, y + 0.8, z); f.rotation.y = (i / 3) * PI; f.renderOrder = 3; scene.add(f); }
+    const ember = new THREE.MeshStandardMaterial({ color: 0x1a0e08, emissive: 0xff4a12, emissiveIntensity: 2.2, roughness: 1 }); emit.ember = ember;
+    for (let i = 0; i < 5; i++) { const e = add(new THREE.CylinderGeometry(0.06, 0.06, R(0.5, 0.9), 6), ember, x + R(-0.25, 0.25), y + 0.1, z + R(-0.25, 0.25)); e.rotation.set(PI / 2, 0, R(0, 3)); e.castShadow = false; }
+    for (let i = 0; i < 3; i++) { const a = i * 2.1 + 0.4; flora.rock(x + 1.5 + Math.cos(a) * 0.22, y - 0.02, z + 0.9 + Math.sin(a) * 0.22, 0.16, { squash: 0.9, color: 0x6e6a62 }); }
+    bag.add(sph, M(x + 1.5, y + 0.42, z + 0.9, 0, 0.26, 0.24, 0.26), 0x5a3626); bag.add(new THREE.CylinderGeometry(0.2, 0.17, 0.12, 12, 1, true), M(x + 1.5, y + 0.66, z + 0.9), 0x6a4030);
     const glow = new THREE.PointLight(0xff8a3a, 14, 14, 1.6); glow.position.set(x, y + 0.9, z); scene.add(glow); emit.glow = glow;
   }
 

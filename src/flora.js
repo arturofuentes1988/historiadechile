@@ -103,6 +103,7 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
   const fernGeo = (() => { const parts = []; for (let i = 0; i < 7; i++) { const a = (i / 7) * PI * 2, d = V(Math.cos(a), 0.75, Math.sin(a)).normalize(); quad(parts, d.clone().multiplyScalar(0.55), V(-Math.sin(a), 0, Math.cos(a)).multiplyScalar(0.42), d.clone().multiplyScalar(1.1), UP); } return mergeGeometries(parts); })();
   const SCATTER = {
     grass: { geo: cross(1.0, 0.62), mat: MAT.grass(TEX.grass), range: 75, cells: new Map() },
+    grass2: { geo: cross(0.8, 1.05), mat: MAT.grass(TEX.grass2), range: 80, cells: new Map() },
     reed: { geo: cross(0.9, 1.7), mat: MAT.grass(TEX.reed), range: 110, cells: new Map() },
     fern: { geo: fernGeo, mat: MAT.grass(TEX.fern), range: 95, cells: new Map() },
     flower: { geo: cross(0.7, 0.5, 2), mat: MAT.grass(TEX.flower), range: 60, cells: new Map() },
@@ -147,7 +148,7 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
     });
     for (const k in SCATTER) for (const [key, list] of SCATTER[k].cells) {
       const m = new THREE.InstancedMesh(SCATTER[k].geo, SCATTER[k].mat, list.length), [ci, cj] = key.split(',').map(Number);
-      list.forEach((t, i) => { M.compose(V(t.x, t.y - 0.03, t.z), q.setFromAxisAngle(UP, rng() * 6.28), V(t.s, t.s * (0.8 + rng() * 0.5), t.s)); m.setMatrixAt(i, M); m.setColorAt(i, c.set(t.color).multiplyScalar(0.5 + rng() * 0.3)); });
+      list.forEach((t, i) => { M.compose(V(t.x, t.y - 0.03, t.z), q.setFromAxisAngle(UP, rng() * 6.28), V(t.s, t.s * (0.8 + rng() * 0.5), t.s)); m.setMatrixAt(i, M); m.setColorAt(i, c.set(t.color).multiplyScalar(0.62 + rng() * 0.34)); });
       m.receiveShadow = true; m.frustumCulled = false; scene.add(m); chunks.push({ m, cx: (ci + 0.5) * CS, cz: (cj + 0.5) * CS, range: SCATTER[k].range });
     }
     const rm = MAT.rock();

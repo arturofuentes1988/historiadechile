@@ -98,6 +98,7 @@ function skin(spine, colorAt, { rings = 18, radial = 14, rough = 0 } = {}) {
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
   return new THREE.Mesh(g, furMat);
 }
+const eyeMat = new THREE.MeshStandardMaterial({ color: 0x0c0a08, roughness: 0.12, metalness: 0.3 }); // ojo húmedo, con brillo
 const mixHex = (a, b, t) => new THREE.Color(a).lerp(new THREE.Color(b), Math.min(1, Math.max(0, t))).getHex();
 
 // Weke (chilihueque): por los restos estudiados, lo más probable es que fuera un guanaco domesticado.
@@ -130,7 +131,8 @@ function buildQuad({ s = 1, kind = 'weke', body = 0xb07a4a, belly = 0xf0e8d8, le
   hd.add(skin(A.head, (t, sa) => (t > 0.86 ? dark : mixHex(weke ? legs : body, belly, (t - 0.55) * (weke ? 0.6 : 0.3) + (-sa - 0.5))), { rings: 12, radial: 12 })); // cara y hocico oscuro
   for (const sx of [-1, 1]) {
     const e = mesh(new THREE.ConeGeometry(A.ear * 0.2, A.ear, 6), weke ? legs : body, hd, sx * A.earAt[0], A.earAt[1] + A.ear * 0.4, A.earAt[2]); e.scale.z = 0.45; e.rotation.z = -sx * 0.22; e.rotation.x = -0.12;
-    ball(A.eyeAt[3], dark, hd, sx * A.eyeAt[0], A.eyeAt[1], A.eyeAt[2]);
+    ball(A.eyeAt[3], dark, hd, sx * A.eyeAt[0], A.eyeAt[1], A.eyeAt[2]).material = eyeMat;
+    ball(A.eyeAt[3] * 0.45, dark, hd, sx * A.eyeAt[0] * 0.35, A.eyeAt[1] * 0.25, A.head[A.head.length - 2][1] + 0.004); // orificio de la nariz
     if (horns) { const a = mesh(new THREE.ConeGeometry(0.006, 0.05, 4), 0x4a3c30, hd, sx * 0.018, 0.075, -0.005); a.rotation.z = -sx * 0.18; }
   }
   const Ls = [], Ks = [];
@@ -144,26 +146,57 @@ function buildQuad({ s = 1, kind = 'weke', body = 0xb07a4a, belly = 0xf0e8d8, le
   return { g, legs: [Ls[0], Ls[1], Ls[2], Ls[3]], knees: Ks, neck, headPivot: hd, tail };
 }
 
-// Aves con sus colores reales:
-// traro: pardo oscuro, cuello crema, cara anaranjada, alas anchas con una mancha clara en la punta;
-// choroy: verde, de cola larga y rojiza, pico largo; rayadito: pequeño, canela, con ceja clara.
+// ---------- aves ----------
+// Cuerpo continuo con plumaje, alas hechas de plumas separadas (cobertoras y remeras) y cola en abanico.
+// Colores de cada especie:
+// traro: pardo oscuro con casquete negro, cuello y pecho crema barrado, cara anaranjada,
+//        mancha blanca en la punta del ala y cola clara con banda oscura al final;
+// choroy: verde, frente y vientre con rojo oscuro, cola larga rojiza, pico largo y ganchudo;
+// rayadito: canela, cabeza negra con ceja color ante, cola terminada en puntas.
 const BIRDS = {
-  traro: { body: 0x2c241e, head: 0xe6dcc0, cap: 0x1c1612, beak: 0xe07a2a, wing: 0x2c241e, tip: 0xb8ae96, tail: 0xd8ceb2, span: 1.25, len: 0.55, wide: 0.3, tailLen: 0.24 },
-  choroy: { body: 0x4a8a3a, head: 0x4a8a3a, cap: 0x8a3428, beak: 0x2a2622, wing: 0x3d7a34, tip: 0x2a5a8a, tail: 0x7a3a2c, span: 0.55, len: 0.4, wide: 0.13, tailLen: 0.2 },
-  small: { body: 0x9a6a3c, head: 0x3a2c22, cap: 0xe8d8a8, beak: 0x2a2622, wing: 0x5a4030, tip: 0xc89a5a, tail: 0x5a4030, span: 0.2, len: 0.14, wide: 0.06, tailLen: 0.07 },
+  traro: { k: 0.56, span: 1.25, chord: 0.3, tailLen: 0.26, tailFan: 0.5, beak: 0xd8d2c0, cere: 0xe8802a, hook: true,
+    coat: (t, sa) => (t > 0.86 ? (sa > 0.15 ? 0x16110e : 0xe8802a) : t > 0.62 ? (sa > 0.55 ? 0x241c16 : 0xe6dcc0) : sa < -0.2 && t > 0.3 ? (Math.sin(t * 60) > 0 ? 0xd8ccac : 0x4a3c30) : 0x2c241e),
+    wing: (f, u) => (f > 0.62 && u > 0.35 && u < 0.8 ? 0xe4dcc8 : f > 0.62 && u >= 0.8 ? 0x1c1612 : 0x2c241e), tail: (u) => (u > 0.78 ? 0x1c1612 : 0xe0d8c2) },
+  choroy: { k: 0.4, span: 0.56, chord: 0.13, tailLen: 0.22, tailFan: 0.16, beak: 0x2a2622, cere: 0x4a4038, hook: true, long: true,
+    coat: (t, sa) => (t > 0.9 && sa > 0 ? 0x8a2e26 : sa < -0.5 && t > 0.2 && t < 0.5 ? 0x8a3a2c : sa > 0.3 ? 0x3d7a34 : 0x58983e),
+    wing: (f, u) => (u > 0.6 && f > 0.5 ? 0x2a5a7a : 0x3d7a34), tail: () => 0x8a3e2c },
+  small: { k: 0.15, span: 0.2, chord: 0.06, tailLen: 0.075, tailFan: 0.25, beak: 0x2a2622, cere: 0x2a2622,
+    coat: (t, sa) => (t > 0.72 ? (sa > 0.65 ? 0x1c1612 : sa > 0.25 ? 0xe2c890 : 0x1c1612) : sa < -0.2 ? 0xe8dcc0 : 0xa86a38),
+    wing: (f, u) => (u > 0.5 && f > 0.4 ? 0x2a2018 : (u > 0.3 && u < 0.5 ? 0xd8a860 : 0x6a4428)), tail: (u) => (u > 0.6 ? 0x2a2018 : 0xa86a38) },
 };
+const featherMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: furTex, roughness: 0.9, side: THREE.DoubleSide });
+// Pluma: una lámina angosta de punta redondeada, con su color a lo largo (u de 0 en la base a 1 en la punta)
+function feathers(list) {
+  const pos = [], col = [], uv = [], idx = [], c = new THREE.Color(); let n = 0;
+  for (const { base, dir, len, wid, colorAt } of list) {
+    const side = new THREE.Vector3(dir.z, 0, -dir.x).normalize(), N = 4;
+    for (let i = 0; i <= N; i++) { const u = i / N, w = wid * (i === N ? 0.25 : 1 - u * 0.25) * 0.5; c.set(colorAt(u)); for (const s of [-1, 1]) { pos.push(base.x + dir.x * len * u + side.x * w * s, base.y + dir.y * len * u - u * u * len * 0.06, base.z + dir.z * len * u + side.z * w * s); col.push(c.r, c.g, c.b); uv.push(s * 0.5 + 0.5, u); } }
+    for (let i = 0; i < N; i++) { const a = n + i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } n += (N + 1) * 2;
+  }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+  return new THREE.Mesh(g, featherMat);
+}
 function buildBird(type) {
-  const B = BIRDS[type], g = new THREE.Group(), k = B.len;
-  const part = (pts, c, par) => { const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3)); geo.setIndex(pts.length === 12 ? [0, 1, 2, 0, 2, 3] : [0, 1, 2]); geo.computeVertexNormals(); const m = new THREE.Mesh(geo, mat(c)); par.add(m); return m; };
-  ball(1, B.body, g, 0, 0, 0, k * 0.2, k * 0.19, k * 0.5);                                           // cuerpo
-  ball(1, B.head, g, 0, k * 0.1, k * 0.46, k * 0.14, k * 0.14, k * 0.17); ball(1, B.cap, g, 0, k * 0.17, k * 0.43, k * 0.115, k * 0.07, k * 0.15); // cabeza y copete
-  const bk = mesh(new THREE.ConeGeometry(k * 0.05, k * (type === 'choroy' ? 0.26 : 0.18), 5), B.beak, g, 0, k * 0.07, k * 0.66); bk.rotation.x = Math.PI / 2 + (type === 'choroy' ? 0.5 : 0.2);
-  part([-k * 0.1, 0, -k * 0.4, k * 0.1, 0, -k * 0.4, k * (type === 'traro' ? 0.22 : 0.07), 0, -k * 0.4 - B.tailLen, -k * (type === 'traro' ? 0.22 : 0.07), 0, -k * 0.4 - B.tailLen], B.tail, g); // cola
-  const wing = (sx) => { // ala en dos tramos: el de afuera se dobla al batir
-    const inner = new THREE.Group(); inner.position.set(sx * k * 0.14, k * 0.05, k * 0.05); g.add(inner);
-    part([0, 0, B.wide * 0.6, sx * B.span * 0.24, 0, B.wide * 0.55, sx * B.span * 0.24, 0, -B.wide * 0.5, 0, 0, -B.wide * 0.5], B.wing, inner);
-    const outer = new THREE.Group(); outer.position.x = sx * B.span * 0.24; inner.add(outer);
-    part([0, 0, B.wide * 0.55, sx * B.span * 0.26, 0, B.wide * 0.25, sx * B.span * 0.24, 0, -B.wide * 0.4, 0, 0, -B.wide * 0.5], B.tip, outer);
+  const B = BIRDS[type], g = new THREE.Group(), k = B.k, V = (x, y, z) => new THREE.Vector3(x, y, z);
+  // cuerpo, cuello y cabeza en una sola piel: cola → vientre → pecho → cuello → cabeza
+  g.add(skin([[0, -0.5 * k, 0.01, 0.01], [0.01 * k, -0.34 * k, 0.09 * k, 0.08 * k], [0.02 * k, -0.05 * k, 0.17 * k, 0.16 * k], [0.04 * k, 0.2 * k, 0.15 * k, 0.15 * k], [0.08 * k, 0.36 * k, 0.085 * k, 0.09 * k], [0.11 * k, 0.47 * k, 0.095 * k, 0.1 * k], [0.1 * k, 0.56 * k, 0.06 * k, 0.065 * k], [0.095 * k, 0.6 * k, 0.012, 0.012]], B.coat, { rings: 18, radial: 12, rough: 0.03 }));
+  // pico: ganchudo en las rapaces y los loros
+  const bk = mesh(new THREE.ConeGeometry(0.045 * k, (B.long ? 0.2 : 0.15) * k, 6), B.beak, g, 0, 0.09 * k, (B.long ? 0.67 : 0.65) * k); bk.rotation.x = Math.PI / 2 + (B.hook ? 0.35 : 0.1);
+  if (B.hook) { const tip = mesh(new THREE.ConeGeometry(0.022 * k, 0.07 * k, 5), B.beak, g, 0, 0.045 * k, (B.long ? 0.75 : 0.71) * k); tip.rotation.x = Math.PI * 0.95; }
+  ball(0.05 * k, B.cere, g, 0, 0.1 * k, 0.585 * k, 1, 0.8, 0.9);
+  for (const sx of [-1, 1]) { const e = ball(0.02 * k, 0x0c0a08, g, sx * 0.075 * k, 0.135 * k, 0.5 * k); e.material = eyeMat; }
+  // cola en abanico
+  const T = 7; g.add(feathers(Array.from({ length: T }, (_, i) => { const a = (i / (T - 1) - 0.5) * B.tailFan * 2; return { base: V(0, 0.01 * k, -0.4 * k), dir: V(Math.sin(a), 0, -Math.cos(a)), len: B.tailLen, wid: B.tailLen * 0.3, colorAt: B.tail }; })));
+  // ala: brazo con cobertoras y secundarias, y mano con las remeras largas abiertas en dedos
+  const wing = (sx) => {
+    const inner = new THREE.Group(); inner.position.set(sx * 0.12 * k, 0.06 * k, 0.1 * k); g.add(inner);
+    const L1 = B.span * 0.22, L2 = B.span * 0.28, sec = [], pri = [];
+    for (let i = 0; i < 7; i++) { const f = i / 6; sec.push({ base: V(sx * L1 * f, 0, B.chord * 0.25), dir: V(sx * 0.12, 0, -1).normalize(), len: B.chord * (0.95 - f * 0.1), wid: L1 / 5.2, colorAt: (u) => B.wing(f * 0.5, u) }); }
+    for (let i = 0; i < 5; i++) { const f = i / 4; sec.push({ base: V(sx * L1 * f, 0.004, B.chord * 0.3), dir: V(sx * 0.1, 0, -1).normalize(), len: B.chord * 0.5, wid: L1 / 3.6, colorAt: () => B.wing(0, 0) }); } // cobertoras
+    inner.add(feathers(sec));
+    const outer = new THREE.Group(); outer.position.x = sx * L1; inner.add(outer);
+    for (let i = 0; i < 8; i++) { const f = i / 7, a = f * 1.25; pri.push({ base: V(sx * L2 * 0.25 * f, 0, B.chord * 0.22), dir: V(sx * Math.sin(a), 0, -Math.cos(a)).normalize(), len: B.chord * 0.9 + L2 * 0.75 * Math.sin(a), wid: B.chord * 0.2, colorAt: (u) => B.wing(0.5 + f * 0.5, u) }); }
+    outer.add(feathers(pri));
     return [inner, outer];
   };
   const [wl, wlo] = wing(1), [wr, wro] = wing(-1);
@@ -206,7 +239,9 @@ export function buildLife({ scene, rng, emit, trees }) {
   const P = (fill, opts) => { const b = new ParticleBatch(); fill(b); const m = b.build(opts); scene.add(m); return m; };
   const pick = (cols) => cols[(rng() * cols.length) | 0];
   P((b) => { for (const [x, y, z, k] of emit.smoke) for (let i = 0; i < 26 * k; i++) b.add(x + R(-0.2, 0.2), y, z + R(-0.2, 0.2), R(0.8, 1.3) * (0.6 + k * 0.4), R(0.7, 1.2), pick([0x8a8782, 0xa6a39c, 0x6c6a66])); }, { span: 14, speed: 1.0, drift: 0.8, wob: 0.6, s0: 0.5, s1: 3.4, opacity: 0.2, wind: [0.28, 0, 0.1] });
-  P((b) => { for (const [x, y, z] of emit.fire) for (let i = 0; i < 26; i++) b.add(x + R(-0.3, 0.3), y, z + R(-0.3, 0.3), R(0.45, 0.8), R(0.8, 1.4), pick([0xff5a18, 0xff9a2a, 0xffd060])); }, { span: 1.3, speed: 1.9, drift: 0.12, wob: 5, s0: 1, s1: 0.25, opacity: 0.8, aspect: 1.5, glow: true, boost: 2.6 });
+  P((b) => { for (const [x, y, z] of emit.fire) for (let i = 0; i < 26; i++) b.add(x + R(-0.3, 0.3), y, z + R(-0.3, 0.3), R(0.45, 0.8), R(0.8, 1.4), pick([0xff5a18, 0xff9a2a, 0xffd060])); }, { span: 1.3, speed: 1.9, drift: 0.12, wob: 5, s0: 1, s1: 0.25, opacity: 0.35, aspect: 1.5, glow: true, boost: 2.2 });
+  // chispas que suben del fogón
+  P((b) => { for (const [x, y, z] of emit.fire) for (let i = 0; i < 30; i++) b.add(x + R(-0.25, 0.25), y + 0.4, z + R(-0.25, 0.25), R(0.025, 0.05), R(0.6, 1.6), pick([0xffb040, 0xff7a20, 0xffe090])); }, { span: 4.2, speed: 1.5, drift: 0.55, wob: 3, opacity: 1, glow: true, boost: 5, wind: [0.15, 0, 0.05] });
   P((b) => { for (const t of trees) if (t.kind === 'roble') for (let i = 0; i < 4; i++) b.add(t.x + R(-3, 3), t.y + t.H * R(0.5, 0.95), t.z + R(-3, 3), R(0.12, 0.2), R(0.6, 1.3), pick([0xc48a28, 0xdcaa3a, 0xa86a1c])); }, { dir: [0, -1, 0], span: 11, speed: 1.0, drift: 1.4, wob: 1.6, opacity: 1, wind: [0.2, 0, 0.08], aspect: 0.6, hard: true });
   P((b) => { for (const [cx, cz, r, n] of [[0, 0, 34, 200], [POI.maqui.x, POI.maqui.z, 24, 200], [POI.pewen.x, POI.pewen.z, 50, 200], [POI.antiguos.x, POI.antiguos.z, 16, 80], [POI.viejo.x, POI.viejo.z, 40, 160]]) for (let i = 0; i < n; i++) { const a = R(0, 6.28), d = Math.sqrt(rng()) * r, x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d; b.add(x, height(x, z) + R(0.4, 5), z, R(0.04, 0.07), R(0.5, 1.5), 0xfff4c8); } }, { dir: [0, 1, 0], span: 2.5, speed: 0.25, drift: 1.3, wob: 0.7, opacity: 0.8, glow: true, boost: 2.2 });
   // luces que flotan en los lugares con dueño: el bosque viejo, el menoko y el lugar de los antiguos
@@ -218,7 +253,7 @@ export function buildLife({ scene, rng, emit, trees }) {
 
   const turn = (o, tx, tz, dt, k = 6) => { let d = Math.atan2(tx - o.x, tz - o.z) - o.face; d = Math.atan2(Math.sin(d), Math.cos(d)); o.face += d * Math.min(1, dt * k); };
 
-  function update(dt, t, pp) {
+  function update(dt, t, pp, speed = 0) {
     for (const p of actors) {
       if (p.mode === 'walk') {
         const [tx, tz] = p.pts[p.i], d = Math.hypot(tx - p.x, tz - p.z);
@@ -231,15 +266,15 @@ export function buildLife({ scene, rng, emit, trees }) {
       p.g.position.set(p.x, height(p.x, p.z) + Math.sin(p.phase * 0.8) * 0.008, p.z); p.g.rotation.y = p.face;
     }
     for (const q of quads) {
-      const dp = Math.hypot(pp.x - q.x, pp.z - q.z), flee = q.shy && dp < api.shyR;
+      const dp = Math.hypot(pp.x - q.x, pp.z - q.z), flee = q.shy && dp < api.shyR * (speed > 4 ? 1 : 0.4); // corriendo los espantas de lejos; caminando puedes acercarte
       if (flee) { q.tx = q.x + ((q.x - pp.x) / dp) * 14; q.tz = q.z + ((q.z - pp.z) / dp) * 14; q.wait = 0; }
       const d = Math.hypot(q.tx - q.x, q.tz - q.z), want = flee ? 5.2 : q.pace;
       if (q.wait > 0) { q.wait -= dt; q.speed += (0 - q.speed) * Math.min(1, dt * 6); q.neck.rotation.x += ((q.graze ? 1.7 : 0.3) - q.neck.rotation.x) * Math.min(1, dt * 3); q.headPivot.rotation.x = -q.neck.rotation.x * 0.6; q.tail.rotation.x = Math.sin(q.phase * 3 + q.x) * 0.25; }
       else if (d < 0.4) { q.wait = R(2, 8); q.graze = rng() < 0.6; const a = R(0, 6.28), r = Math.sqrt(rng()) * q.hr; q.tx = q.hx + Math.cos(a) * r; q.tz = q.hz + Math.sin(a) * r; }
       else { turn(q, q.tx, q.tz, dt, flee ? 9 : 3); q.speed += (want - q.speed) * Math.min(1, dt * 5); q.x += Math.sin(q.face) * q.speed * dt; q.z += Math.cos(q.face) * q.speed * dt; q.neck.rotation.x += (0.3 + Math.sin(q.phase) * 0.05 - q.neck.rotation.x) * Math.min(1, dt * 5); q.headPivot.rotation.x = -0.3; }
-      q.phase += dt * (1 + q.speed * 5); const sw = Math.sin(q.phase) * Math.min(0.7, q.speed * 0.6);
-      q.legs[0].rotation.x = sw; q.legs[3].rotation.x = sw; q.legs[1].rotation.x = -sw; q.legs[2].rotation.x = -sw;
-      const kb = Math.max(0, Math.cos(q.phase)) * Math.min(0.9, q.speed * 0.7), kb2 = Math.max(0, -Math.cos(q.phase)) * Math.min(0.9, q.speed * 0.7); q.knees[0].rotation.x = q.knees[3].rotation.x = kb; q.knees[1].rotation.x = q.knees[2].rotation.x = kb2;
+      q.phase += dt * (1 + q.speed * 5); const amp = Math.min(0.6, q.speed * 0.55), OFF = [Math.PI / 2, Math.PI * 1.5, 0, Math.PI]; // delantera izq., delantera der., trasera izq., trasera der.
+      for (let i = 0; i < 4; i++) { q.legs[i].rotation.x = -Math.sin(q.phase + OFF[i]) * amp; q.knees[i].rotation.x = Math.max(0, Math.cos(q.phase + OFF[i])) * amp * 1.3; }
+      q.g.rotation.z = Math.sin(q.phase) * amp * 0.04;
       q.g.position.set(q.x, height(q.x, q.z) + Math.abs(Math.sin(q.phase)) * Math.min(0.02, q.speed * 0.01), q.z); q.g.rotation.y = q.face;
     }
     for (const b of birds) {

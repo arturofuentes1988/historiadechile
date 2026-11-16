@@ -13,7 +13,7 @@ export function createUI({ world, onToast, onClose, onSkill }) {
   let found = data.found, skills = data.skills || [], done = data.done || {}, extra = data.extra || 0, mctx = null;
   for (const id in found) if (!BY[id]) delete found[id];
   const SK = Object.fromEntries(SKILLS.map((k) => [k.id, k]));
-  const bag = {}; let open = null, cat = 'naturaleza', sel = null;
+  const bag = {}; let open = null, cat = 'naturaleza', sel = null, selM = null, selK = null;
   const save = () => { try { localStorage.setItem(SAVE, JSON.stringify({ found, skills, done, extra })); } catch { /* sin espacio: se pierde al recargar */ } };
   // puntos ganados (cuaderno + misiones + extras) y puntos disponibles (ganados menos lo gastado en saberes)
   const earned = () => points() + extra + MISSIONS.reduce((t, m) => t + (done[m.id] ? m.pts : 0), 0);
@@ -84,24 +84,30 @@ export function createUI({ world, onToast, onClose, onSkill }) {
       const [px, py] = P(last.x, last.z); g.translate(px, py); g.rotate(-last.f); g.fillStyle = '#fff'; g.strokeStyle = '#14110f'; g.lineWidth = 3;
       g.beginPath(); g.moveTo(0, 18); g.lineTo(11, -12); g.lineTo(0, -5); g.lineTo(-11, -12); g.closePath(); g.fill(); g.stroke();
     } else if (open === 'misiones') {
+      // lista simple: una línea por misión; el detalle aparece al elegirla
       $('panel-title').textContent = 'Misiones';
-      const row = (m) => {
-        const r = m.check && mctx ? m.check(mctx) : [false, 0, 1], isDone = !!done[m.id], locked = m.soon || (m.pide && !done[m.pide]);
-        return `<div class="mis${isDone ? ' done' : locked ? ' locked' : ''}"><div class="mk">${isDone ? '✓' : locked ? '·' : m.main ? m.n : '◆'}</div><div><h3>${m.title}${m.who && !locked ? ` <small>· te la encargó ${m.who}</small>` : ''}</h3>` +
-          (m.soon ? '<p class="muted">Próximamente, en los siguientes capítulos.</p>' : locked ? '<p class="muted">Se abre al terminar la misión anterior.</p>' : `<p>${m.text}</p><div class="prog"><i style="width:${(isDone ? 1 : r[1] / r[2]) * 100}%"></i></div><em>${isDone ? 'Completada' : `${r[1]} de ${r[2]}`} · recompensa: ${m.pts} puntos</em>`) + '</div></div>';
-      };
-      body.innerHTML = '<h4 class="sec2">Principales</h4><p class="muted how">Siguen la historia: la preparación del We Tripantu.</p>' + MISSIONS.filter((m) => m.main).map(row).join('') +
-        '<h4 class="sec2">Secundarias</h4><p class="muted how">Se completan explorando y conversando, en el orden que quieras.</p>' + MISSIONS.filter((m) => !m.main).map(row).join('');
+      const st = (m) => (done[m.id] ? 'done' : m.soon || (m.pide && !done[m.pide]) ? 'locked' : 'open');
+      const row = (m) => { const r = m.check && mctx ? m.check(mctx) : [false, 0, 1], k = st(m);
+        return `<button class="mrow2 ${k}${m.id === selM ? ' on' : ''}" data-mis="${m.id}"><span class="dot"></span><span class="t">${m.title}</span><span class="p">${k === 'done' ? 'hecha' : k === 'locked' ? (m.soon ? 'próximamente' : 'bloqueada') : r[2] > 1 ? `${r[1]} / ${r[2]}` : 'en curso'}</span></button>`; };
+      const m = MISSIONS.find((x) => x.id === selM) || MISSIONS.find((x) => st(x) === 'open') || MISSIONS[0], k = st(m), r = m.check && mctx ? m.check(mctx) : [false, 0, 1];
+      body.innerHTML = '<div class="mis2"><div><h4 class="sec2">Principales</h4>' + MISSIONS.filter((x) => x.main).map(row).join('') + '<h4 class="sec2">Secundarias</h4>' + MISSIONS.filter((x) => !x.main).map(row).join('') + '</div>' +
+        `<aside><small>${m.main ? `Misión principal ${m.n}` : 'Misión secundaria'}</small><h3>${m.title}</h3>` +
+        (m.soon ? '<p class="muted">Llegará con los próximos capítulos.</p>' : k === 'locked' ? '<p class="muted">Se abre al terminar la misión anterior.</p>' :
+          `<p>${m.text}</p>${m.who ? `<p class="muted">Te la encargó ${m.who}.</p>` : ''}<div class="prog"><i style="width:${(k === 'done' ? 1 : r[1] / r[2]) * 100}%"></i></div><em>${k === 'done' ? 'Completada' : `${r[1]} de ${r[2]}`} · ${m.pts} puntos</em>`) + '</aside></div>';
     } else if (open === 'saberes') {
+      // árbol: Leftraru arriba, y de él bajan las ramas; cada nudo es un saber
       $('panel-title').textContent = 'Saberes';
-      const node = (k) => {
-        const have = skills.includes(k.id), teacher = BY[k.de], met = found[k.de] !== undefined, pre = !k.pide || skills.includes(k.pide), can = !have && met && pre && avail() >= k.cost;
-        const why = have ? 'Aprendido' : !met ? `Habla primero con ${teacher.title}` : !pre ? `Requiere ${SK[k.pide].name}` : avail() < k.cost ? `Te faltan ${k.cost - avail()} puntos` : '';
-        return `<div class="skill${have ? ' have' : can ? ' can' : ''}" style="grid-column:${k.col + 1};grid-row:${k.row + 2}"><h3>${k.name}</h3><p>${k.text}</p><small>Lo enseña ${teacher.title} · ${k.cost} puntos</small>${can ? `<button class="btn main" data-skill="${k.id}">Aprender</button>` : `<em>${why}</em>`}</div>`;
-      };
-      const ramas = [['El bosque', '1 / 3'], ['El cuerpo', '3'], ['La palabra', '4']];
-      body.innerHTML = `<div class="score"><div><b>${avail()}</b> puntos para gastar</div><div class="lvl">has ganado ${earned()} en total</div></div><p class="muted how">Los puntos de investigación se convierten en saberes. Cada saber lo enseña alguien de la aldea: primero tienes que haber conversado con esa persona.</p>` +
-        '<div class="tree">' + ramas.map(([n, c]) => `<h4 class="sec2" style="grid-column:${c};grid-row:1">${n}</h4>`).join('') + SKILLS.map(node).join('') + '</div>';
+      const POS = { raiz: [50, 8], vista: [12, 46], rastro: [12, 84], pudu: [37, 46], ligero: [63, 46], salto: [63, 84], memoria: [88, 46] };
+      const info = (k) => { const have = skills.includes(k.id), teacher = BY[k.de], met = found[k.de] !== undefined, pre = !k.pide || skills.includes(k.pide), can = !have && met && pre && avail() >= k.cost;
+        return { have, can, teacher, why: have ? 'Ya lo aprendiste.' : !met ? `Habla primero con ${teacher.title}.` : !pre ? `Antes debes aprender ${SK[k.pide].name}.` : avail() < k.cost ? `Te faltan ${k.cost - avail()} puntos.` : '' }; };
+      const line = (a, b, on) => `<line x1="${POS[a][0]}" y1="${POS[a][1]}" x2="${POS[b][0]}" y2="${POS[b][1]}" class="${on ? 'on' : ''}"/>`;
+      const k = SK[selK] || SKILLS[0], d = info(k);
+      body.innerHTML = `<div class="score"><div><b>${avail()}</b> puntos para gastar</div><div class="lvl">has ganado ${earned()} en total</div></div>` +
+        '<div class="tree2"><div class="canvas"><svg viewBox="0 0 100 100" preserveAspectRatio="none">' + SKILLS.map((x) => line(x.pide || 'raiz', x.id, skills.includes(x.id))).join('') + '</svg>' +
+        `<div class="node root" style="left:${POS.raiz[0]}%;top:${POS.raiz[1]}%"><i></i><span>Leftraru<small>Observar</small></span></div>` +
+        ['El bosque|24', 'El cuerpo|63', 'La palabra|88'].map((x) => { const [n, l] = x.split('|'); return `<div class="branch" style="left:${l}%">${n}</div>`; }).join('') +
+        SKILLS.map((x) => { const q = info(x); return `<button class="node${q.have ? ' have' : q.can ? ' can' : ''}${x.id === k.id ? ' on' : ''}" data-node="${x.id}" style="left:${POS[x.id][0]}%;top:${POS[x.id][1]}%"><i></i><span>${x.name}<small>${q.have ? 'aprendido' : x.cost + ' puntos'}</small></span></button>`; }).join('') + '</div>' +
+        `<aside><small>${k.rama}</small><h3>${k.name}</h3><p>${k.text}</p><p class="muted">Lo enseña ${d.teacher.title}. Cuesta ${k.cost} puntos.</p>${d.can ? `<button class="btn main" data-skill="${k.id}">Aprender</button>` : `<em>${d.why}</em>`}</aside></div>`;
     } else if (open === 'bolsa') {
       const ids = Object.keys(bag);
       $('panel-title').textContent = 'Bolsa';
@@ -124,7 +130,8 @@ export function createUI({ world, onToast, onClose, onSkill }) {
     open = which; document.exitPointerLock?.(); panel.classList.add('on'); if (which === 'notas') $('btn-notas').classList.remove('new'); render();
   }
   body.addEventListener('click', (e) => {
-    const c = e.target.closest('[data-cat]'), n = e.target.closest('[data-note]'), k = e.target.closest('[data-skill]');
+    const c = e.target.closest('[data-cat]'), n = e.target.closest('[data-note]'), k = e.target.closest('[data-skill]'), mi = e.target.closest('[data-mis]'), nd = e.target.closest('[data-node]');
+    if (mi) { selM = mi.dataset.mis; return render(); } if (nd) { selK = nd.dataset.node; return render(); }
     if (c) { cat = c.dataset.cat; sel = null; render(); } else if (n) { sel = n.dataset.note; render(); }
     else if (k && avail() >= SK[k.dataset.skill].cost) { skills.push(k.dataset.skill); save(); refreshScore(); onToast(`Aprendiste: ${SK[k.dataset.skill].name}`); onSkill?.(); render(); }
   });
@@ -148,6 +155,7 @@ export function createUI({ world, onToast, onClose, onSkill }) {
       found[id] = img; save(); cat = n.cat; sel = id; refreshScore();
       onToast(`${n.title} · +${CATS[n.cat].pts + bonus} puntos de investigación`); $('btn-notas').classList.add('new'); if (open) render(); return true;
     },
+    retake(id, img) { if (found[id] === undefined) return; found[id] = img; save(); onToast(`Foto actualizada: ${BY[id].title}`); if (open) render(); },
     place(key) { places.add(key); },
     addItem(id) { bag[id] = (bag[id] || 0) + 1; if (open) render(); },
     reset() { found = {}; skills = []; done = {}; extra = 0; save(); refreshScore(); },

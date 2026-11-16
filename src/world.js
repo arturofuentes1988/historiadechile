@@ -12,7 +12,7 @@ const R = (a, b) => a + (b - a) * rng();
 const Q = Math.min(2, Math.max(0.2, parseFloat(new URLSearchParams(location.search).get('q')) || parseFloat(JSON.parse(localStorage.getItem('leftraru.opciones') || '{}').detalle) || 1));
 
 // color del suelo según la zona
-const GROUND = { forest: 0x55472f, grassy: 0x526a32, needles: 0x62452e, moss: 0x3a4a2c, meadow: 0x587834, marsh: 0x40593c, earth: 0x7a6248, path: 0x94805f, pebble: 0x908c80, bed: 0x5c6456, rock: 0x74767a, alpine: 0x6c7040 };
+const GROUND = { forest: 0x55472f, grassy: 0x526a32, needles: 0x62452e, moss: 0x4c5a38, meadow: 0x587834, marsh: 0x40593c, earth: 0x7a6248, path: 0x94805f, pebble: 0x908c80, bed: 0x5c6456, rock: 0x74767a, alpine: 0x6c7040 };
 const GC = {}; for (const k in GROUND) GC[k] = new THREE.Color(GROUND[k]);
 
 export function buildWorld(scene, RAPIER, physics) {
@@ -42,8 +42,12 @@ export function buildWorld(scene, RAPIER, physics) {
   const hOut = (x, z) => { const cx = Math.min(B.x1, Math.max(B.x0, x)), cz = Math.min(B.z1, Math.max(B.z0, z)), d = Math.hypot(x - cx, z - cz), far = Math.hypot(x, z);
     return (height(cx, cz) + 2) * (1 - smooth(0, 200, d)) + smooth(0, 200, d) * Math.max(-8, 4 + fbm(x * 0.004, z * 0.004) * 34 + (x > 0 ? x * 0.035 : x * 0.05) + smooth(300, 900, far) * (x > -200 ? 120 * fbm(x * 0.0016 + 9, z * 0.0016) : 0)) - 1.6; };
   { const S = 30, N = 90, half = (N * S) / 2, P = [], C = [], I = [], c = new THREE.Color();
-    for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) { const x = -half + i * S, z = -half + j * S, h = hOut(x, z); P.push(x, h, z); c.set(h > 95 ? 0x6f7478 : fbm(x * 0.01, z * 0.01) > 0.55 ? 0x3f5a34 : 0x2f4a30).multiplyScalar(0.8 + 0.3 * vnoise(x * 0.02, z * 0.02)); C.push(c.r, c.g, c.b); }
-    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { const x = -half + i * S, z = -half + j * S; if (x > B.x0 + 6 && x + S < B.x1 - 6 && z > B.z0 + 6 && z + S < B.z1 - 6) continue; const a = j * (N + 1) + i; I.push(a, a + N + 1, a + 1, a + 1, a + N + 1, a + N + 2); }
+    for (let j = 0; j <= N; j++) for (let i = 0; i <= N; i++) {
+      let x = -half + i * S, z = -half + j * S;
+      // los vértices que caerían dentro del mapa se llevan a su borde, para que este terreno tosco nunca tape al fino
+      if (x > B.x0 && x < B.x1 && z > B.z0 && z < B.z1) { const dx = Math.min(x - B.x0, B.x1 - x), dz = Math.min(z - B.z0, B.z1 - z); if (dx < dz) x = x - B.x0 < B.x1 - x ? B.x0 : B.x1; else z = z - B.z0 < B.z1 - z ? B.z0 : B.z1; }
+      const inside = x >= B.x0 && x <= B.x1 && z >= B.z0 && z <= B.z1, h = inside ? height(x, z) - 0.25 : hOut(x, z); P.push(x, h, z); c.set(h > 95 ? 0x6f7478 : fbm(x * 0.01, z * 0.01) > 0.55 ? 0x3f5a34 : 0x2f4a30).multiplyScalar(0.8 + 0.3 * vnoise(x * 0.02, z * 0.02)); C.push(c.r, c.g, c.b); }
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) { const x = -half + i * S, z = -half + j * S; if (x >= B.x0 && x + S <= B.x1 && z >= B.z0 && z + S <= B.z1) continue; const a = j * (N + 1) + i; I.push(a, a + N + 1, a + 1, a + 1, a + N + 1, a + N + 2); }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.setIndex(I); g.computeVertexNormals();
     scene.add(new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 })));
     // bosque que continúa más allá del borde del mapa (solo se ve, no se camina)
@@ -102,12 +106,12 @@ export function buildWorld(scene, RAPIER, physics) {
     const x = R(B.x0 + 2, B.x1 - 2), z = R(B.z0 + 2, B.z1 - 2), h = height(x, z);
     if (h < WATER_Y + 0.05 || pathDist(x, z) < 1.3) continue;
     const zk = zone(x, z, h, normalAt(x, z)[1]), u = rng();
-    if (zk === 'meadow') { if (u < 0.92) flora.scatter('grass', x, h, z, R(0.9, 1.5), 0xd8e8b0); else flora.scatter('flower', x, h, z, R(0.8, 1.2), FL[(u * 1000 | 0) % 3]); }
-    else if (zk === 'grassy') { if (u < 0.7) flora.scatter('grass', x, h, z, R(0.8, 1.3)); }
-    else if (zk === 'alpine') { if (u < 0.5) flora.scatter('grass', x, h, z, R(0.6, 1.0), 0xe6dc9a); }
+    if (zk === 'meadow') { if (u < 0.66) flora.scatter('grass', x, h, z, R(0.9, 1.5), 0xd8e8b0); else if (u < 0.9) flora.scatter('grass2', x, h, z, R(0.8, 1.3), 0xe8e4b8); else flora.scatter('flower', x, h, z, R(0.8, 1.2), FL[(u * 1000 | 0) % 3]); }
+    else if (zk === 'grassy') { if (u < 0.5) flora.scatter('grass', x, h, z, R(0.8, 1.3)); else if (u < 0.75) flora.scatter('grass2', x, h, z, R(0.7, 1.2), 0xe6dca8); else if (u < 0.78) flora.scatter('flower', x, h, z, R(0.7, 1), FL[(u * 1000 | 0) % 3]); }
+    else if (zk === 'alpine') { if (u < 0.35) flora.scatter('grass', x, h, z, R(0.6, 1.0), 0xe6dc9a); else if (u < 0.6) flora.scatter('grass2', x, h, z, R(0.6, 1.0), 0xe8d898); }
     else if (zk === 'marsh') { if (u < 0.45) flora.scatter('reed', x, h, z, R(0.8, 1.3)); else if (u < 0.75) flora.scatter('grass', x, h, z, R(1, 1.5), 0xb8d8a8); }
     else if (zk === 'pebble') { if (u < 0.1) flora.scatter('reed', x, h, z, R(0.7, 1.1)); }
-    else if (zk === 'earth') { if (u < 0.08 && Math.hypot(x, z) > 20) flora.scatter('grass', x, h, z, R(0.5, 0.8), 0xe0d8a0); }
+    else if (zk === 'earth') { if (u < 0.14 && Math.hypot(x, z) > 9) flora.scatter(u < 0.1 ? 'grass' : 'grass2', x, h, z, R(0.4, 0.8), 0xe0d8a0); } // matas ralas donde la tierra no está tan pisada
     else if (zk === 'forest') { if (u < 0.2) flora.scatter('grass', x, h, z, R(0.6, 1.0), 0xc8d8a0); else if (u < 0.27) flora.scatter('fern', x, h, z, R(0.8, 1.3)); else if (u < 0.55) flora.scatter('litter', x, h, z, R(0.7, 1.3), near(x, z, 6) && rng() < 0.5 ? 0xf0d890 : 0xb09070); }
     else if (zk === 'moss') { if (u < 0.3) flora.scatter('fern', x, h, z, R(1, 1.9)); else if (u < 0.36) flora.scatter('grass', x, h, z, R(0.6, 1), 0xa8c090); else if (u < 0.55) flora.scatter('litter', x, h, z, R(0.7, 1.3), 0x8a8a5a); }
     else if (zk === 'needles') { if (u < 0.05) flora.scatter('fern', x, h, z, R(0.7, 1.1)); else if (u < 0.09) flora.scatter('grass', x, h, z, R(0.5, 0.8), 0xd8d0a0); else if (u < 0.2) flora.scatter('litter', x, h, z, R(0.7, 1.2), 0x9a7050); }
@@ -148,6 +152,6 @@ export function buildWorld(scene, RAPIER, physics) {
     items, trees, life, strokes: Math.round(tris),
     nearTree(x, z, r) { const ci = Math.floor(x / 8), cj = Math.floor(z / 8); let best = null; for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const l = grid.get(ci + i + ',' + (cj + j)); if (l) for (const t of l) { const d = Math.hypot(t.x - x, t.z - z); if (d < r && (!best || d < best.d)) best = { ...t, d }; } } return best; },
     nearPlant: flora.nearScatter, nearBush: flora.nearBush, volcano: new THREE.Vector3(VOL.x, 380, VOL.z),
-    update(dt, t, camPos, playerPos) { flora.update(camPos); life.update(dt, t, playerPos); if (emit.glow) emit.glow.intensity = 12 + Math.sin(t * 11) * 2.5 + Math.sin(t * 23.7) * 1.5; },
+    update(dt, t, camPos, playerPos, speed) { flora.update(camPos); life.update(dt, t, playerPos, speed); if (emit.glow) { emit.glow.intensity = 12 + Math.sin(t * 11) * 2.5 + Math.sin(t * 23.7) * 1.5; emit.ember.emissiveIntensity = 1.8 + Math.sin(t * 3.1) * 0.5 + Math.sin(t * 7.3) * 0.25; } },
   };
 }

@@ -51,7 +51,8 @@ const pp = () => pBody.translation();
 function enter() {
   if (state !== 'title') return;
   setMenu(false); state = 'play'; $('title').classList.add('hide'); document.body.classList.add('playing'); $('hud').classList.add('on');
-  lock(); hint('Sigue el sendero hacia el norte · Acércate a las cosas y pulsa E para observarlas', 10);
+  if (!document.fullscreenElement) { try { document.documentElement.requestFullscreen?.()?.catch?.(() => {}); } catch { /* el navegador no lo permitió */ } }
+  lock(); hint(`Sigue el sendero hacia el norte · Acércate a algo y pulsa ${keyName(opts.keys.observar)} para observarlo`, 10);
   if (!ui.has('leftraru')) { const t = pp(); ui.discover('leftraru', photo({ x: t.x, y: t.y + 0.25, z: t.z }, { dist: 2.3, up: 0.2, fov: 40, self: true })); }
 }
 
@@ -99,7 +100,7 @@ $('c-entrar').onclick = enter; $('c-opciones').onclick = () => setMenu(true);
 // pantalla completa
 const toggleFull = () => { if (document.fullscreenElement) document.exitFullscreen?.(); else document.documentElement.requestFullscreen?.().catch(() => hint('Este navegador no permitió la pantalla completa', 4)); };
 $('btn-full').onclick = toggleFull; $('o-full').onchange = toggleFull;
-document.addEventListener('fullscreenchange', () => { const on = !!document.fullscreenElement; $('o-full').checked = on; $('full-label').textContent = on ? 'Salir de pantalla completa' : 'Pantalla completa'; });
+document.addEventListener('fullscreenchange', () => { const on = !!document.fullscreenElement; if (on && state === 'play' && !menuOpen && !ui.open) lock(); $('o-full').checked = on; $('full-label').textContent = on ? 'Salir de pantalla completa' : 'Pantalla completa'; });
 if (!document.documentElement.requestFullscreen) { $('btn-full').style.display = 'none'; $('o-full').parentElement.style.display = 'none'; }
 // al soltar el ratón con Escape durante el juego, se abre el menú
 // El ratón: al entrar al mundo queda tomado para girar la cámara. Escape lo suelta y abre el menú.
@@ -143,17 +144,17 @@ const viewPhoto = (id) => withCamera(() => { const [from, look, fov] = VIEWS[id]
 const herePhoto = () => { draw(); return grab(); };
 
 // ---------- observar y conversar (tecla E) ----------
-let near = null, scanT = 0, talk = null, misT = 0, summit = false;
+let near = null, scanT = 0, talk = null, misT = 0, summit = false, still = 0;
 function applySkills() { explorer.reach = ui.skill('vista') ? 1.7 : 1; world.life.shyR = ui.skill('pudu') ? 3.5 : 9; }
 function say() { document.body.classList.add('talking'); const t = talk; $('dlg-name').textContent = t.name; $('dlg-text').textContent = t.lines[t.i]; $('dlg-more').textContent = `${keyName(opts.keys.observar)} · ${t.i < t.lines.length - 1 ? 'seguir' : 'cerrar'}`; $('dialogo').classList.add('on'); }
 function interact() {
   if (talk) { if (++talk.i < talk.lines.length) return say(); const t = talk; talk = null; $('dialogo').classList.remove('on'); document.body.classList.remove('talking'); if (t.done) t.done(); return; }
-  if (!near || state !== 'play' || ui.open) return;
+  if (!near || state !== 'play' || ui.open || focus) return;
   const c = near; near = null; $('prompt').classList.remove('on');
   if (c.person) {
     const d = TALK[c.id], a = c.person; a.face = Math.atan2(pp().x - a.x, pp().z - a.z); player.facing = Math.atan2(a.x - pp().x, a.z - pp().z);
     talk = { name: d.name, lines: c.known ? [d.again] : d.lines, i: 0, done: c.known ? null : () => { ui.discover(c.id, photo(c.target, c.shot)); for (const id of d.da) ui.discover(id, VIEWS[id] ? viewPhoto(id) : ''); } }; say();
-  } else ui.discover(c.id, c.shot.view ? viewPhoto(c.shot.view) : photo(c.target, c.shot));
+  } else if (c.shot.view) ui.discover(c.id, viewPhoto(c.shot.view)); else startFocus(c);
 }
 $('dialogo').addEventListener('click', () => interact());
 
@@ -188,13 +189,13 @@ addEventListener('keydown', (e) => {
 });
 addEventListener('keyup', (e) => { keys[e.code] = false; });
 addEventListener('mousemove', (e) => {
-  if (!locked() && !(dragging && state === 'play')) return;
+  if (focus || (!locked() && !(dragging && state === 'play'))) return;
   cam.yaw -= e.movementX * 0.0028 * opts.sens; cam.pitch = Math.min(1.2, Math.max(-0.25, cam.pitch + e.movementY * 0.0022 * opts.sens * (opts.inv ? -1 : 1)));
 });
 
 function updatePlayer(dt) {
   let ix = 0, iz = 0;
-  if (state === 'play' && !ui.open && !talk) {
+  if (state === 'play' && !ui.open && !talk && !focus) {
     ix = (down('derecha') || keys.ArrowRight ? 1 : 0) - (down('izquierda') || keys.ArrowLeft ? 1 : 0);
     iz = (down('adelante') || keys.ArrowUp ? 1 : 0) - (down('atras') || keys.ArrowDown ? 1 : 0);
     cam.yaw += ((down('camIzq') ? 1 : 0) - (down('camDer') ? 1 : 0)) * dt * 1.8;
@@ -204,7 +205,7 @@ function updatePlayer(dt) {
   const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw);
   let dx = fx * iz + rx * ix, dz = fz * iz + rz * ix; const l = Math.hypot(dx, dz);
   if (l > 0) { dx /= l; dz /= l; player.dirX = dx; player.dirZ = dz; let d = Math.atan2(dx, dz) - player.facing; d = Math.atan2(Math.sin(d), Math.cos(d)); player.facing += d * Math.min(1, dt * 12); }
-  if (player.grounded && state === 'play' && !ui.open && !talk && down('saltar')) { player.vy = 6.6 * (ui.skill('salto') ? 1.22 : 1); player.grounded = false; }
+  if (player.grounded && state === 'play' && !ui.open && !talk && !focus && down('saltar')) { player.vy = 6.6 * (ui.skill('salto') ? 1.22 : 1); player.grounded = false; }
   player.vy = Math.max(-25, player.vy - 18 * dt);
   if (player.vy > 0) ctrl.disableSnapToGround(); else ctrl.enableSnapToGround(0.3);
   const mvx = (player.dirX || 0) * player.speed * dt, mvz = (player.dirZ || 0) * player.speed * dt;
@@ -229,17 +230,41 @@ function updatePlayer(dt) {
     ui.marks = ui.skill('rastro') ? explorer.hints(t) : [];
   }
   // ¿hay algo cerca que observar o alguien con quien hablar?
-  if ((scanT -= dt) <= 0 && state === 'play') { scanT = 0.2; near = talk || ui.open ? null : explorer.scan(t); $('prompt').classList.toggle('on', !!near); if (near) $('prompt-text').textContent = `${near.verb} ${near.label}`; }
+  if ((scanT -= dt) <= 0 && state === 'play') { scanT = 0.2; still = player.speed < 0.3 ? still + 0.2 : 0; near = talk || ui.open || focus ? null : explorer.scan(t, still > 0.8); $('prompt').classList.toggle('on', !!near); if (near) $('prompt-text').textContent = `${near.verb} ${near.label}`; }
 }
 
-function updateCamera(dt) {
+function chase() { // dónde debe estar la cámara de juego: detrás del personaje, sin atravesar troncos ni rocas
   const t = pp(), cp = Math.cos(cam.pitch), d = { x: Math.sin(cam.yaw) * cp, y: Math.sin(cam.pitch), z: Math.cos(cam.yaw) * cp };
-  // si un tronco o roca tapa al personaje, la cámara se acerca
   const hit = physics.castRay(new RAPIER.Ray({ x: t.x, y: t.y + 0.75, z: t.z }, d), cam.dist, true, undefined, undefined, pCol);
   const dist = hit ? Math.max(0.9, (hit.timeOfImpact ?? hit.toi) - 0.3) : cam.dist;
-  let x = t.x + d.x * dist, y = t.y + 0.75 + d.y * dist, z = t.z + d.z * dist;
-  y = Math.max(y, height(x, z) + 0.5);
-  camera.position.lerp(V3(x, y, z), Math.min(1, dt * 9)); camera.lookAt(t.x, t.y + 0.75, t.z);
+  const x = t.x + d.x * dist, z = t.z + d.z * dist;
+  return [V3(x, Math.max(t.y + 0.75 + d.y * dist, height(x, z) + 0.5), z), V3(t.x, t.y + 0.75, t.z)];
+}
+function updateCamera(dt) { const [pos, look] = chase(); camera.position.lerp(pos, Math.min(1, dt * 9)); camera.lookAt(look); }
+
+// ---------- observar: la cámara se acerca sola al objeto, lo encuadra, toma la foto y vuelve ----------
+let focus = null;
+// luz suave que acompaña a la cámara al observar algo de cerca, para que se vea aunque esté a la sombra
+const lamp = new THREE.PointLight(0xfff2dc, 0, 9, 1.4); scene.add(lamp);
+const ease = (k) => k * k * (3 - 2 * k);
+function startFocus(c) {
+  const t = pp(), T = c.live ? c.live() : c.target, sh = c.shot, pos = V3();
+  if (sh.fromPlayer) pos.set(t.x, t.y + 0.95, t.z); // las aves se miran desde donde estás, con mucho acercamiento
+  else { let dx = t.x - T.x, dz = t.z - T.z; const l = Math.hypot(dx, dz) || 1; pos.set(T.x + (dx / l) * sh.dist, T.y + sh.up, T.z + (dz / l) * sh.dist); pos.y = Math.max(pos.y, height(pos.x, pos.z) + 0.35); }
+  lamp.userData.on = !sh.fromPlayer && sh.dist < 6;
+  focus = { c, pos, fov: sh.fov, t: 0, stage: 0, hold: 0, sp: camera.position.clone(), sf: camera.fov, look: V3(t.x, t.y + 0.75, t.z), done: false };
+  $('prompt').classList.remove('on'); $('focus').textContent = `Observando ${c.label}…`; $('focus').classList.add('on'); document.body.classList.add('talking');
+}
+function updateFocus(dt) {
+  const f = focus, T = f.c.live ? f.c.live() : f.c.target, tv = V3(T.x, T.y, T.z);
+  if (f.stage === 0) { f.t = Math.min(1, f.t + dt / 0.9); const k = ease(f.t); camera.position.lerpVectors(f.sp, f.pos, k); camera.fov = f.sf + (f.fov - f.sf) * k; camera.lookAt(f.look.clone().lerp(tv, k)); if (k > 0.4) boy.g.visible = false; if (f.t >= 1) f.stage = 1; }
+  else if (f.stage === 1) {
+    camera.position.copy(f.pos); camera.lookAt(tv); f.hold += dt;
+    if (f.hold > 0.45 && !f.done) { f.done = true; camera.updateProjectionMatrix(); world.update(0, time, camera.position, pp(), 0); draw(); const img = grab(); if (f.c.known) ui.retake(f.c.id, img); else ui.discover(f.c.id, img); }
+    if (f.hold > 1.7) { f.stage = 2; f.t = 0; $('focus').classList.remove('on'); }
+  } else { f.t = Math.min(1, f.t + dt / 0.7); const k = ease(f.t), [pos, look] = chase(); camera.position.lerpVectors(f.pos, pos, k); camera.fov = f.fov + (f.sf - f.fov) * k; camera.lookAt(tv.lerp(look, k)); if (k > 0.5) boy.g.visible = true; if (f.t >= 1) { camera.fov = f.sf; focus = null; document.body.classList.remove('talking'); } }
+  lamp.position.copy(camera.position); lamp.intensity = lamp.userData.on && focus ? (f.stage === 1 ? 7 : f.stage === 0 ? 7 * f.t : 7 * (1 - f.t)) : 0;
+  camera.updateProjectionMatrix();
 }
 
 function updateItems() {
@@ -272,9 +297,10 @@ function tick(dt) {
   updatePlayer(dt);
   if (cine.active) cine.update(dt);
   else if (state === 'title') { const a = time * 0.04 + 2.4; camera.position.set(Math.sin(a) * 31, 12, Math.cos(a) * 31); camera.lookAt(0, 4, 0); }
+  else if (focus) updateFocus(dt);
   else updateCamera(dt);
   updateItems();
-  world.update(dt, time, camera.position, pp()); lights.follow(state === 'title' ? { x: 0, y: 3, z: 0 } : pp());
+  world.update(dt, time, camera.position, pp(), player.speed); lights.follow(state === 'title' ? { x: 0, y: 3, z: 0 } : pp());
   if (state === 'play') ui.drawMap(pp(), player.facing);
   if (hintT > 0 && (hintT -= dt) <= 0) $('hint').classList.remove('on');
 }

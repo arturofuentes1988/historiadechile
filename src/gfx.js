@@ -102,10 +102,24 @@ function grassCanvas(cols, tall = false) {
   }
   return c;
 }
-function fernCanvas() {
-  const [c, x] = canvas(96, 256);
-  x.strokeStyle = rgb(60, 90, 40); x.lineWidth = 2.5; x.beginPath(); x.moveTo(48, 256); x.lineTo(48, 8); x.stroke();
-  for (let i = 0; i < 34; i++) { const y = 250 - i * 7.2, l = 44 * Math.sin(Math.min(1, i / 30) * 2.6 + 0.35) * (1 - i / 44), k = R(0.75, 1.15); x.fillStyle = rgb(46 * k, 104 * k, 44 * k); for (const s of [-1, 1]) { x.beginPath(); x.moveTo(48, y); x.quadraticCurveTo(48 + s * l * 0.6, y - 9, 48 + s * l, y - 3); x.quadraticCurveTo(48 + s * l * 0.5, y + 4, 48, y + 3); x.fill(); } }
+function seedGrassCanvas() { // pasto alto con espigas en la punta
+  const [c, x] = canvas(128, 256);
+  for (let i = 0; i < 22; i++) { const bx = R(12, 116), h = R(120, 244), lean = R(-22, 22), k = R(0.75, 1.15); x.strokeStyle = rgb(124 * k, 142 * k, 64 * k); x.lineWidth = R(1.4, 2.6); x.beginPath(); x.moveTo(bx, 256); x.quadraticCurveTo(bx + lean * 0.3, 256 - h * 0.6, bx + lean, 256 - h); x.stroke();
+    if (i % 2) { x.fillStyle = rgb(196 * k, 170 * k, 96 * k); for (let q = 0; q < 7; q++) { x.beginPath(); x.ellipse(bx + lean + (q % 2 ? 2.5 : -2.5), 256 - h + q * 5, 2.4, 4.2, (q % 2 ? 0.5 : -0.5), 0, 6.3); x.fill(); } } }
+  for (let i = 0; i < 16; i++) { const bx = R(8, 120), h = R(50, 120), lean = R(-18, 18), w = R(2, 4), k = R(0.7, 1.1), g = x.createLinearGradient(0, 256, 0, 256 - h); g.addColorStop(0, rgb(52 * k, 78 * k, 30 * k)); g.addColorStop(1, rgb(118 * k, 150 * k, 60 * k)); x.fillStyle = g; x.beginPath(); x.moveTo(bx - w, 256); x.quadraticCurveTo(bx + lean * 0.3, 256 - h * 0.6, bx + lean, 256 - h); x.quadraticCurveTo(bx + lean * 0.4 + w, 256 - h * 0.5, bx + w, 256); x.fill(); }
+  return c;
+}
+function fernCanvas() { // fronda de helecho: raquis al centro y pinas a los lados, cada una con su nervio
+  const [c, x] = canvas(192, 512);
+  x.strokeStyle = rgb(92, 120, 54); x.lineWidth = 5; x.beginPath(); x.moveTo(96, 512); x.lineTo(96, 14); x.stroke();
+  for (let i = 0; i < 40; i++) {
+    const y = 500 - i * 12.2, l = 88 * Math.sin(Math.min(1, i / 34) * 2.6 + 0.35) * (1 - i / 50), k = R(0.85, 1.2);
+    for (const s of [-1, 1]) {
+      const g = x.createLinearGradient(96, 0, 96 + s * l, 0); g.addColorStop(0, rgb(58 * k, 122 * k, 50 * k)); g.addColorStop(1, rgb(104 * k, 168 * k, 70 * k)); x.fillStyle = g;
+      x.beginPath(); x.moveTo(96, y); x.quadraticCurveTo(96 + s * l * 0.6, y - 16, 96 + s * l, y - 5); x.quadraticCurveTo(96 + s * l * 0.5, y + 6, 96, y + 5); x.fill();
+      x.strokeStyle = rgb(150, 196, 104, 0.7); x.lineWidth = 1.2; x.beginPath(); x.moveTo(96, y + 1); x.quadraticCurveTo(96 + s * l * 0.5, y - 7, 96 + s * l * 0.94, y - 4); x.stroke();
+    }
+  }
   return c;
 }
 function quilaCanvas() { // caña de quila: tallo delgado con hojas angostas en ramilletes
@@ -155,6 +169,7 @@ export const TEX = {
   litre: tex(leafCanvas({ n: 260, len: 9, wid: 5.5, pow: 0.65, side: 6, vein: [214, 206, 110], cols: [[40, 84, 44], [52, 98, 50], [34, 70, 40]] }), { wrap: false }),                  // ovalada, con nervios amarillos muy marcados
   pewen: tex(pewenCanvas(), { wrap: false }),
   grass: tex(grassCanvas([[92, 132, 52], [112, 150, 60], [140, 160, 72]]), { wrap: false }),
+  grass2: tex(seedGrassCanvas(), { wrap: false }),
   reed: tex(grassCanvas([[150, 146, 78], [124, 138, 70], [176, 164, 96]], true), { wrap: false }),
   fern: tex(fernCanvas(), { wrap: false }), flower: tex(flowerCanvas(), { wrap: false }), quila: tex(quilaCanvas(), { wrap: false }), copihue: tex(copihueCanvas(), { wrap: false }),
   bark: tex(streakCanvas(256, 512, [[150, 140, 130], [110, 100, 92], [190, 180, 168], [70, 62, 56]], 900)),
@@ -260,12 +275,12 @@ export function buildSky(scene) {
       void main(){
         vec3 d = normalize(vD); float h = max(d.y, 0.);
         float s0 = max(dot(normalize(vec3(d.x, 0., d.z)), normalize(vec3(uSun.x, 0., uSun.z))), 0.);
-        vec3 col = mix(mix(vec3(0.62, 0.72, 0.82), vec3(1.0, 0.82, 0.58), pow(s0, 3.) * 0.75), vec3(0.20, 0.40, 0.72), pow(h, 0.5));   // del horizonte dorado al azul del cenit
+        vec3 col = mix(mix(vec3(0.62, 0.72, 0.82), vec3(0.98, 0.84, 0.66), pow(s0, 4.) * 0.5), vec3(0.20, 0.40, 0.72), pow(h, 0.5));   // del horizonte dorado al azul del cenit
         col = mix(col, vec3(0.09, 0.24, 0.58), smoothstep(0.45, 1., h));
         float s = max(dot(d, uSun), 0.);
-        col += vec3(1.0, 0.82, 0.55) * (pow(s, 6.) * 0.16 + pow(s, 60.) * 0.4) + vec3(1.0, 0.95, 0.85) * smoothstep(0.9992, 0.9997, s) * 2.2; // resplandor y disco del sol
+        col += vec3(1.0, 0.82, 0.55) * (pow(s, 8.) * 0.08 + pow(s, 90.) * 0.25) + vec3(1.0, 0.95, 0.85) * smoothstep(0.9993, 0.9997, s) * 1.6; // resplandor y disco del sol
         if (d.y < 0.) col = vec3(0.58, 0.61, 0.56);
-        gl_FragColor = vec4(col * 1.7, 1.);
+        gl_FragColor = vec4(col * 1.25, 1.);
         #include <colorspace_fragment>
       }`,
   }));
@@ -280,9 +295,14 @@ export function buildSky(scene) {
       void main(){
         vec3 d = normalize(vD); if (d.y < 0.02) discard;
         vec2 p = d.xz / (d.y + 0.18) * 1.5 + vec2(uTime*0.006, uTime*0.002);
-        float n = fbm(p), c = smoothstep(0.62, 0.82, n), thick = smoothstep(0.68, 0.95, n);
-        vec3 col = mix(vec3(0.96, 0.95, 0.93), vec3(0.50, 0.55, 0.64), thick*0.75) * (0.9 + 0.25*pow(max(dot(d, uSun), 0.), 3.));
-        gl_FragColor = vec4(col * 1.9, c * 0.92 * smoothstep(0.02, 0.2, d.y));
+        // cúmulos: base plana y sombreada, tope claro; más arriba, cirros finos estirados por el viento
+        float n = fbm(p), det = fbm(p*3.1 + 7.) - 0.5, c = smoothstep(0.6, 0.76, n + det*0.16), thick = smoothstep(0.66, 0.9, n + det*0.1);
+        float lit = clamp(fbm(p + uSun.xz*0.12) - n + 0.5, 0., 1.);
+        vec3 col = mix(vec3(0.55, 0.59, 0.67), vec3(0.97, 0.96, 0.93), lit*0.7 + 0.3 - thick*0.25);
+        float cir = smoothstep(0.62, 0.86, fbm(vec2(p.x*0.35 + 20., p.y*1.9) * 1.3 + uTime*0.002)) * 0.35;
+        float a = max(c * 0.9, cir * (1. - c)) * smoothstep(0.02, 0.2, d.y);
+        col = mix(vec3(0.94, 0.95, 0.96), col, c);
+        gl_FragColor = vec4(col * 1.25, a);
         ${END}
       }`,
   }));
@@ -332,7 +352,7 @@ export function buildLights(scene, renderer) {
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.0;
   scene.fog = new THREE.FogExp2(FOG.color, FOG.density);
-  scene.add(new THREE.HemisphereLight(0xb8cff0, 0x7a6c52, 1.9));
+  scene.add(new THREE.HemisphereLight(0xb8cff0, 0x7a6c52, 2.3));
   const sun = new THREE.DirectionalLight(0xffdcae, 3.6);
   sun.castShadow = true; sun.shadow.mapSize.set(4096, 4096); sun.shadow.bias = -0.0004; sun.shadow.normalBias = 0.35;
   const c = sun.shadow.camera; c.left = c.bottom = -75; c.right = c.top = 75; c.near = 20; c.far = 420; c.updateProjectionMatrix();
@@ -376,7 +396,7 @@ export function createPost(renderer, scene, camera) {
   const rt = new THREE.WebGLRenderTarget(size.x, size.y, { samples: 4, type: THREE.HalfFloatType });
   const composer = new EffectComposer(renderer, rt);
   composer.addPass(new RenderPass(scene, camera));
-  composer.addPass(new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.26, 0.6, 1.05));
+  composer.addPass(new UnrealBloomPass(new THREE.Vector2(size.x, size.y), 0.16, 0.45, 1.25));
   composer.addPass(new OutputPass());
   composer.addPass(new ShaderPass({
     uniforms: { tDiffuse: { value: null } },
@@ -387,7 +407,7 @@ export function createPost(renderer, scene, camera) {
         c = mix(vec3(l), c, 1.14);                                                        // un poco más de color
         c = mix(c * vec3(0.94, 0.99, 1.08), c * vec3(1.07, 1.01, 0.9), smoothstep(0.15, 0.75, l)); // sombras frías, luces doradas
         c = c * c * (3. - 2. * c) * 0.35 + c * 0.65;                                       // contraste suave
-        vec2 q = vUv - 0.5; c *= 1. - dot(q, q) * 0.55;                                    // viñeta
+        vec2 q = vUv - 0.5; c *= 1. - dot(q, q) * 0.4;                                    // viñeta
         gl_FragColor = vec4(c, 1.);
       }`,
   }));
@@ -395,4 +415,25 @@ export function createPost(renderer, scene, camera) {
     render: () => { uSunView.value.copy(SUN).transformDirection(camera.matrixWorldInverse); composer.render(); },
     resize() { const s = renderer.getDrawingBufferSize(new THREE.Vector2()); composer.setPixelRatio(renderer.getPixelRatio()); composer.setSize(s.x / renderer.getPixelRatio(), s.y / renderer.getPixelRatio()); },
   };
+}
+
+// ---------- llamas: láminas cruzadas con la forma del fuego animada en el shader ----------
+export function flameMaterial() {
+  return new THREE.ShaderMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: { uTime },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
+    fragmentShader: /* glsl */ `uniform float uTime; varying vec2 vUv;
+      float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
+      float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.-2.*f); return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y); }
+      void main(){
+        float t = uTime, x = vUv.x - 0.5 + (vn(vec2(vUv.y*3. - t*1.8, t*0.6)) - 0.5) * 0.22 * vUv.y;   // la llama se ladea al subir
+        float n = vn(vec2(x*5., vUv.y*3.5 - t*2.8))*0.6 + vn(vec2(x*11. + 3., vUv.y*8. - t*4.6))*0.4;
+        float body = (1. - vUv.y) * (1. - abs(x) * (2.3 + vUv.y*2.6));                                   // ancha abajo, en punta arriba
+        float f = smoothstep(0.2, 0.62, body*0.95 + n*0.5 - vUv.y*0.28) * smoothstep(0., 0.07, vUv.y);
+        vec3 col = mix(vec3(0.9, 0.16, 0.02), vec3(1.0, 0.62, 0.12), smoothstep(0.2, 0.7, f));
+        col = mix(col, vec3(1.0, 0.92, 0.6), smoothstep(0.75, 1., f) * (1. - vUv.y));                    // corazón casi blanco
+        gl_FragColor = vec4(col * f * 2.4, f);
+        ${END}
+      }`,
+  });
 }
