@@ -1,6 +1,6 @@
 // Arma el mundo del Acto I: terreno, agua, bosque, aldea, lejanía y vida.
 import * as THREE from 'three';
-import { TEX, GeoBag, FOG, mulberry32, waterMaterial, buildSky, buildShafts } from './gfx.js';
+import { GeoBag, FOG, mulberry32, waterMaterial, buildSky, buildShafts, groundMaterial } from './gfx.js';
 import { B, WATER_Y, CERRO, POI, height, normalAt, zone, pathDist, vnoise, fbm, smooth } from './terrain.js';
 import { makeFlora } from './flora.js';
 import { buildVillage, CORRAL } from './village.js';
@@ -20,17 +20,17 @@ export function buildWorld(scene, RAPIER, physics) {
   const bag = new GeoBag(), flora = makeFlora({ rng, scene, physics, RAPIER, fixed });
 
   // ---------- terreno: malla fina para ver, malla más gruesa para chocar ----------
-  { const NX = B.x1 - B.x0, NZ = B.z1 - B.z0, P = new Float32Array((NX + 1) * (NZ + 1) * 3), C = new Float32Array(P.length), U = new Float32Array((NX + 1) * (NZ + 1) * 2), I = new Uint32Array(NX * NZ * 6), c = new THREE.Color();
+  { const NX = B.x1 - B.x0, NZ = B.z1 - B.z0, P = new Float32Array((NX + 1) * (NZ + 1) * 3), C = new Float32Array(P.length), U = new Float32Array((NX + 1) * (NZ + 1) * 2), F = new Float32Array((NX + 1) * (NZ + 1)), I = new Uint32Array(NX * NZ * 6), c = new THREE.Color(), FOREST = { forest: 1, moss: 0.9, needles: 0.75, grassy: 0.6, marsh: 0.3 };
     for (let j = 0, k = 0, u = 0; j <= NZ; j++) for (let i = 0; i <= NX; i++, k += 3, u += 2) {
       const x = B.x0 + i, z = B.z0 + j, h = height(x, z), ny = normalAt(x, z)[1];
       // el color se promedia con puntos vecinos para que las zonas se fundan
-      c.setRGB(0, 0, 0); for (let s = 0; s < 3; s++) { const jx = x + (vnoise(x * 0.9 + s * 7, z * 0.9) - 0.5) * 3.5, jz = z + (vnoise(x * 0.9, z * 0.9 + s * 5) - 0.5) * 3.5; c.add(GC[zone(jx, jz, height(jx, jz), ny)]); }
+      c.setRGB(0, 0, 0); let fo = 0; for (let s = 0; s < 3; s++) { const jx = x + (vnoise(x * 0.9 + s * 7, z * 0.9) - 0.5) * 3.5, jz = z + (vnoise(x * 0.9, z * 0.9 + s * 5) - 0.5) * 3.5, zk = zone(jx, jz, height(jx, jz), ny); c.add(GC[zk]); fo += (FOREST[zk] || 0) / 3; } F[u / 2] = fo;
       const sh = (0.8 + 0.3 * vnoise(x * 0.35, z * 0.35) + 0.15 * vnoise(x * 0.05, z * 0.05)) * (0.9 + 0.2 * fbm(x * 0.02, z * 0.02));
       P[k] = x; P[k + 1] = h; P[k + 2] = z; C[k] = c.r * sh; C[k + 1] = c.g * sh; C[k + 2] = c.b * sh; U[u] = x / 3.3; U[u + 1] = z / 3.3;
     }
     for (let j = 0, k = 0; j < NZ; j++) for (let i = 0; i < NX; i++) { const a = j * (NX + 1) + i, b = a + 1, cc = a + NX + 1, d = cc + 1; I[k++] = a; I[k++] = cc; I[k++] = b; I[k++] = b; I[k++] = cc; I[k++] = d; }
-    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('color', new THREE.BufferAttribute(C, 3)); g.setAttribute('uv', new THREE.BufferAttribute(U, 2)); g.setIndex(new THREE.BufferAttribute(I, 1)); g.computeVertexNormals();
-    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, map: TEX.grain, bumpMap: TEX.grainBump, bumpScale: 9, roughness: 1 })); m.receiveShadow = true; scene.add(m);
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.BufferAttribute(P, 3)); g.setAttribute('color', new THREE.BufferAttribute(C, 3)); g.setAttribute('uv', new THREE.BufferAttribute(U, 2)); g.setAttribute('aForest', new THREE.BufferAttribute(F, 1)); g.setIndex(new THREE.BufferAttribute(I, 1)); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, groundMaterial()); m.receiveShadow = true; scene.add(m);
   }
   { const ST = 2, NX = (B.x1 - B.x0) / ST, NZ = (B.z1 - B.z0) / ST, verts = new Float32Array((NX + 1) * (NZ + 1) * 3), idx = new Uint32Array(NX * NZ * 6);
     for (let j = 0, k = 0; j <= NZ; j++) for (let i = 0; i <= NX; i++, k += 3) { const x = B.x0 + i * ST, z = B.z0 + j * ST; verts[k] = x; verts[k + 1] = height(x, z); verts[k + 2] = z; }

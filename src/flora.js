@@ -2,7 +2,7 @@
 // tarjetas de follaje con textura de hojas) que se repiten por el mapa con distinto tamaño y giro.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { TEX, MAT, mulberry32 } from './gfx.js';
+import { TEX, MAT, mulberry32, photo } from './gfx.js';
 import { height } from './terrain.js';
 
 const PI = Math.PI, UP = new THREE.Vector3(0, 1, 0);
@@ -75,13 +75,14 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
   }
 
   // Cada especie con su porte real: altura del modelo (H), grosor del tronco (r0), a qué altura se abre (fork) y forma de la copa
+  const barkPewen = MAT.bark(0xffffff, photo('corteza-pewen')); barkPewen.bumpScale = 3; // corteza fotográfica
   const SPEC = {
     coigue: { n: 3, make: (i) => broadleafModel(11 + i, { H: 22, r0: 0.6, cards: 34, size: 2.6, flat: 0.42, spread: 0.3 }), leaf: MAT.leaf(TEX.coigue), bark: MAT.bark(0xffffff, TEX.barkCoigue) },          // alto, de copa en pisos horizontales
     roble: { n: 3, make: (i) => broadleafModel(31 + i, { H: 20, r0: 0.5, cards: 22, size: 2.5, fork: [0.45, 0.6] }), leaf: MAT.leaf(TEX.roble), bark: MAT.bark(0xffffff, TEX.barkRoble) },                    // tronco recto y oscuro, copa abierta
     canelo: { n: 2, make: (i) => broadleafModel(51 + i, { H: 9, r0: 0.2, cone: true, spread: 0.2, cards: 24, size: 1.7 }), leaf: MAT.leaf(TEX.canelo), bark: MAT.bark(0xffffff, TEX.barkCanelo) },            // delgado, cónico, de corteza clara
     giant: { n: 2, make: (i) => broadleafModel(71 + i, { H: 32, r0: 1.3, limbs: 6, spread: 0.3, cards: 44, size: 3.2, flat: 0.5 }), leaf: MAT.leaf(TEX.coigue, 0xd0e0c8), bark: MAT.bark(0xe8ecd8, TEX.barkCoigue) },
-    pewen: { n: 3, make: (i) => pewenModel(91 + i, false), leaf: MAT.leaf(TEX.pewen), bark: MAT.bark(0xffffff, TEX.barkPewen) },                                                                             // corteza gruesa en placas
-    pewenYoung: { n: 2, make: (i) => pewenModel(111 + i, true), leaf: MAT.leaf(TEX.pewen), bark: MAT.bark(0xffffff, TEX.barkPewen) },
+    pewen: { n: 3, make: (i) => pewenModel(91 + i, false), leaf: MAT.leaf(TEX.pewen), bark: barkPewen },                                                                             // corteza gruesa en placas
+    pewenYoung: { n: 2, make: (i) => pewenModel(111 + i, true), leaf: MAT.leaf(TEX.pewen), bark: barkPewen },
     // bosque esclerófilo: árboles más bajos, de hoja dura y siempre verde, en las laderas soleadas
     peumo: { n: 2, make: (i) => broadleafModel(151 + i, { H: 12, r0: 0.34, limbs: 5, spread: 0.36, cards: 36, size: 2.0, fork: [0.24, 0.34] }), leaf: MAT.leaf(TEX.peumo), bark: MAT.bark(0xffffff, TEX.barkPardo) },   // copa redonda y densa
     boldo: { n: 2, make: (i) => broadleafModel(171 + i, { H: 8, r0: 0.26, limbs: 5, spread: 0.42, cards: 34, size: 1.7, fork: [0.16, 0.26] }), leaf: MAT.leaf(TEX.boldo), bark: MAT.bark(0xffffff, TEX.barkPardo) },    // bajo, ramificado desde abajo

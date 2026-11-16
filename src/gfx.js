@@ -185,6 +185,29 @@ export const TEX = {
   fur: tex(streakCanvas(256, 256, [[236, 236, 236], [205, 205, 205], [255, 255, 255], [176, 176, 176]], 2200, { lw: [0.6, 1.6] })), // pelaje: pelos cortos en la dirección del cuerpo
 };
 
+// ---------- texturas fotográficas (generadas aparte y guardadas en public/assets/tex) ----------
+const loader = new THREE.TextureLoader();
+export function photo(name, repeat) { const t = loader.load(`assets/tex/${name}.jpg`); t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.anisotropy = 8; if (repeat) t.repeat.set(...repeat); return t; }
+
+// Suelo: color por zona (como antes) y, en las zonas de bosque, la foto de la hojarasca.
+// La foto se muestrea a dos escalas y se mezclan con ruido, para que no se note que se repite.
+export function groundMaterial() {
+  const m = new THREE.MeshStandardMaterial({ vertexColors: true, map: TEX.grain, bumpMap: TEX.grainBump, bumpScale: 9, roughness: 1 }), tex = photo('suelo-bosque');
+  m.onBeforeCompile = (sh) => {
+    sh.uniforms.uForest = { value: tex };
+    sh.vertexShader = 'attribute float aForest; varying float vForest;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n vForest = aForest;');
+    sh.fragmentShader = 'uniform sampler2D uForest; varying float vForest;\n' + sh.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+      if (vForest > 0.01) {
+        vec2 fu = vMapUv * 0.62;
+        vec3 a = texture2D(uForest, fu).rgb, b = texture2D(uForest, vec2(fu.y, -fu.x) * 0.37 + 0.31).rgb;
+        float k = smoothstep(0.35, 0.65, texture2D(map, vMapUv * 0.11).r);
+        vec3 lum = vec3(dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11)));
+        diffuseColor.rgb = mix(diffuseColor.rgb, mix(a, b, k) * (0.55 + lum * 3.2), vForest); // conserva lo claro y lo oscuro de cada zona
+      }`);
+  };
+  return m;
+}
+
 // ---------- materiales ----------
 // viento: mueve las hojas y la punta del pasto
 export function withWind(m, amp, tipOnly = false, roundNormals = false) {

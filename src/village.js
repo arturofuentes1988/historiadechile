@@ -1,6 +1,6 @@
 // La aldea y los lugares construidos: rukas, fogón, rewe, corral, telar y otros detalles.
 import * as THREE from 'three';
-import { TEX, MAT, flameMaterial } from './gfx.js';
+import { TEX, MAT, flameMaterial, photo } from './gfx.js';
 import { height, POI, CERRO } from './terrain.js';
 
 export const RUKAS = [
@@ -19,7 +19,7 @@ export function buildVillage({ scene, rng, bag, flora, physics, RAPIER, fixed })
 
   // ---------- ruka: casa de paja con la puerta hacia el oriente ----------
   const thatch = MAT.thatch(), prof = [[1, 0], [1.03, 0.9], [0.86, 1.8], [0.5, 2.8], [0.1, 3.55]];
-  thatch.map = TEX.thatch.clone(); thatch.map.repeat.set(5, 1.6); thatch.bumpMap = thatch.map;
+  thatch.map = photo('paja', [4, 1.25]); thatch.bumpMap = thatch.map; thatch.bumpScale = 4; // paja fotográfica, en hileras alrededor de la ruka
   const darkMat = new THREE.MeshStandardMaterial({ color: 0x0c0a08, roughness: 1 });
   function ruka({ x, z, s, smoke }) {
     const y = height(x, z) - 0.05, r = 3.3 * s;
