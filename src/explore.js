@@ -3,7 +3,7 @@ import { POI, CERRO, riverZ, height } from './terrain.js';
 import { RUKAS, FOGON } from './village.js';
 import { TALK } from './notes.js';
 
-const PERSON = { 'Curiñancu': 'curinancu', 'Millaray': 'millaray', 'la abuela': 'abuela', 'Ayelén': 'ayelen', 'Rayen': 'rayen', 'la machi': 'machi', 'Ñamku': 'namku' };
+export const PERSON = { 'Curiñancu': 'curinancu', 'Millaray': 'millaray', 'la abuela': 'abuela', 'Ayelén': 'ayelen', 'Rayen': 'rayen', 'la machi': 'machi', 'Ñamku': 'namku' };
 const TREE = { pewen: ['pewen', 'el pewen'], coigue: ['coigue', 'el coigüe'], roble: ['roble', 'el roble'], canelo: ['canelo', 'el canelo'], giant: ['gigante', 'el árbol abuelo'], peumo: ['peumo', 'el peumo'], boldo: ['boldo', 'el boldo'], quillay: ['quillay', 'el quillay'], litre: ['litre', 'el litre'] };
 const BIRD = { traro: ['traro', 'el traro', 85, 2.2], choroy: ['choroy', 'el choroy', 75, 1.6], small: ['rayadito', 'el rayadito', 16, 2.4] }; // el último número es el ángulo de visión: muy cerrado, como un catalejo
 

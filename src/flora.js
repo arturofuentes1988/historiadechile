@@ -74,23 +74,25 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
     return { wood: mergeGeometries(wood), leaves: mergeGeometries(leaves), H };
   }
 
+  // El tamaño de cada tarjeta de follaje se ajustó a la hoja real de la especie: las de coigüe son chicas,
+  // las de roble medianas y las de canelo grandes. Todas van algo agrandadas para que se distingan.
   // Cada especie con su porte real: altura del modelo (H), grosor del tronco (r0), a qué altura se abre (fork) y forma de la copa
   // cortezas y hojas fotográficas de cada especie
   const bark = (n, tint = 0xffffff) => { const m = MAT.bark(tint, photo(n)); m.bumpScale = 3; return m; }, leaf = (n, tint) => MAT.leaf(photo(n, { cut: true }), tint);
   const barkPewen = bark('corteza-pewen'), bCoigue = bark('corteza-coigue'), bRoble = bark('corteza-roble'), bCanelo = bark('corteza-canelo'), bPeumo = bark('corteza-peumo'), bQuillay = bark('corteza-quillay');
   const SPEC = {
-    coigue: { n: 3, make: (i) => broadleafModel(11 + i, { H: 22, r0: 0.6, cards: 34, size: 2.6, flat: 0.42, spread: 0.3 }), leaf: leaf('hoja-coigue'), bark: bCoigue },          // alto, de copa en pisos horizontales
-    roble: { n: 3, make: (i) => broadleafModel(31 + i, { H: 20, r0: 0.5, cards: 22, size: 2.5, fork: [0.45, 0.6] }), leaf: leaf('hoja-roble'), bark: bRoble },                    // tronco recto y oscuro, copa abierta
-    canelo: { n: 2, make: (i) => broadleafModel(51 + i, { H: 9, r0: 0.2, cone: true, spread: 0.2, cards: 24, size: 1.7 }), leaf: leaf('hoja-canelo'), bark: bCanelo },            // delgado, cónico, de corteza clara
-    giant: { n: 2, make: (i) => broadleafModel(71 + i, { H: 32, r0: 1.3, limbs: 6, spread: 0.3, cards: 44, size: 3.2, flat: 0.5 }), leaf: leaf('hoja-coigue', 0xd0e0c8), bark: bark('corteza-coigue', 0xe8ecd8) },
+    coigue: { n: 3, make: (i) => broadleafModel(11 + i, { H: 22, r0: 0.6, cards: 62, size: 1.75, flat: 0.42, spread: 0.3 }), leaf: leaf('hoja-coigue'), bark: bCoigue },          // alto, de copa en pisos horizontales
+    roble: { n: 3, make: (i) => broadleafModel(31 + i, { H: 20, r0: 0.5, cards: 32, size: 1.95, fork: [0.45, 0.6] }), leaf: leaf('hoja-roble'), bark: bRoble },                    // tronco recto y oscuro, copa abierta
+    canelo: { n: 2, make: (i) => broadleafModel(51 + i, { H: 9, r0: 0.2, cone: true, spread: 0.2, cards: 38, size: 1.25 }), leaf: leaf('hoja-canelo'), bark: bCanelo },            // delgado, cónico, de corteza clara
+    giant: { n: 2, make: (i) => broadleafModel(71 + i, { H: 32, r0: 1.3, limbs: 6, spread: 0.3, cards: 76, size: 2.3, flat: 0.5 }), leaf: leaf('hoja-coigue', 0xd0e0c8), bark: bark('corteza-coigue', 0xe8ecd8) },
     pewen: { n: 3, make: (i) => pewenModel(91 + i, false), leaf: leaf('rama-pewen'), bark: barkPewen },                                                                             // corteza gruesa en placas
     pewenYoung: { n: 2, make: (i) => pewenModel(111 + i, true), leaf: leaf('rama-pewen'), bark: barkPewen },
     // bosque esclerófilo: árboles más bajos, de hoja dura y siempre verde, en las laderas soleadas
-    peumo: { n: 2, make: (i) => broadleafModel(151 + i, { H: 12, r0: 0.34, limbs: 5, spread: 0.36, cards: 36, size: 2.0, fork: [0.24, 0.34] }), leaf: leaf('hoja-peumo'), bark: bPeumo },   // copa redonda y densa
-    boldo: { n: 2, make: (i) => broadleafModel(171 + i, { H: 8, r0: 0.26, limbs: 5, spread: 0.42, cards: 34, size: 1.7, fork: [0.16, 0.26] }), leaf: leaf('hoja-boldo'), bark: bPeumo },    // bajo, ramificado desde abajo
-    quillay: { n: 2, make: (i) => broadleafModel(191 + i, { H: 13, r0: 0.36, limbs: 4, spread: 0.3, cards: 18, size: 2.0, fork: [0.36, 0.5] }), leaf: leaf('hoja-quillay'), bark: bQuillay },  // copa rala e irregular, corteza gris agrietada
-    litre: { n: 2, make: (i) => broadleafModel(211 + i, { H: 6, r0: 0.2, limbs: 5, spread: 0.5, cards: 24, size: 1.5, fork: [0.2, 0.3] }), leaf: leaf('hoja-litre'), bark: bQuillay },         // pequeño y ancho, casi un arbusto
-    bush: { n: 2, make: (i) => { const r = mulberry32(131 + i), w = [], l = []; for (let k = 0; k < 4; k++) cyl(w, V(0, 0, 0), V(r() - 0.5, 0.9, r() - 0.5), 0.05, 0.02, 4); cluster(l, V(0, 1, 0), 1.0, 26, 1.4, r); return { wood: mergeGeometries(w), leaves: mergeGeometries(l), H: 1 }; }, leaf: leaf('hoja-maqui'), bark: MAT.bark(0xa08a74) },
+    peumo: { n: 2, make: (i) => broadleafModel(151 + i, { H: 12, r0: 0.34, limbs: 5, spread: 0.36, cards: 48, size: 1.6, fork: [0.24, 0.34] }), leaf: leaf('hoja-peumo'), bark: bPeumo },   // copa redonda y densa
+    boldo: { n: 2, make: (i) => broadleafModel(171 + i, { H: 8, r0: 0.26, limbs: 5, spread: 0.42, cards: 54, size: 1.15, fork: [0.16, 0.26] }), leaf: leaf('hoja-boldo'), bark: bPeumo },    // bajo, ramificado desde abajo
+    quillay: { n: 2, make: (i) => broadleafModel(191 + i, { H: 13, r0: 0.36, limbs: 4, spread: 0.3, cards: 38, size: 1.25, fork: [0.36, 0.5] }), leaf: leaf('hoja-quillay'), bark: bQuillay },  // copa rala e irregular, corteza gris agrietada
+    litre: { n: 2, make: (i) => broadleafModel(211 + i, { H: 6, r0: 0.2, limbs: 5, spread: 0.5, cards: 36, size: 1.1, fork: [0.2, 0.3] }), leaf: leaf('hoja-litre'), bark: bQuillay },         // pequeño y ancho, casi un arbusto
+    bush: { n: 2, make: (i) => { const r = mulberry32(131 + i), w = [], l = []; for (let k = 0; k < 4; k++) cyl(w, V(0, 0, 0), V(r() - 0.5, 0.9, r() - 0.5), 0.05, 0.02, 4); cluster(l, V(0, 1, 0), 1.0, 34, 1.1, r); return { wood: mergeGeometries(w), leaves: mergeGeometries(l), H: 1 }; }, leaf: leaf('hoja-maqui'), bark: MAT.bark(0xa08a74) },
   };
   for (const k in SPEC) { SPEC[k].models = Array.from({ length: SPEC[k].n }, (_, i) => SPEC[k].make(i)); SPEC[k].inst = SPEC[k].models.map(() => []); SPEC[k].far = SPEC[k].models.map(() => []); }
 
@@ -100,6 +102,7 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
     (solid ? sp.inst : sp.far)[v].push(rec);
     const r = kind === 'bush' ? 0 : ({ giant: 1.3, pewen: 0.48, pewenYoung: 0.16, coigue: 0.6, roble: 0.5, canelo: 0.2, peumo: 0.34, boldo: 0.26, quillay: 0.36, litre: 0.2 }[kind]) * s;
     if (solid && r > 0.08) physics.createCollider(RAPIER.ColliderDesc.cylinder(H * 0.3, r).setTranslation(x, y + H * 0.3 - 0.5, z), fixed);
+    if (solid && kind === 'bush') physics.createCollider(RAPIER.ColliderDesc.cylinder(0.55 * s, 0.42 * s).setTranslation(x, y + 0.55 * s, z), fixed); // los arbustos ya no se atraviesan
     return rec;
   }
 
@@ -119,6 +122,7 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
   function scatter(kind, x, y, z, s = 1, color = 0xffffff) {
     const sc = SCATTER[kind], k = Math.floor(x / CS) + ',' + Math.floor(z / CS);
     (sc.cells.get(k) || sc.cells.set(k, []).get(k)).push({ x, y, z, s, color });
+    if (kind === 'quila') physics.createCollider(RAPIER.ColliderDesc.cylinder(1.1 * s, 0.75 * s).setTranslation(x, y + 1.1 * s, z), fixed); // una mata de quila es una maraña cerrada
   }
 
   // ---------- rocas y troncos caídos ----------
@@ -132,7 +136,7 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
   function rock(x, y, z, s, { squash = 0.7, color = 0xb4b4b0 } = {}) {
     const v = (rng() * 3) | 0, m = new THREE.Matrix4().compose(V(x, y + s * squash * 0.3, z), new THREE.Quaternion().setFromAxisAngle(UP, R(0, 6.28)), V(s, s * squash, s * R(0.75, 1.15)));
     rocks[v].push({ m, color });
-    if (s > 0.5) { const P = rockGeos[v].attributes.position, pts = new Float32Array(P.count * 3), t = V(); for (let i = 0; i < P.count; i++) { t.fromBufferAttribute(P, i).applyMatrix4(m); pts[i * 3] = t.x; pts[i * 3 + 1] = t.y; pts[i * 3 + 2] = t.z; } physics.createCollider(RAPIER.ColliderDesc.convexHull(pts) || RAPIER.ColliderDesc.ball(s), fixed); }
+    if (s > 0.28) { const P = rockGeos[v].attributes.position, pts = new Float32Array(P.count * 3), t = V(); for (let i = 0; i < P.count; i++) { t.fromBufferAttribute(P, i).applyMatrix4(m); pts[i * 3] = t.x; pts[i * 3 + 1] = t.y; pts[i * 3 + 2] = t.z; } physics.createCollider(RAPIER.ColliderDesc.convexHull(pts) || RAPIER.ColliderDesc.ball(s), fixed); }
   }
   function log(x, y, z, len, r, yaw) {
     logs.push(new THREE.Matrix4().compose(V(x, y + r * 0.7, z), new THREE.Quaternion().setFromEuler(new THREE.Euler(0, yaw, PI / 2)), V(r, len, r)));

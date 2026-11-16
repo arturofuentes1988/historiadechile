@@ -33,14 +33,16 @@ export function buildVillage({ scene, rng, bag, flora, physics, RAPIER, fixed })
     bag.add(cyl, M(x + r * 1.02, y + 2.1 * s, z, PI / 2, 0.09, 2.0 * s, 0.09, PI / 2), WOOD);
     for (const rz of [0.5, -0.5]) bag.add(cyl, M(x, y + 3.6 * s, z, R(0, 3), 0.045, 1.6, 0.045, rz), WOOD2); // palos cruzados en la cumbre
     // amarras de fibra que sujetan la paja, a tres alturas
-    for (const [f, hh] of [[1.035, 0.85], [0.9, 1.75], [0.56, 2.7]]) { const tor = new THREE.TorusGeometry(r * f, 0.035, 5, 28); tor.rotateX(PI / 2); bag.add(tor, M(x, y + hh * s, z, 0, 1, 1, 0.82), 0x6e5a34); }
+    for (const [f, hh] of [[1.035, 0.85], [0.9, 1.75], [0.56, 2.7]]) { const tor = new THREE.TorusGeometry(r * f, 0.035, 5, 28); tor.rotateX(PI / 2); bag.add(tor, M(x, y + hh * s, z, 0, 1, 1, 0.82), 0x6e5a34, 'otros'); }
     // cuero que cierra la puerta, recogido a un lado, y la estera de la entrada
-    bag.add(new THREE.PlaneGeometry(0.75 * s, 1.75 * s), M(x + r * 1.03, y + 0.95 * s, z - 0.5 * s, PI / 2 - 0.25), 0x6a4a30);
-    bag.add(new THREE.BoxGeometry(1.3, 0.03, 1.5), M(x + r * 1.03 + 0.8, y + 0.03, z, R(-0.1, 0.1)), 0xb89c5e);
+    bag.add(new THREE.PlaneGeometry(0.75 * s, 1.75 * s), M(x + r * 1.03, y + 0.95 * s, z - 0.5 * s, PI / 2 - 0.25), 0x6a4a30, 'cuero');
+    bag.add(new THREE.PlaneGeometry(0.5 * s, 0.5 * s), M(x + r * 1.05, y + 1.95 * s, z + 0.55 * s, PI / 2 + 0.1), 0x5a4030, 'cuero'); // un cuero chico colgado del dintel
+    bag.add(new THREE.BoxGeometry(1.3, 0.03, 1.5), M(x + r * 1.03 + 0.8, y + 0.03, z, R(-0.1, 0.1)), 0xb89c5e, 'estera');
     // cosas de todos los días junto a la pared: varas apoyadas, un canasto y la piedra de moler
     const a0 = R(1.2, 2.2) * (rng() < 0.5 ? 1 : -1), wx = x + Math.cos(a0) * r * 1.08, wz = z + Math.sin(a0) * r * 0.9;
     for (let i = 0; i < 3; i++) bag.add(cyl, M(wx + i * 0.16, y + 1.05, wz + i * 0.05, 0, 0.025, 2.3 + i * 0.2, 0.025, 0.2 * (Math.cos(a0) > 0 ? -1 : 1)), i % 2 ? WOOD : 0x8a7a50);
-    bag.add(new THREE.CylinderGeometry(0.3, 0.22, 0.34, 10, 1, true), M(wx - 0.6, y + 0.17, wz + 0.5), 0xb09a5a); bag.add(new THREE.TorusGeometry(0.3, 0.03, 5, 12).rotateX(PI / 2), M(wx - 0.6, y + 0.34, wz + 0.5), 0x8a743e);
+    bag.add(new THREE.CylinderGeometry(0.3, 0.22, 0.34, 10, 1, true), M(wx - 0.6, y + 0.17, wz + 0.5), 0xb09a5a, 'estera'); bag.add(new THREE.TorusGeometry(0.3, 0.03, 5, 12).rotateX(PI / 2), M(wx - 0.6, y + 0.34, wz + 0.5), 0x8a743e, 'otros');
+    physics.createCollider(RAPIER.ColliderDesc.cylinder(0.2, 0.3).setTranslation(wx - 0.6, y + 0.2, wz + 0.5), fixed);
     flora.rock(wx + 0.9, y - 0.06, wz - 0.4, 0.42, { squash: 0.3, color: 0xa8a49a }); flora.rock(wx + 0.9, y + 0.1, wz - 0.4, 0.13, { squash: 0.7, color: 0x8e8a80 });
     physics.createCollider(RAPIER.ColliderDesc.cylinder(1.6, r * 0.88).setTranslation(x, y + 1.6, z), fixed);
     if (smoke) emit.smoke.push([x, y + 3.5 * s, z, 0.7]);
@@ -55,12 +57,15 @@ export function buildVillage({ scene, rng, bag, flora, physics, RAPIER, fixed })
     for (let i = 0; i < 5; i++) { const a = 0.6 + i * 1.2; bag.add(cyl, M(x + Math.cos(a) * 2.9, y + 0.2, z + Math.sin(a) * 2.9, PI / 2 - a, 0.22, 1.7, 0.22, PI / 2), WOOD); } // troncos para sentarse
     const ash = add(new THREE.CircleGeometry(1.5, 20), new THREE.MeshStandardMaterial({ color: 0x2a2622, roughness: 1 }), x, y + 0.03, z); ash.rotation.x = -PI / 2; ash.castShadow = false;
     emit.fire.push([x, y + 0.2, z]); emit.smoke.push([x, y + 0.9, z, 1]);
+    physics.createCollider(RAPIER.ColliderDesc.cylinder(0.35, 1.05).setTranslation(x, y + 0.35, z), fixed); // el fuego no se cruza
+    for (let i = 0; i < 5; i++) { const a = 0.6 + i * 1.2; physics.createCollider(RAPIER.ColliderDesc.capsule(0.62, 0.21).setTranslation(x + Math.cos(a) * 2.9, y + 0.2, z + Math.sin(a) * 2.9).setRotation(new THREE.Quaternion().setFromEuler(new THREE.Euler(PI / 2, 0, a - PI / 2, 'ZYX'))), fixed); }
+    physics.createCollider(RAPIER.ColliderDesc.cylinder(0.35, 0.3).setTranslation(x + 1.5, y + 0.35, z + 0.9), fixed);
     // llamas, brasas que brillan y una olla de greda sobre tres piedras
     const fm = flameMaterial(); for (let i = 0; i < 3; i++) { const f = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.45), fm); f.position.set(x, y + 0.8, z); f.rotation.y = (i / 3) * PI; f.renderOrder = 3; scene.add(f); }
     const ember = new THREE.MeshStandardMaterial({ color: 0x1a0e08, emissive: 0xff4a12, emissiveIntensity: 2.2, roughness: 1 }); emit.ember = ember;
     for (let i = 0; i < 5; i++) { const e = add(new THREE.CylinderGeometry(0.06, 0.06, R(0.5, 0.9), 6), ember, x + R(-0.25, 0.25), y + 0.1, z + R(-0.25, 0.25)); e.rotation.set(PI / 2, 0, R(0, 3)); e.castShadow = false; }
     for (let i = 0; i < 3; i++) { const a = i * 2.1 + 0.4; flora.rock(x + 1.5 + Math.cos(a) * 0.22, y - 0.02, z + 0.9 + Math.sin(a) * 0.22, 0.16, { squash: 0.9, color: 0x6e6a62 }); }
-    bag.add(sph, M(x + 1.5, y + 0.42, z + 0.9, 0, 0.26, 0.24, 0.26), 0x5a3626); bag.add(new THREE.CylinderGeometry(0.2, 0.17, 0.12, 12, 1, true), M(x + 1.5, y + 0.66, z + 0.9), 0x6a4030);
+    bag.add(sph, M(x + 1.5, y + 0.42, z + 0.9, 0, 0.26, 0.24, 0.26), 0x5a3626, 'otros'); bag.add(new THREE.CylinderGeometry(0.2, 0.17, 0.12, 12, 1, true), M(x + 1.5, y + 0.66, z + 0.9), 0x6a4030, 'otros');
     const glow = new THREE.PointLight(0xff8a3a, 14, 14, 1.6); glow.position.set(x, y + 0.9, z); scene.add(glow); emit.glow = glow;
   }
 
@@ -88,12 +93,14 @@ export function buildVillage({ scene, rng, bag, flora, physics, RAPIER, fixed })
   { const x = -10.6, z = -4.2, y = height(x, z), yaw = 0.5, dx = Math.cos(yaw), dz = Math.sin(yaw);
     for (const s of [-1, 1]) bag.add(cyl, M(x + dx * s * 0.8, y + 1.1, z + dz * s * 0.8, 0, 0.06, 2.3, 0.06, 0.12), WOOD);
     for (const hh of [0.35, 1.95]) bag.add(cyl, M(x, y + hh, z, -yaw, 0.045, 1.9, 0.045, PI / 2), WOOD2);
-    const cloth = add(new THREE.PlaneGeometry(1.4, 1.35), new THREE.MeshStandardMaterial({ map: TEX.textile, side: THREE.DoubleSide, roughness: 1 }), x, y + 1.15, z); cloth.rotation.y = -yaw;
+    const cloth = add(new THREE.PlaneGeometry(1.4, 1.35), new THREE.MeshStandardMaterial({ map: photo('manta'), bumpMap: photo('manta'), bumpScale: 3, side: THREE.DoubleSide, roughness: 1 }), x, y + 1.15, z); cloth.rotation.y = -yaw;
+    for (let i = 0; i < 4; i++) bag.add(sph, M(x + dx * (1.25 + i * 0.05) + dz * 0.3 * (i % 2), y + 0.13, z + dz * (1.25 + i * 0.05) - dx * 0.3 * (i % 2), 0, 0.13, 0.12, 0.13), [0xa83a2a, 0xe8dcc0, 0x2a2420, 0xa83a2a][i], 'otros'); // ovillos de lana teñida
+    physics.createCollider(RAPIER.ColliderDesc.cuboid(0.95, 1.1, 0.12).setTranslation(x, y + 1.1, z).setRotation(new THREE.Quaternion().setFromAxisAngle(UP, -yaw)), fixed);
   }
 
   // ---------- leña y vasijas ----------
-  for (const [x, z, ry] of [[-19, -3, 0.3], [9, -12, 1.2], [-7, 15, 2.2], [17, 8, 0.6]]) { const y = height(x, z); for (let i = 0; i < 9; i++) bag.add(cyl, M(x + Math.sin(ry) * (i % 3) * 0.22, y + 0.11 + Math.floor(i / 3) * 0.2, z + Math.cos(ry) * (i % 3) * 0.22, ry, 0.1, 1.1, 0.1, PI / 2), i % 2 ? WOOD : WOOD2); }
-  for (const [x, z] of [[-12.6, -11.5], [-12.2, -12.3], [3, 2.4], [13.6, 10.6], [14.2, 11.2], [-1.6, 16.2], [19.2, -4.6]]) { const y = height(x, z), s = R(0.22, 0.32); bag.add(sph, M(x, y + s * 0.85, z, 0, s, s * 0.95, s), 0x9a5a38); bag.add(cyl, M(x, y + s * 1.8, z, 0, s * 0.5, s * 0.4, s * 0.5), 0x86492c); }
+  for (const [x, z, ry] of [[-19, -3, 0.3], [9, -12, 1.2], [-7, 15, 2.2], [17, 8, 0.6]]) { const y = height(x, z); for (let i = 0; i < 9; i++) bag.add(cyl, M(x + Math.sin(ry) * (i % 3) * 0.22, y + 0.11 + Math.floor(i / 3) * 0.2, z + Math.cos(ry) * (i % 3) * 0.22, ry, 0.1, 1.1, 0.1, PI / 2), i % 2 ? WOOD : WOOD2); physics.createCollider(RAPIER.ColliderDesc.cuboid(0.55, 0.33, 0.35).setTranslation(x + Math.sin(ry) * 0.22, y + 0.33, z + Math.cos(ry) * 0.22).setRotation(new THREE.Quaternion().setFromAxisAngle(UP, ry + PI / 2)), fixed); }
+  for (const [x, z] of [[-12.6, -11.5], [-12.2, -12.3], [3, 2.4], [13.6, 10.6], [14.2, 11.2], [-1.6, 16.2], [19.2, -4.6]]) { const y = height(x, z), s = R(0.22, 0.32); bag.add(sph, M(x, y + s * 0.85, z, 0, s, s * 0.95, s), 0x9a5a38, 'otros'); bag.add(cyl, M(x, y + s * 1.8, z, 0, s * 0.5, s * 0.4, s * 0.5), 0x86492c, 'otros'); physics.createCollider(RAPIER.ColliderDesc.cylinder(s, s).setTranslation(x, y + s, z), fixed); }
 
   // ---------- cancha de palin: estacas en el borde ----------
   { const c0 = 0.94, s0 = 0.34; for (let i = -5; i <= 5; i++) for (const sd of [-1, 1]) { const u = i * 4, v = sd * 5.6, x = POI.cancha.x + u * c0 - v * s0, z = POI.cancha.z + u * s0 + v * c0; bag.add(cyl, M(x, height(x, z) + 0.3, z, 0, 0.035, 0.6, 0.035, R(-0.1, 0.1)), WOOD); } }

@@ -1,34 +1,204 @@
 {
-  "tileable": "Seamless tileable texture, uniform coverage edge to edge, flat diffuse overcast lighting, no cast shadows, no vignette, no text, photorealistic, highly detailed.",
-  "cutout": "Isolated on a perfectly uniform pure blue (#0000FF) background, even soft lighting, no shadows, no ground, no text, photorealistic botanical photograph, highly detailed.",
-  "items": [
-    ["suelo-tierra", "1:1", "tileable", "Packed bare earth of a village yard seen from directly above: light brown dry compacted soil with fine cracks, a few small pebbles and scattered bits of dry straw."],
-    ["suelo-pasto", "1:1", "tileable", "Short wild meadow grass seen from directly above: dense mixed green blades with a few dry yellow ones and tiny clover leaves."],
-    ["suelo-piedras", "1:1", "tileable", "River bank seen from directly above: rounded pebbles of mixed grey, tan and dark colours on coarse grey sand, slightly damp."],
-    ["roca", "1:1", "tileable", "Weathered grey volcanic rock surface seen straight on, with cracks and patches of pale green and orange lichen."],
-    ["corteza-coigue", "1:1", "tileable", "Bark of an old Nothofagus dombeyi (coihue) trunk seen straight on: grey-brown bark with fine vertical fissures and thin scaly plates, some green moss."],
-    ["corteza-roble", "1:1", "tileable", "Bark of an old Nothofagus obliqua (roble) trunk seen straight on: dark brown thick bark with deep vertical furrows and rough ridges."],
-    ["corteza-canelo", "1:1", "tileable", "Bark of a Drimys winteri (canelo) trunk seen straight on: smooth pale grey bark with thin horizontal lines and spots of white and pale green lichen."],
-    ["corteza-peumo", "1:1", "tileable", "Bark of a Cryptocarya alba (peumo) trunk seen straight on: brown-grey slightly rough bark with small cracks and thin scales."],
-    ["corteza-quillay", "1:1", "tileable", "Bark of an old Quillaja saponaria (quillay) trunk seen straight on: dark ash-grey thick bark deeply cracked into vertical ridges."],
-    ["paja", "1:1", "tileable", "Thatched roof of dry reeds and straw seen straight on: long golden-brown stems running vertically, layered in overlapping horizontal rows, slightly weathered."],
-    ["pelaje", "1:1", "tileable", "Short dense fur of a guanaco, light cream-white, all hairs flowing in one direction from top to bottom, extreme close-up."],
-    ["tejido", "1:1", "tileable", "Hand-woven coarse wool cloth, plain weave, natural undyed off-white wool with thick visible threads, flat, extreme close-up."],
-    ["hoja-coigue", "1:1", "cutout", "A single leafy twig of Nothofagus dombeyi (coihue) laid flat and photographed from above, filling most of the frame: many small ovate glossy dark green leaves with finely toothed edges, arranged densely in a flat spray."],
-    ["hoja-roble", "1:1", "cutout", "A single leafy twig of Nothofagus obliqua (roble) in autumn laid flat and photographed from above, filling most of the frame: oblong leaves with toothed lobed margins and marked veins, golden yellow and orange."],
-    ["hoja-canelo", "1:1", "cutout", "A single leafy twig of Drimys winteri (canelo) laid flat and photographed from above, filling most of the frame: large oblong leathery leaves, glossy green above, clustered around the twig tip."],
-    ["hoja-peumo", "1:1", "cutout", "A single leafy twig of Cryptocarya alba (peumo) laid flat and photographed from above, filling most of the frame: oval leathery glossy dark green leaves with wavy margins and a few small red fruits."],
-    ["hoja-boldo", "1:1", "cutout", "A single leafy twig of Peumus boldus (boldo) laid flat and photographed from above, filling most of the frame: oval thick rough dull dark green leaves with tiny pale bumps, in opposite pairs."],
-    ["hoja-quillay", "1:1", "cutout", "A single leafy twig of Quillaja saponaria (quillay) laid flat and photographed from above, filling most of the frame: elliptic yellowish-green leathery leaves with a few teeth."],
-    ["hoja-litre", "1:1", "cutout", "A single leafy twig of Lithraea caustica (litre) laid flat and photographed from above, filling most of the frame: oval leathery dark green leaves with prominent yellowish veins and wavy margins."],
-    ["hoja-maqui", "1:1", "cutout", "A single leafy twig of Aristotelia chilensis (maqui) laid flat and photographed from above, filling most of the frame: ovate serrated green leaves with reddish stalks and clusters of small dark purple berries."],
-    ["rama-pewen", "16:9", "cutout", "A single branch of Araucaria araucana seen from the side, perfectly horizontal and spanning the full width of the image from left edge to right edge: densely covered with stiff triangular overlapping dark green scale leaves, like a thick spiky rope."],
-    ["helecho", "9:16", "cutout", "A single green fern frond standing upright, stem at the bottom centre and tip at the top, filling the height of the image, with many pairs of narrow leaflets."],
-    ["pasto", "3:2", "cutout", "A tuft of green grass seen from the side, blades growing upward and fanning out from the bottom edge of the image, filling the frame."],
-    ["pasto-espiga", "3:4", "cutout", "A tuft of tall wild grass seen from the side, growing upward from the bottom edge of the image, with thin stems carrying golden seed heads and some dry yellow blades."],
-    ["junco", "9:16", "cutout", "A clump of tall thin rushes seen from the side, upright green and yellowish stems growing from the bottom edge to the top of the image."],
-    ["flores", "3:2", "cutout", "A small clump of white wildflowers with yellow centres seen from the side, on thin green stems with a few small leaves, growing upward from the bottom edge of the image."],
-    ["quila", "9:16", "cutout", "A single cane of Chusquea quila bamboo, perfectly vertical from bottom to top of the image: thin yellowish-green cane with nodes, each node with a whorl of narrow pointed green leaves."],
-    ["copihue", "9:16", "cutout", "A vine of Lapageria rosea (copihue) hanging vertically from top to bottom of the image: thin stem with dark green pointed leaves and several hanging red bell-shaped flowers."]
+ "tileable": "Seamless tileable texture, uniform coverage edge to edge, flat diffuse overcast lighting, no cast shadows, no vignette, no text, photorealistic, highly detailed.",
+ "cutout": "Isolated on a perfectly uniform pure blue (#0000FF) background, even soft lighting, no shadows, no ground, no text, photorealistic botanical photograph, highly detailed.",
+ "items": [
+  [
+   "suelo-tierra",
+   "1:1",
+   "tileable",
+   "Packed bare earth of a village yard seen from directly above: light brown dry compacted soil with fine cracks, a few small pebbles and scattered bits of dry straw."
+  ],
+  [
+   "suelo-pasto",
+   "1:1",
+   "tileable",
+   "Short wild meadow grass seen from directly above: dense mixed green blades with a few dry yellow ones and tiny clover leaves."
+  ],
+  [
+   "suelo-piedras",
+   "1:1",
+   "tileable",
+   "River bank seen from directly above: rounded pebbles of mixed grey, tan and dark colours on coarse grey sand, slightly damp."
+  ],
+  [
+   "roca",
+   "1:1",
+   "tileable",
+   "Weathered grey volcanic rock surface seen straight on, with cracks and patches of pale green and orange lichen."
+  ],
+  [
+   "corteza-coigue",
+   "1:1",
+   "tileable",
+   "Bark of an old Nothofagus dombeyi (coihue) trunk seen straight on: grey-brown bark with fine vertical fissures and thin scaly plates, some green moss."
+  ],
+  [
+   "corteza-roble",
+   "1:1",
+   "tileable",
+   "Bark of an old Nothofagus obliqua (roble) trunk seen straight on: dark brown thick bark with deep vertical furrows and rough ridges."
+  ],
+  [
+   "corteza-canelo",
+   "1:1",
+   "tileable",
+   "Bark of a Drimys winteri (canelo) trunk seen straight on: smooth pale grey bark with thin horizontal lines and spots of white and pale green lichen."
+  ],
+  [
+   "corteza-peumo",
+   "1:1",
+   "tileable",
+   "Bark of a Cryptocarya alba (peumo) trunk seen straight on: brown-grey slightly rough bark with small cracks and thin scales."
+  ],
+  [
+   "corteza-quillay",
+   "1:1",
+   "tileable",
+   "Bark of an old Quillaja saponaria (quillay) trunk seen straight on: dark ash-grey thick bark deeply cracked into vertical ridges."
+  ],
+  [
+   "paja",
+   "1:1",
+   "tileable",
+   "Thatched roof of dry reeds and straw seen straight on: long golden-brown stems running vertically, layered in overlapping horizontal rows, slightly weathered."
+  ],
+  [
+   "pelaje",
+   "1:1",
+   "tileable",
+   "Short dense fur of a guanaco, light cream-white, all hairs flowing in one direction from top to bottom, extreme close-up."
+  ],
+  [
+   "tejido",
+   "1:1",
+   "tileable",
+   "Hand-woven coarse wool cloth, plain weave, natural undyed off-white wool with thick visible threads, flat, extreme close-up."
+  ],
+  [
+   "hoja-coigue",
+   "1:1",
+   "cutout",
+   "A single leafy twig of Nothofagus dombeyi (coihue) laid flat and photographed from above, filling most of the frame: many small ovate glossy dark green leaves with finely toothed edges, arranged densely in a flat spray."
+  ],
+  [
+   "hoja-roble",
+   "1:1",
+   "cutout",
+   "A single leafy twig of Nothofagus obliqua (roble) in autumn laid flat and photographed from above, filling most of the frame: oblong leaves with toothed lobed margins and marked veins, golden yellow and orange."
+  ],
+  [
+   "hoja-canelo",
+   "1:1",
+   "cutout",
+   "A single leafy twig of Drimys winteri (canelo) laid flat and photographed from above, filling most of the frame: large oblong leathery leaves, glossy green above, clustered around the twig tip."
+  ],
+  [
+   "hoja-peumo",
+   "1:1",
+   "cutout",
+   "A single leafy twig of Cryptocarya alba (peumo) laid flat and photographed from above, filling most of the frame: oval leathery glossy dark green leaves with wavy margins and a few small red fruits."
+  ],
+  [
+   "hoja-boldo",
+   "1:1",
+   "cutout",
+   "A single leafy twig of Peumus boldus (boldo) laid flat and photographed from above, filling most of the frame: oval thick rough dull dark green leaves with tiny pale bumps, in opposite pairs."
+  ],
+  [
+   "hoja-quillay",
+   "1:1",
+   "cutout",
+   "A single leafy twig of Quillaja saponaria (quillay) laid flat and photographed from above, filling most of the frame: elliptic yellowish-green leathery leaves with a few teeth."
+  ],
+  [
+   "hoja-litre",
+   "1:1",
+   "cutout",
+   "A single leafy twig of Lithraea caustica (litre) laid flat and photographed from above, filling most of the frame: oval leathery dark green leaves with prominent yellowish veins and wavy margins."
+  ],
+  [
+   "hoja-maqui",
+   "1:1",
+   "cutout",
+   "A single leafy twig of Aristotelia chilensis (maqui) laid flat and photographed from above, filling most of the frame: ovate serrated green leaves with reddish stalks and clusters of small dark purple berries."
+  ],
+  [
+   "rama-pewen",
+   "16:9",
+   "cutout",
+   "A single branch of Araucaria araucana seen from the side, perfectly horizontal and spanning the full width of the image from left edge to right edge: densely covered with stiff triangular overlapping dark green scale leaves, like a thick spiky rope."
+  ],
+  [
+   "helecho",
+   "9:16",
+   "cutout",
+   "A single green fern frond standing upright, stem at the bottom centre and tip at the top, filling the height of the image, with many pairs of narrow leaflets."
+  ],
+  [
+   "pasto",
+   "3:2",
+   "cutout",
+   "A tuft of green grass seen from the side, blades growing upward and fanning out from the bottom edge of the image, filling the frame."
+  ],
+  [
+   "pasto-espiga",
+   "3:4",
+   "cutout",
+   "A tuft of tall wild grass seen from the side, growing upward from the bottom edge of the image, with thin stems carrying golden seed heads and some dry yellow blades."
+  ],
+  [
+   "junco",
+   "9:16",
+   "cutout",
+   "A clump of tall thin rushes seen from the side, upright green and yellowish stems growing from the bottom edge to the top of the image."
+  ],
+  [
+   "flores",
+   "3:2",
+   "cutout",
+   "A small clump of white wildflowers with yellow centres seen from the side, on thin green stems with a few small leaves, growing upward from the bottom edge of the image."
+  ],
+  [
+   "quila",
+   "9:16",
+   "cutout",
+   "A single cane of Chusquea quila bamboo, perfectly vertical from bottom to top of the image: thin yellowish-green cane with nodes, each node with a whorl of narrow pointed green leaves."
+  ],
+  [
+   "copihue",
+   "9:16",
+   "cutout",
+   "A vine of Lapageria rosea (copihue) hanging vertically from top to bottom of the image: thin stem with dark green pointed leaves and several hanging red bell-shaped flowers."
+  ],
+  [
+   "madera",
+   "1:1",
+   "tileable",
+   "Old weathered wooden post surface seen straight on: hand-hewn brown wood with vertical grain, fine cracks and a few knots, matte."
+  ],
+  [
+   "manta",
+   "1:1",
+   "tileable",
+   "Hand-woven wool blanket seen straight on, flat: thick visible threads, wide horizontal stripes in deep red, black and natural cream, with one simple band of small stepped diamond shapes, slightly irregular handmade weave, plant-dyed matte colours."
+  ],
+  [
+   "cuero",
+   "1:1",
+   "tileable",
+   "Tanned animal hide used as a door curtain, seen straight on: brown rawhide leather with natural wrinkles, slight colour variation and worn patches, matte."
+  ],
+  [
+   "estera",
+   "1:1",
+   "tileable",
+   "Hand-woven floor mat of dried rushes seen from directly above: flat plaited straw-coloured reeds in a simple over-under weave, slightly worn."
+  ],
+  [
+   "nubes",
+   "1:1",
+   "tileable",
+   "Sky full of scattered fair-weather cumulus clouds photographed looking straight up at the zenith: soft white fluffy clouds of different sizes with slightly grey shaded centres, on a perfectly uniform pure black background instead of blue sky, evenly distributed, about half of the frame covered."
   ]
+ ]
 }

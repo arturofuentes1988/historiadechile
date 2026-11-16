@@ -9,7 +9,8 @@ import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 
 export const SUN = new THREE.Vector3(0.62, 0.4, -0.44).normalize(); // sol bajo y dorado de la mañana, desde el nororiente
 export const uTime = { value: 0 };
-export const uSunView = { value: new THREE.Vector3() }; // dirección del sol vista desde la cámara
+export const uSunView = { value: new THREE.Vector3() };
+export const uPlayer = { value: new THREE.Vector3(0, -999, 0) }; // dónde está Leftraru: las plantas se apartan a su paso // dirección del sol vista desde la cámara
 export const FOG = { color: new THREE.Color(0xc9cdc4), density: 0.0038 };
 
 export function mulberry32(a) {
@@ -182,6 +183,7 @@ export const TEX = {
   thatch: tex(streakCanvas(512, 512, [[176, 150, 92], [208, 184, 118], [140, 116, 66], [108, 88, 50]], 2600, { bands: 5, lw: [1, 2.4] })),
   wood: tex(streakCanvas(128, 256, [[140, 110, 78], [110, 84, 58], [166, 134, 96]], 300)),
   textile: tex(textileCanvas()), soft: tex(softCanvas(), { wrap: false }),
+  strand: (() => { const [c, x] = canvas(256, 256); x.fillStyle = '#000'; x.fillRect(0, 0, 256, 256); for (let i = 0; i < 9000; i++) { const v = (40 + rnd() * 215) | 0; x.fillStyle = rgb(v, v, v); x.beginPath(); x.arc(R(0, 256), R(0, 256), R(0.7, 1.5), 0, 6.3); x.fill(); } return tex(c, { srgb: false }); })(), // puntas de pelo: cada punto es una hebra, más clara mientras más larga
   fur: tex(streakCanvas(256, 256, [[236, 236, 236], [205, 205, 205], [255, 255, 255], [176, 176, 176]], 2200, { lw: [0.6, 1.6] })), // pelaje: pelos cortos en la dirección del cuerpo
 };
 
@@ -231,8 +233,8 @@ export function groundMaterial() {
 // viento: mueve las hojas y la punta del pasto
 export function withWind(m, amp, tipOnly = false, roundNormals = false) {
   m.onBeforeCompile = (sh) => {
-    sh.uniforms.uTime = uTime; sh.uniforms.uSunView = uSunView;
-    sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
+    sh.uniforms.uTime = uTime; sh.uniforms.uSunView = uSunView; sh.uniforms.uPlayer = uPlayer;
+    sh.vertexShader = 'uniform float uTime; uniform vec3 uPlayer;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
       #ifdef USE_INSTANCING
         vec4 wPos = modelMatrix * instanceMatrix * vec4(position, 1.);
       #else
@@ -241,7 +243,18 @@ export function withWind(m, amp, tipOnly = false, roundNormals = false) {
       float wMask = ${tipOnly ? 'uv.y' : '1.0'};
       float gust = sin(uTime*0.7 + wPos.x*0.05 + wPos.z*0.04) * 0.5 + 0.5;
       transformed.x += (sin(uTime*1.5 + wPos.x*0.4 + wPos.y*0.3) * 0.5 + gust) * ${amp.toFixed(3)} * wMask;
-      transformed.z += cos(uTime*1.2 + wPos.z*0.4) * ${(amp * 0.6).toFixed(3)} * wMask;`);
+      transformed.z += cos(uTime*1.2 + wPos.z*0.4) * ${(amp * 0.6).toFixed(3)} * wMask;
+      // al pasar Leftraru, lo que está a su altura se aparta y se inclina
+      vec3 away = wPos.xyz - uPlayer; float dp = length(away.xz);
+      if (dp < 1.4 && away.y > -0.4 && away.y < 1.9) {
+        float push = pow(1. - dp / 1.4, 2.) * ${tipOnly ? '0.55' : '0.3'} * wMask;
+        vec3 dirW = vec3(away.x, 0., away.z) / max(dp, 0.05);
+        #ifdef USE_INSTANCING
+          vec3 dirL = inverse(mat3(instanceMatrix)) * dirW; transformed += normalize(dirL) * push / max(length(instanceMatrix[0].xyz), 0.2); transformed.y -= push * 0.35 / max(length(instanceMatrix[1].xyz), 0.2);
+        #else
+          transformed += dirW * push;
+        #endif
+      }`);
     // el follaje usa normales "redondas" (hacia afuera de la copa) para que la luz lo modele como un volumen
     if (roundNormals) sh.fragmentShader = 'uniform vec3 uSunView;\n' + sh.fragmentShader.replace('#include <normal_fragment_begin>', '#include <normal_fragment_begin>\n normal = normalize(vNormal);')
       .replace('#include <emissivemap_fragment>', '#include <emissivemap_fragment>\n totalEmissiveRadiance += diffuseColor.rgb * pow(max(dot(normalize(-vViewPosition), uSunView), 0.), 3.) * 1.1; // la hoja se enciende a contraluz');
@@ -257,18 +270,25 @@ export const MAT = {
   solid: () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }),
 };
 
-// Junta muchas piezas sólidas (postes, vasijas, estacas) en una sola malla con sombras
+// Junta muchas piezas sólidas en pocas mallas con sombras, una por material:
+// madera (postes, cercos, telar), cuero, estera y "otros" (vasijas, amarras). La textura se
+// proyecta según la posición, con la veta a lo largo de la altura.
 export class GeoBag {
-  constructor() { this.p = []; this.n = []; this.c = []; }
-  add(geo, matrix, color) {
+  constructor() { this.k = {}; }
+  add(geo, matrix, color, kind = 'madera') {
     const g = geo.index ? geo.toNonIndexed() : geo.clone(); g.applyMatrix4(matrix); g.computeVertexNormals();
-    const P = g.attributes.position.array, N = g.attributes.normal.array, col = new THREE.Color(color);
-    for (let i = 0; i < P.length; i += 3) { this.p.push(P[i], P[i + 1], P[i + 2]); this.n.push(N[i], N[i + 1], N[i + 2]); this.c.push(col.r, col.g, col.b); }
+    const P = g.attributes.position.array, N = g.attributes.normal.array, col = new THREE.Color(color), o = this.k[kind] || (this.k[kind] = { p: [], n: [], c: [], u: [] }), sc = kind === 'otros' ? 1.4 : 0.75;
+    if (kind !== 'otros') col.multiplyScalar(1.5).lerp(new THREE.Color(0xd8d0c4), 0.45); // con textura real, el color solo matiza
+    for (let i = 0; i < P.length; i += 3) { o.p.push(P[i], P[i + 1], P[i + 2]); o.n.push(N[i], N[i + 1], N[i + 2]); o.c.push(col.r, col.g, col.b); if (Math.abs(N[i + 1]) > 0.7) o.u.push(P[i] * sc, P[i + 2] * sc); else o.u.push((P[i] + P[i + 2]) * sc, P[i + 1] * sc); }
   }
   build() {
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.Float32BufferAttribute(this.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(this.n, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(this.c, 3));
-    const m = new THREE.Mesh(g, MAT.solid()); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; return m;
+    const grp = new THREE.Group();
+    for (const kind in this.k) {
+      const o = this.k[kind], g = new THREE.BufferGeometry(), t = kind === 'otros' ? TEX.grain : photo(kind);
+      g.setAttribute('position', new THREE.Float32BufferAttribute(o.p, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(o.n, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(o.c, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(o.u, 2));
+      const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, map: t, bumpMap: t, bumpScale: kind === 'otros' ? 2 : 4, roughness: 0.95, side: THREE.DoubleSide })); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; grp.add(m);
+    }
+    return grp;
   }
 }
 
@@ -310,6 +330,7 @@ export function waterMaterial() {
 
 // ---------- cielo con dispersión atmosférica y una capa de nubes que deriva ----------
 export function buildSky(scene) {
+  const nubes = photo('nubes'); nubes.wrapS = nubes.wrapT = THREE.MirroredRepeatWrapping; nubes.needsUpdate = true;
   const sky = new THREE.Mesh(new THREE.SphereGeometry(5000, 32, 16), new THREE.ShaderMaterial({
     side: THREE.BackSide, depthWrite: false, toneMapped: false, uniforms: { uSun: { value: SUN } },
     vertexShader: `varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix*viewMatrix*vec4(position + cameraPosition, 1.); }`,
@@ -328,21 +349,27 @@ export function buildSky(scene) {
   }));
   sky.frustumCulled = false; sky.renderOrder = -2; scene.add(sky);
   const clouds = new THREE.Mesh(new THREE.SphereGeometry(4000, 32, 12, 0, Math.PI * 2, 0, Math.PI * 0.5), new THREE.ShaderMaterial({
-    transparent: true, depthWrite: false, toneMapped: false, side: THREE.BackSide, uniforms: { uTime, uSun: { value: SUN } },
+    transparent: true, depthWrite: false, toneMapped: false, side: THREE.BackSide, uniforms: { uTime, uSun: { value: SUN }, tNubes: { value: nubes } },
     vertexShader: `varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix*viewMatrix*vec4(position + cameraPosition, 1.); }`,
-    fragmentShader: /* glsl */ `uniform float uTime; uniform vec3 uSun; varying vec3 vD;
+    fragmentShader: /* glsl */ `uniform float uTime; uniform vec3 uSun; uniform sampler2D tNubes; varying vec3 vD;
       float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
       float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.-2.*f); return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y); }
       float fbm(vec2 p){ float v = 0., a = 0.5; for (int i = 0; i < 5; i++) { v += vn(p)*a; p = p*2.03 + 11.; a *= 0.5; } return v; }
       void main(){
         vec3 d = normalize(vD); if (d.y < 0.02) discard;
         vec2 p = d.xz / (d.y + 0.18) * 1.5 + vec2(uTime*0.006, uTime*0.002);
-        // cúmulos: base plana y sombreada, tope claro; más arriba, cirros finos estirados por el viento
-        float n = fbm(p), det = fbm(p*3.1 + 7.) - 0.5, c = smoothstep(0.6, 0.76, n + det*0.16), thick = smoothstep(0.66, 0.9, n + det*0.1);
-        float lit = clamp(fbm(p + uSun.xz*0.12) - n + 0.5, 0., 1.);
-        vec3 col = mix(vec3(0.55, 0.59, 0.67), vec3(0.97, 0.96, 0.93), lit*0.7 + 0.3 - thick*0.25);
-        float cir = smoothstep(0.62, 0.86, fbm(vec2(p.x*0.35 + 20., p.y*1.9) * 1.3 + uTime*0.002)) * 0.35;
-        float a = max(c * 0.9, cir * (1. - c)) * smoothstep(0.02, 0.2, d.y);
+        // cúmulos fotografiados, en dos capas de distinto tamaño que se mueven a distinta velocidad;
+        // el sol los ilumina por el lado que le da y la base queda en sombra. Más arriba, cirros finos.
+        vec2 w = vec2(fbm(p*0.7), fbm(p*0.7 + 5.)) * 0.06;
+        float c1 = texture2D(tNubes, p*0.085 + w + vec2(uTime*0.0012, 0.)).g, c2 = texture2D(tNubes, p*0.21 + w*2. + vec2(3.7, 1.3) + vec2(uTime*0.002, uTime*0.0006)).g;
+        float big = smoothstep(0.42, 0.62, fbm(p*0.22 + 3.));                       // zonas de cielo despejado y zonas cargadas
+        float n = max(c1 * (0.55 + big*0.45), c2 * big * 0.9), c = smoothstep(0.1, 0.5, n);
+        float e = texture2D(tNubes, p*0.085 + w + vec2(uTime*0.0012, 0.) + normalize(uSun.xz + 1e-4)*0.006).g; // hacia el sol: si ahí hay menos nube, este borde recibe luz
+        float lit = clamp(0.62 + (n - e)*2.2, 0., 1.);
+        vec3 col = mix(vec3(0.5, 0.55, 0.64), vec3(1.0, 0.985, 0.95), lit * (0.45 + n*0.55));
+        col = mix(col, vec3(1.0, 0.9, 0.72), pow(max(dot(d, uSun), 0.), 6.) * 0.5); // dorado cerca del sol
+        float cir = smoothstep(0.62, 0.86, fbm(vec2(p.x*0.35 + 20., p.y*1.9) * 1.3 + uTime*0.002)) * 0.3;
+        float a = max(c * 0.94, cir * (1. - c)) * smoothstep(0.02, 0.2, d.y);
         col = mix(vec3(0.94, 0.95, 0.96), col, c);
         gl_FragColor = vec4(col * 1.25, a);
         ${END}

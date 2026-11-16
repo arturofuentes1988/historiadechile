@@ -83,7 +83,11 @@ export function animatePerson(p, phase, amp, air = false) {
 // de puntos [alto, largo, radio horizontal, radio vertical], como el contorno real del animal.
 const furTex = TEX.fur.clone(); furTex.repeat.set(3, 3); furTex.needsUpdate = true; // pelos cortos dibujados: la foto de pelaje no calza con la forma del cuerpo y se veía a franjas
 const furMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: furTex, bumpMap: furTex, bumpScale: 1.6, roughness: 1 });
-function skin(spine, colorAt, { rings = 18, radial = 14, rough = 0 } = {}) {
+// Pelaje de verdad: sobre la piel van varias capas apenas separadas, y en cada una solo se dibujan las hebras
+// que llegan hasta esa altura. De cerca se ven los pelos sueltos y el contorno deja de ser liso.
+const SHELLS = 5, strandTex = TEX.strand.clone(); strandTex.repeat.set(5, 4); strandTex.needsUpdate = true;
+const shellMat = Array.from({ length: SHELLS }, (_, k) => { const f = (k + 1) / SHELLS; return new THREE.MeshStandardMaterial({ vertexColors: true, alphaMap: strandTex, alphaTest: 0.12 + f * 0.7, roughness: 1, color: new THREE.Color().setScalar(0.74 + f * 0.36) }); });
+function skin(spine, colorAt, { rings = 18, radial = 14, rough = 0, fur = 0 } = {}) {
   const curve = new THREE.CatmullRomCurve3(spine.map(([y, z]) => new THREE.Vector3(0, y, z))), pos = [], col = [], uv = [], idx = [], c = new THREE.Color(), n = spine.length - 1;
   for (let i = 0; i <= rings; i++) {
     const t = i / rings, p = curve.getPoint(t), T = curve.getTangent(t), f = t * n, k = Math.min(n - 1, Math.floor(f)), u = f - k;
@@ -96,7 +100,13 @@ function skin(spine, colorAt, { rings = 18, radial = 14, rough = 0 } = {}) {
   }
   for (let i = 0; i < rings; i++) for (let j = 0; j < radial; j++) { const a = i * (radial + 1) + j, b = a + radial + 1; idx.push(a, a + 1, b, a + 1, b + 1, b); }
   const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
-  return new THREE.Mesh(g, furMat);
+  const m = new THREE.Mesh(g, furMat);
+  if (fur) for (let k = 0; k < SHELLS; k++) {
+    const f = (k + 1) / SHELLS, gg = g.clone(), P = gg.attributes.position, N = g.attributes.normal;
+    for (let i = 0; i < P.count; i++) P.setXYZ(i, P.getX(i) + N.getX(i) * fur * f, P.getY(i) + N.getY(i) * fur * f - fur * f * f * 0.45, P.getZ(i) + N.getZ(i) * fur * f - fur * f * f * 0.3); // el pelo cae y se peina hacia atrás
+    const sh = new THREE.Mesh(gg, shellMat[k]); sh.userData.shell = true; m.add(sh);
+  }
+  return m;
 }
 const eyeMat = new THREE.MeshStandardMaterial({ color: 0x0c0a08, roughness: 0.12, metalness: 0.3 }); // ojo húmedo, con brillo
 const mixHex = (a, b, t) => new THREE.Color(a).lerp(new THREE.Color(b), Math.min(1, Math.max(0, t))).getHex();
@@ -110,25 +120,25 @@ const ANIMAL = {
     neckAt: [1.12, 0.36], neck: [[-0.14, -0.06, 0.13, 0.17], [0.02, 0.02, 0.1, 0.12], [0.25, 0.07, 0.07, 0.08], [0.48, 0.09, 0.058, 0.065], [0.6, 0.1, 0.055, 0.06], [0.66, 0.1, 0.03, 0.03]],
     headAt: [0.63, 0.1], head: [[0, -0.08, 0.02, 0.02], [0.03, -0.03, 0.062, 0.07], [0.035, 0.04, 0.066, 0.072], [0.02, 0.11, 0.05, 0.05], [0.005, 0.18, 0.036, 0.034], [0, 0.215, 0.03, 0.026], [0, 0.232, 0.012, 0.012]],
     hipY: 0.86, hipX: 0.11, hipZ: [0.34, -0.4], thigh: [[0, 0, 0.07, 0.1], [-0.18, 0, 0.05, 0.065], [-0.4, 0, 0.032, 0.036]], shin: [[0, 0, 0.032, 0.036], [-0.2, 0, 0.024, 0.026], [-0.4, 0, 0.022, 0.024], [-0.44, 0.01, 0.03, 0.034], [-0.46, 0.01, 0.01, 0.01]],
-    tailAt: [1.1, -0.56], tail: [[0, 0, 0.03, 0.03], [0.04, -0.07, 0.045, 0.05], [0.0, -0.15, 0.02, 0.02]], ear: 0.14, earAt: [0.04, 0.1, -0.005], eyeAt: [0.058, 0.05, 0.07, 0.011], rough: 0.035,
+    tailAt: [1.1, -0.56], tail: [[0, 0, 0.03, 0.03], [0.04, -0.07, 0.045, 0.05], [0.0, -0.15, 0.02, 0.02]], ear: 0.14, earAt: [0.04, 0.1, -0.005], eyeAt: [0.058, 0.05, 0.07, 0.011], rough: 0.035, fur: 0.034,
   },
   pudu: {
     torso: [[0.4, -0.3, 0.01, 0.01], [0.42, -0.24, 0.09, 0.1], [0.41, -0.1, 0.115, 0.125], [0.38, 0.05, 0.11, 0.125], [0.36, 0.16, 0.085, 0.105], [0.36, 0.23, 0.04, 0.05], [0.36, 0.25, 0.01, 0.01]],
     neckAt: [0.4, 0.17], neck: [[-0.06, -0.04, 0.07, 0.085], [0.02, 0.02, 0.05, 0.055], [0.09, 0.05, 0.042, 0.046], [0.12, 0.06, 0.02, 0.02]],
     headAt: [0.1, 0.055], head: [[0, -0.045, 0.012, 0.012], [0.012, -0.015, 0.042, 0.046], [0.014, 0.03, 0.042, 0.044], [0.006, 0.075, 0.028, 0.027], [0, 0.1, 0.02, 0.018], [0, 0.11, 0.006, 0.006]],
     hipY: 0.265, hipX: 0.055, hipZ: [0.15, -0.2], thigh: [[0, 0, 0.035, 0.05], [-0.07, 0, 0.024, 0.03], [-0.13, 0, 0.014, 0.016]], shin: [[0, 0, 0.014, 0.016], [-0.07, 0, 0.011, 0.012], [-0.12, 0, 0.01, 0.011], [-0.13, 0.004, 0.014, 0.016], [-0.135, 0.004, 0.004, 0.004]],
-    tailAt: [0.42, -0.28], tail: [[0, 0, 0.012, 0.012], [0.005, -0.03, 0.018, 0.018], [0, -0.05, 0.006, 0.006]], ear: 0.05, earAt: [0.03, 0.055, -0.005], eyeAt: [0.036, 0.03, 0.04, 0.007], rough: 0.02,
+    tailAt: [0.42, -0.28], tail: [[0, 0, 0.012, 0.012], [0.005, -0.03, 0.018, 0.018], [0, -0.05, 0.006, 0.006]], ear: 0.05, earAt: [0.03, 0.055, -0.005], eyeAt: [0.036, 0.03, 0.04, 0.007], rough: 0.02, fur: 0.013,
   },
 };
 function buildQuad({ s = 1, kind = 'weke', body = 0xb07a4a, belly = 0xf0e8d8, legs = 0x7a6a5e, horns = false }) {
   const A = ANIMAL[kind], g = new THREE.Group(), dark = 0x18130f, weke = kind === 'weke';
   const coat = (t, sa) => mixHex(body, belly, (-sa - 0.25) * 2.2);                          // lomo de un color, vientre más claro
-  g.add(skin(A.torso, coat, { rings: 22, rough: A.rough }));
-  const tail = new THREE.Group(); tail.position.set(0, A.tailAt[0], A.tailAt[1]); tail.add(skin(A.tail, () => body, { rings: 6, radial: 8 })); g.add(tail);
+  const F = A.fur; g.add(skin(A.torso, coat, { rings: 22, rough: A.rough, fur: F }));
+  const tail = new THREE.Group(); tail.position.set(0, A.tailAt[0], A.tailAt[1]); tail.add(skin(A.tail, () => body, { rings: 6, radial: 8, fur: F * 0.8 })); g.add(tail);
   const neck = new THREE.Group(); neck.position.set(0, A.neckAt[0], A.neckAt[1]); g.add(neck);
-  neck.add(skin(A.neck, (t, sa) => mixHex(body, belly, (-sa - 0.1) * 2.5 * (weke ? 1 : 0.5)), { rings: 12, rough: A.rough * 0.6 })); // garganta clara
+  neck.add(skin(A.neck, (t, sa) => mixHex(body, belly, (-sa - 0.1) * 2.5 * (weke ? 1 : 0.5)), { rings: 12, rough: A.rough * 0.6, fur: F * 0.75 })); // garganta clara
   const hd = new THREE.Group(); hd.position.set(0, A.headAt[0], A.headAt[1]); neck.add(hd);
-  hd.add(skin(A.head, (t, sa) => (t > 0.86 ? dark : mixHex(weke ? legs : body, belly, (t - 0.55) * (weke ? 0.6 : 0.3) + (-sa - 0.5))), { rings: 12, radial: 12 })); // cara y hocico oscuro
+  hd.add(skin(A.head, (t, sa) => (t > 0.86 ? dark : mixHex(weke ? legs : body, belly, (t - 0.55) * (weke ? 0.6 : 0.3) + (-sa - 0.5))), { rings: 12, radial: 12, fur: F * 0.22 })); // cara y hocico oscuro
   for (const sx of [-1, 1]) {
     const e = mesh(new THREE.ConeGeometry(A.ear * 0.2, A.ear, 6), weke ? legs : body, hd, sx * A.earAt[0], A.earAt[1] + A.ear * 0.4, A.earAt[2]); e.scale.z = 0.45; e.rotation.z = -sx * 0.22; e.rotation.x = -0.12;
     ball(A.eyeAt[3], dark, hd, sx * A.eyeAt[0], A.eyeAt[1], A.eyeAt[2]).material = eyeMat;
@@ -137,13 +147,14 @@ function buildQuad({ s = 1, kind = 'weke', body = 0xb07a4a, belly = 0xf0e8d8, le
   }
   const Ls = [], Ks = [];
   for (const z of A.hipZ) for (const x of [1, -1]) {
-    const hip = new THREE.Group(); hip.position.set(x * A.hipX, A.hipY, z); g.add(hip); hip.add(skin(A.thigh, (t) => mixHex(body, legs, t * 1.1 - 0.3), { rings: 8, radial: 10 }));
+    const hip = new THREE.Group(); hip.position.set(x * A.hipX, A.hipY, z); g.add(hip); hip.add(skin(A.thigh, (t) => mixHex(body, legs, t * 1.1 - 0.3), { rings: 8, radial: 10, fur: F * 0.45 }));
     const knee = new THREE.Group(); knee.position.y = A.thigh[A.thigh.length - 1][0]; hip.add(knee); knee.add(skin(A.shin, (t) => (t > 0.86 ? dark : legs), { rings: 9, radial: 8 })); // la pezuña es oscura
     Ls.push(hip); Ks.push(knee);
   }
   hd.rotation.x = -0.3; neck.rotation.x = 0.3;
   g.scale.setScalar(s); shadows(g);
-  return { g, legs: [Ls[0], Ls[1], Ls[2], Ls[3]], knees: Ks, neck, headPivot: hd, tail };
+  const shells = []; g.traverse((o) => { if (o.userData.shell) { o.castShadow = false; shells.push(o); } });
+  return { g, shells, legs: [Ls[0], Ls[1], Ls[2], Ls[3]], knees: Ks, neck, headPivot: hd, tail };
 }
 
 // ---------- aves ----------
@@ -204,11 +215,23 @@ function buildBird(type) {
   return { g, wl, wr, wlo, wro };
 }
 
-export function buildLife({ scene, rng, emit, trees }) {
+// Símbolo que flota sobre quien tiene algo que contar: una estrella de ocho puntas como las del kultrun
+function markTexture() {
+  const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'); x.translate(64, 64);
+  const star = (r0, r1, col) => { x.fillStyle = col; x.beginPath(); for (let i = 0; i < 16; i++) { const a = (i / 16) * 6.283, r = i % 2 ? r1 : r0; x.lineTo(Math.sin(a) * r, -Math.cos(a) * r); } x.closePath(); x.fill(); };
+  star(60, 30, '#1c1410'); star(52, 25, '#f1e4c4'); star(34, 17, '#b3262e'); star(15, 8, '#f1e4c4');
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
+}
+export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
   const R = (a, b) => a + (b - a) * rng(), actors = [], quads = [], birds = [];
+  // personas y animales tienen cuerpo: ya no se los atraviesa
+  const solid = (o, r, hh, cy) => { o.rb = physics.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(o.x, height(o.x, o.z) + cy, o.z)); physics.createCollider(RAPIER.ColliderDesc.capsule(hh, r), o.rb); o.cy = cy; };
+  const markMat = new THREE.SpriteMaterial({ map: markTexture(), fog: false, toneMapped: false, depthWrite: false });
 
   // ---------- gente de la aldea ----------
-  const person = (opts, x, z, beh) => { const p = buildPerson(opts); p.x = x; p.z = z; p.face = beh.face ?? 0; p.phase = R(0, 6); p.speed = 0; p.wait = R(0, 3); p.i = 0; Object.assign(p, beh); p.g.position.set(x, height(x, z), z); scene.add(p.g); actors.push(p); return p; };
+  const person = (opts, x, z, beh) => { const p = buildPerson(opts); p.x = x; p.z = z; p.face = beh.face ?? 0; p.phase = R(0, 6); p.speed = 0; p.wait = R(0, 3); p.i = 0; Object.assign(p, beh); p.g.position.set(x, height(x, z), z); scene.add(p.g); actors.push(p); solid(p, 0.26, p.h * 0.5 - 0.26, p.h * 0.5);
+    if (p.name) { p.mark = new THREE.Sprite(markMat); p.mark.scale.setScalar(0.3); p.mark.visible = false; p.mark.renderOrder = 5; scene.add(p.mark); }
+    return p; };
   const man = { kind: 'man', h: 1.66, skin: 0x96603c, cloth: 0x2a2630 }, woman = { kind: 'woman', h: 1.56, skin: 0xa0683f, cloth: 0x1f1c26, trim: 0xb3262e, band: 0xc23a36 };
   person({ ...man, band: 0xe9dcb8, trim: 0xb3262e }, 2, -9, { name: 'Curiñancu', mode: 'idle', face: Math.PI });
   person(woman, -9.6, -5.4, { name: 'Millaray', mode: 'work', face: 2.2 });
@@ -222,7 +245,7 @@ export function buildLife({ scene, rng, emit, trees }) {
   person({ ...man, h: 1.7, cloth: 0x2a2630, trim: 0x8a4a2c }, -20, 6, { mode: 'work', face: -2.6 });
 
   // ---------- animales ----------
-  const quad = (opts, x, z, beh) => { const q = buildQuad(opts); q.x = x; q.z = z; q.face = R(0, 6); q.phase = R(0, 6); q.wait = R(0, 4); q.tx = x; q.tz = z; q.speed = 0; Object.assign(q, beh); q.kind = opts.kind || 'weke'; scene.add(q.g); quads.push(q); };
+  const quad = (opts, x, z, beh) => { const q = buildQuad(opts); q.x = x; q.z = z; q.face = R(0, 6); q.phase = R(0, 6); q.wait = R(0, 4); q.tx = x; q.tz = z; q.speed = 0; Object.assign(q, beh); q.kind = opts.kind || 'weke'; scene.add(q.g); quads.push(q); const k = opts.s || 1; if (q.kind === 'weke') solid(q, 0.4 * k, 0.25 * k, 0.75 * k); else solid(q, 0.17, 0.03, 0.22); };
   // weke: la mayoría con el pelaje del guanaco; el blanco era el más apreciado
   for (const [body, belly, legs, s] of [[0xb07a4a, 0xf0e8d8, 0x7a6a5e, 1], [0xa87044, 0xece2d0, 0x74645a, 1.04], [0xeee6d8, 0xf8f2e6, 0x9a9088, 0.98], [0x6e4c36, 0xbfa88c, 0x3e322c, 1], [0xb8824e, 0xf0e8d8, 0x7a6a5e, 0.66]])
     quad({ body, belly, legs, s }, CORRAL.x + R(-3, 3), CORRAL.z + R(-3, 3), { hx: CORRAL.x, hz: CORRAL.z, hr: CORRAL.r - 1.9, pace: 0.8 });
@@ -257,13 +280,16 @@ export function buildLife({ scene, rng, emit, trees }) {
     for (const p of actors) {
       if (p.mode === 'walk') {
         const [tx, tz] = p.pts[p.i], d = Math.hypot(tx - p.x, tz - p.z);
+        const near = Math.hypot(pp.x - p.x, pp.z - p.z); if (near < 1.7) { p.wait = Math.max(p.wait, 0.6); turn(p, pp.x, pp.z, dt, 3); } // si te cruzas, se detiene y te mira
         if (p.wait > 0) { p.wait -= dt; p.speed += (0 - p.speed) * Math.min(1, dt * 8); }
         else if (d < 0.5) { p.i = (p.i + 1) % p.pts.length; p.wait = R(1.5, 5); }
         else { turn(p, tx, tz, dt); p.speed += (p.pace - p.speed) * Math.min(1, dt * 5); p.x += Math.sin(p.face) * p.speed * dt; p.z += Math.cos(p.face) * p.speed * dt; }
         p.phase += dt * (1.5 + p.speed * 3.4 / Math.sqrt(p.h)); animatePerson(p, p.phase, Math.min(1, p.speed / 2.4) * 0.75 + (p.speed > 0.1 ? 0.2 : 0));
       } else if (p.mode === 'work') { p.phase += dt * 2.2; animatePerson(p, 0, 0); p.armL.rotation.x = -0.9 + Math.sin(p.phase) * 0.3; p.armR.rotation.x = -0.9 + Math.sin(p.phase + 2) * 0.3; p.foreL.rotation.x = -0.7 + Math.sin(p.phase + 1) * 0.3; p.foreR.rotation.x = -0.7 + Math.sin(p.phase + 3) * 0.3; p.head.rotation.x = 0.2; }
       else { p.phase += dt; animatePerson(p, 0, 0); p.armL.rotation.x = Math.sin(p.phase * 0.6) * 0.05; p.body.rotation.z = Math.sin(p.phase * 0.35) * 0.015; p.head.rotation.y = Math.sin(p.phase * 0.23) * 0.3; if (Math.hypot(pp.x - p.x, pp.z - p.z) < 6) { turn(p, pp.x, pp.z, dt, 2.5); p.head.rotation.y *= 0.3; } }
-      p.g.position.set(p.x, height(p.x, p.z) + Math.sin(p.phase * 0.8) * 0.008, p.z); p.g.rotation.y = p.face;
+      const gy = height(p.x, p.z); p.g.position.set(p.x, gy + Math.sin(p.phase * 0.8) * 0.008, p.z); p.g.rotation.y = p.face;
+      p.rb.setNextKinematicTranslation({ x: p.x, y: gy + p.cy, z: p.z });
+      if (p.mark) { p.mark.position.set(p.x, gy + p.h + 0.36 + Math.sin(t * 2.2 + p.x) * 0.045, p.z); p.mark.material.rotation = Math.sin(t * 0.9) * 0.12; }
     }
     for (const q of quads) {
       const dp = Math.hypot(pp.x - q.x, pp.z - q.z), flee = q.shy && dp < api.shyR * (speed > 4 ? 1 : 0.4); // corriendo los espantas de lejos; caminando puedes acercarte
@@ -275,11 +301,17 @@ export function buildLife({ scene, rng, emit, trees }) {
       q.phase += dt * (1 + q.speed * 5); const amp = Math.min(0.6, q.speed * 0.55), OFF = [Math.PI / 2, Math.PI * 1.5, 0, Math.PI]; // delantera izq., delantera der., trasera izq., trasera der.
       for (let i = 0; i < 4; i++) { q.legs[i].rotation.x = -Math.sin(q.phase + OFF[i]) * amp; q.knees[i].rotation.x = Math.max(0, Math.cos(q.phase + OFF[i])) * amp * 1.3; }
       q.g.rotation.z = Math.sin(q.phase) * amp * 0.04;
-      q.g.position.set(q.x, height(q.x, q.z) + Math.abs(Math.sin(q.phase)) * Math.min(0.02, q.speed * 0.01), q.z); q.g.rotation.y = q.face;
+      const gy = height(q.x, q.z); q.g.position.set(q.x, gy + Math.abs(Math.sin(q.phase)) * Math.min(0.02, q.speed * 0.01), q.z); q.g.rotation.y = q.face;
+      q.rb.setNextKinematicTranslation({ x: q.x, y: gy + q.cy, z: q.z });
+      // los weke levantan la cabeza y te siguen con la mirada cuando te acercas
+      let look = 0; if (!q.shy && dp < 5) { look = Math.atan2(pp.x - q.x, pp.z - q.z) - q.face; look = Math.max(-1.2, Math.min(1.2, Math.atan2(Math.sin(look), Math.cos(look)))); if (dp < 3.2) q.graze = false; }
+      q.neck.rotation.y += (look * 0.6 - q.neck.rotation.y) * Math.min(1, dt * 3); q.headPivot.rotation.y = q.neck.rotation.y * 0.7;
+      const fine = dp < 26; if (fine !== q.fine) { q.fine = fine; for (const sh of q.shells) sh.visible = fine; } // el pelaje fino solo se dibuja de cerca
     }
     for (const b of birds) {
       const [x, y, z, amp, fq] = b.f(t, b), [x2, y2, z2] = b.f(t + 0.05, b);
-      b.g.position.set(x, y, z); b.g.rotation.y = Math.atan2(x2 - x, z2 - z); b.g.rotation.x = -(y2 - y) * 2;
+      const scare = b.type === 'small' && Math.hypot(pp.x - x, pp.z - z) < 9 && speed > 1; b.up = (b.up || 0) + ((scare ? 7 : 0) - (b.up || 0)) * Math.min(1, dt * (scare ? 2.5 : 0.25)); // los pajaritos suben cuando pasas debajo
+      b.g.position.set(x, y + b.up, z); b.g.rotation.y = Math.atan2(x2 - x, z2 - z); b.g.rotation.x = -(y2 - y) * 2;
       const fl = Math.sin(t * fq + b.o) * amp; b.wl.rotation.z = fl; b.wr.rotation.z = -fl; b.wlo.rotation.z = fl * 0.7 + Math.cos(t * fq + b.o) * amp * 0.3; b.wro.rotation.z = -b.wlo.rotation.z;
     }
   }

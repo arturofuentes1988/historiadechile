@@ -139,7 +139,7 @@ export function buildWorld(scene, RAPIER, physics) {
   buildSky(scene);
   // rayos de sol que se cuelan entre las copas, en las zonas de bosque
   { const pts = []; for (let i = 0; i < 4000 && pts.length < 190 * Q; i++) { const x = R(B.x0 + 10, B.x1 - 10), z = R(B.z0 + 10, B.z1 - 10), h = height(x, z), zk = zone(x, z, h, 1); if ((zk === 'forest' || zk === 'needles' || zk === 'moss') && near(x, z, 9)) pts.push([x, h - 1, z, R(1.2, 3.4), R(22, 38)]); } buildShafts(scene, pts); }
-  const life = buildLife({ scene, rng, emit, trees });
+  const life = buildLife({ scene, rng, emit, trees, physics, RAPIER });
 
   // ---------- piñones (coleccionables) ----------
   const pm = new THREE.MeshStandardMaterial({ color: 0xd99a2c, emissive: 0xb86a10, emissiveIntensity: 1.3, roughness: 0.5 }), gm = new THREE.MeshBasicMaterial({ color: 0xffe9a0, transparent: true, opacity: 0.28, depthWrite: false });
