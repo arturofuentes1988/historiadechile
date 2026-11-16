@@ -8,8 +8,8 @@ import { buildLife } from './life.js';
 
 const rng = mulberry32(1545);
 const R = (a, b) => a + (b - a) * rng();
-// ?q=0.5 pinta menos trazos en equipos lentos
-const Q = Math.min(2, Math.max(0.2, parseFloat(new URLSearchParams(location.search).get('q')) || 1));
+// cantidad de trazos: se elige en Opciones (o con ?q=0.5 en la dirección)
+const Q = Math.min(2, Math.max(0.2, parseFloat(new URLSearchParams(location.search).get('q')) || parseFloat(JSON.parse(localStorage.getItem('leftraru.opciones') || '{}').detalle) || 1));
 
 const CS = 40; // tamaño de cada trozo de mapa; los lejanos no se dibujan
 class Chunks {

@@ -16,4 +16,5 @@ Abre la dirección que aparece en la terminal.
 - **WASD / flechas:** moverse · **Shift:** correr · **Espacio:** saltar
 - **Clic + ratón** (o **Q / E**): girar la cámara · **Enter:** saltar cinemática
 - **N:** notas · **B:** bolsa · **M** (o clic en el minimapa): mapa completo
+- **Esc** (o el botón de la esquina): menú de opciones · **F:** pantalla completa
 - En equipos lentos, agrega `?q=0.5` a la dirección para pintar menos trazos.

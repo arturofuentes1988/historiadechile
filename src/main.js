@@ -42,17 +42,48 @@ let state = 'title', got = 0, time = 0;
 const cine = new Cinematic(camera);
 const pp = () => pBody.translation();
 
-function intro() {
-  state = 'cine'; $('title').classList.add('hide');
-  const p = V3(START[0], height(...START) + 1, START[1]), top = V3(CERRO[0], height(...CERRO) + 4, CERRO[1]);
-  cine.play([
-    { dur: 9, from: V3(-150, 62, 70), to: V3(-90, 44, 50), lookFrom: world.volcano, lookTo: top, text: 'Tierras de Nahuelbuta. Invierno de 1545.' },
-    { dur: 9, from: V3(-46, 20, 38), to: V3(-20, 7, 16), lookFrom: V3(8, 6, -6), lookTo: V3(0, 3, 0), text: 'Faltan pocos días para el We Tripantu, el regreso del sol. Leftraru tiene once años.' },
-    { dur: 7, from: V3(p.x + 5, p.y + 1.4, p.z + 6), to: V3(p.x + 2.4, p.y + 0.5, p.z + 3.2), lookFrom: p, text: 'Su padre le encargó reunir los últimos piñones del pewen para la celebración.' },
-  ], () => { state = 'play'; document.body.classList.add('playing'); $('hud').classList.add('on'); hint('Sigue el sendero hacia el norte, al bosque de pewenes · WASD para moverte', 9); ui.unlock('leftraru', 'curinancu', 'nahuelbuta'); });
+// Entrar al mundo directamente desde la portada (sin cinemática de inicio)
+function enter() {
+  if (state !== 'title') return;
+  setMenu(false); state = 'play'; $('title').classList.add('hide'); document.body.classList.add('playing'); $('hud').classList.add('on');
+  hint('Sigue el sendero hacia el norte, al bosque de pewenes · WASD para moverte', 9);
+  ui.unlock('leftraru', 'curinancu', 'nahuelbuta');
 }
+
+// ---------- opciones (se guardan en este navegador) ----------
+const opts = Object.assign({ calidad: 'auto', detalle: '1', sens: 1, inv: false, mini: true }, JSON.parse(localStorage.getItem('leftraru.opciones') || '{}'));
+const detalleInicial = opts.detalle;
+let menuOpen = false, pr = Math.min(devicePixelRatio, 1.5);
+function applyOpts() {
+  pr = opts.calidad === 'auto' ? Math.min(devicePixelRatio, 1.5) : Math.min(parseFloat(opts.calidad), Math.max(1, devicePixelRatio));
+  renderer.setPixelRatio(pr); document.body.classList.toggle('nomini', !opts.mini);
+  $('o-reload').hidden = opts.detalle === detalleInicial;
+  localStorage.setItem('leftraru.opciones', JSON.stringify(opts));
+}
+function setMenu(on) {
+  menuOpen = on; $('menu').classList.toggle('on', on); document.body.classList.toggle('en-portada', state === 'title');
+  if (on) { ui.show(null); document.exitPointerLock?.(); for (const k in keys) keys[k] = false; }
+}
+$('o-calidad').value = opts.calidad; $('o-detalle').value = opts.detalle; $('o-sens').value = opts.sens; $('o-inv').checked = opts.inv; $('o-mini').checked = opts.mini;
+$('o-calidad').onchange = (e) => { opts.calidad = e.target.value; applyOpts(); };
+$('o-detalle').onchange = (e) => { opts.detalle = e.target.value; applyOpts(); };
+$('o-sens').oninput = (e) => { opts.sens = parseFloat(e.target.value); applyOpts(); };
+$('o-inv').onchange = (e) => { opts.inv = e.target.checked; applyOpts(); };
+$('o-mini').onchange = (e) => { opts.mini = e.target.checked; applyOpts(); };
+$('o-recargar').onclick = $('m-portada').onclick = () => location.reload();
+$('m-continuar').onclick = () => { setMenu(false); if (state === 'play') renderer.domElement.requestPointerLock?.(); };
+$('btn-menu').onclick = () => setMenu(!menuOpen);
+$('c-entrar').onclick = enter; $('c-opciones').onclick = () => setMenu(true);
+// pantalla completa
+const toggleFull = () => { if (document.fullscreenElement) document.exitFullscreen?.(); else document.documentElement.requestFullscreen?.().catch(() => hint('Este navegador no permitió la pantalla completa', 4)); };
+$('btn-full').onclick = toggleFull; $('o-full').onchange = toggleFull;
+document.addEventListener('fullscreenchange', () => { const on = !!document.fullscreenElement; $('o-full').checked = on; $('btn-full').textContent = on ? '⛶ Salir de pantalla completa' : '⛶ Pantalla completa'; });
+if (!document.documentElement.requestFullscreen) { $('btn-full').style.display = 'none'; $('o-full').parentElement.style.display = 'none'; }
+// al soltar el ratón con Escape durante el juego, se abre el menú
+document.addEventListener('pointerlockchange', () => { if (!document.pointerLockElement && state === 'play' && !ui.open && !menuOpen) setMenu(true); });
+
 function outro() {
-  state = 'cine'; ui.show(null); document.body.classList.remove('playing'); $('hud').classList.remove('on');
+  setMenu(false); state = 'cine'; ui.show(null); document.body.classList.remove('playing'); $('hud').classList.remove('on');
   const p = V3(pp().x, pp().y + 0.6, pp().z), dir = world.volcano.clone().sub(p).setY(0).normalize();
   cine.play([
     { dur: 6, from: p.clone().addScaledVector(dir, 3.5).add(V3(0, 0.6, 0)), to: p.clone().addScaledVector(dir, 2.6).add(V3(0, 0.3, 0)), lookFrom: p, text: 'El último piñón. Suficientes para todos.' },
@@ -63,20 +94,21 @@ let hintT = 0;
 function hint(txt, secs) { $('hint').textContent = txt; $('hint').classList.add('on'); hintT = secs; }
 
 addEventListener('keydown', (e) => {
+  if (e.code === 'Enter') { if (state === 'title') enter(); else cine.skip(); }
+  if (e.code === 'KeyF' && !e.repeat) toggleFull();
+  if (menuOpen) { if (e.code === 'Escape') setMenu(false); return; }
   keys[e.code] = true;
-  if (e.code === 'Enter') { if (state === 'title') intro(); else cine.skip(); }
   if (state === 'play' && e.code === 'KeyN') { ui.show('notas'); ui.seen(); }
   if (state === 'play' && e.code === 'KeyB') ui.show('bolsa');
   if (state === 'play' && e.code === 'KeyM') ui.show('mapa');
-  if (e.code === 'Escape') ui.show(null);
+  if (e.code === 'Escape') { if (ui.open) ui.show(null); else if (state !== 'cine') setMenu(true); }
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
 });
 addEventListener('keyup', (e) => { keys[e.code] = false; });
-$('title').addEventListener('click', () => { if (state === 'title') intro(); });
-renderer.domElement.addEventListener('click', () => { if (state === 'play' && !ui.open) renderer.domElement.requestPointerLock?.(); });
+renderer.domElement.addEventListener('click', () => { if (state === 'play' && !ui.open && !menuOpen) renderer.domElement.requestPointerLock?.(); });
 addEventListener('mousemove', (e) => {
   if (document.pointerLockElement !== renderer.domElement) return;
-  cam.yaw -= e.movementX * 0.0028; cam.pitch = Math.min(1.2, Math.max(-0.25, cam.pitch + e.movementY * 0.0022));
+  cam.yaw -= e.movementX * 0.0028 * opts.sens; cam.pitch = Math.min(1.2, Math.max(-0.25, cam.pitch + e.movementY * 0.0022 * opts.sens * (opts.inv ? -1 : 1)));
 });
 
 function updatePlayer(dt) {
@@ -141,12 +173,13 @@ function updateItems() {
 const ui = createUI({ world, onToast: (t) => hint(t, 5) });
 $('total').textContent = world.items.length;
 $('loading').remove();
-window.__g = { ui, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, intro, paused: false, keys,
+window.__g = { ui, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
   tp(x, y, z) { pBody.setTranslation({ x, y, z }, true); player.vy = 0; },
   view(x, y, z, lx, ly, lz) { camera.position.set(x, y, z); camera.lookAt(lx, ly, lz); world.update(0, time, camera.position, pp()); renderer.render(scene, camera); return renderer.domElement.toDataURL('image/jpeg', 0.9); },
   snap() { renderer.render(scene, camera); return renderer.domElement.toDataURL('image/jpeg', 0.9); } };
 
-const clock = new THREE.Clock(); let fpsT = 0, fpsN = 0, pr = Math.min(devicePixelRatio, 1.5);
+const clock = new THREE.Clock(); let fpsT = 0, fpsN = 0;
+applyOpts();
 function tick(dt) {
   time += dt; shared.uTime.value = time;
   updatePlayer(dt);
@@ -163,9 +196,9 @@ function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(0.05, clock.getDelta());
   if (window.__g.paused) return;
-  tick(dt);
+  if (!menuOpen || state === 'title') tick(dt); // el juego se detiene con el menú abierto
   renderer.render(scene, camera);
   // si el equipo va lento, baja la resolución de a poco
-  fpsT += dt; fpsN++; if (fpsT > 3) { if (fpsN / fpsT < 27 && pr > 0.6) { pr = Math.max(0.6, pr - 0.25); renderer.setPixelRatio(pr); } fpsT = fpsN = 0; }
+  fpsT += dt; fpsN++; if (fpsT > 3) { if (opts.calidad === 'auto' && !menuOpen && fpsN / fpsT < 27 && pr > 0.6) { pr = Math.max(0.6, pr - 0.25); renderer.setPixelRatio(pr); } fpsT = fpsN = 0; }
 }
 frame();
