@@ -78,46 +78,70 @@ export function animatePerson(p, phase, amp, air = false) {
   p.body.rotation.x = amp * 0.09; p.body.rotation.y = s * amp * 0.07; p.body.position.y = Math.abs(c) * amp * 0.012;
 }
 
-// Weke: pariente de la llama. Medidas reales: 1,1 m a la cruz, cuello largo y erguido, cabeza chica
-// de orejas largas, cuerpo lanudo sobre patas delgadas.
-// Pudú: ciervo enano de 40 cm a la cruz, cuerpo redondo con la grupa más alta que los hombros,
-// patas cortas, cabeza pequeña y, el macho, dos cuernos como espinas.
-function buildQuad({ s = 1, kind = 'weke', body = 0xd9d0b6, legs = 0x8a7a66 }) {
-  const g = new THREE.Group(), weke = kind === 'weke', dark = 0x1a1512, hoof = 0x2a2420;
-  const H = weke ? 1.02 : 0.34, L = weke ? 1.05 : 0.5, legLen = weke ? 0.72 : 0.22;
-  const cap = (r, len, c, x, y, z, rx = Math.PI / 2) => { const m = mesh(new THREE.CapsuleGeometry(r, len, 5, 12), c, g, x, y, z); m.rotation.x = rx; return m; };
-  if (weke) {
-    cap(0.27, 0.5, body, 0, H, 0); ball(0.29, body, g, 0, H - 0.04, -0.1, 1.02, 0.95, 1.2);      // tronco lanudo
-    ball(0.22, body, g, 0, H + 0.02, 0.32, 0.95, 1.05, 0.9); ball(0.25, body, g, 0, H, -0.36, 1, 1, 0.9); // pecho y grupa
-    ball(0.06, body, g, 0, H + 0.1, -0.6, 1, 1.5, 0.9);                                           // cola corta
-  } else {
-    const b = cap(0.125, 0.22, body, 0, H, 0); b.rotation.x = Math.PI / 2 + 0.12;                 // lomo que sube hacia la grupa
-    ball(0.135, body, g, 0, H + 0.025, -0.13, 1, 1.05, 1); ball(0.105, body, g, 0, H - 0.015, 0.15, 1, 1, 1);
-    ball(0.028, legs, g, 0, H + 0.07, -0.27);
+// ---------- animales con piel continua ----------
+// Cada parte (tronco, cuello, cabeza, patas) es un tubo de sección ovalada que sigue una línea
+// de puntos [alto, largo, radio horizontal, radio vertical], como el contorno real del animal.
+const furTex = TEX.fur.clone(); furTex.repeat.set(3, 3); furTex.needsUpdate = true;
+const furMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: furTex, bumpMap: furTex, bumpScale: 1.6, roughness: 1 });
+function skin(spine, colorAt, { rings = 18, radial = 14, rough = 0 } = {}) {
+  const curve = new THREE.CatmullRomCurve3(spine.map(([y, z]) => new THREE.Vector3(0, y, z))), pos = [], col = [], uv = [], idx = [], c = new THREE.Color(), n = spine.length - 1;
+  for (let i = 0; i <= rings; i++) {
+    const t = i / rings, p = curve.getPoint(t), T = curve.getTangent(t), f = t * n, k = Math.min(n - 1, Math.floor(f)), u = f - k;
+    const rx = spine[k][2] + (spine[k + 1][2] - spine[k][2]) * u, ry = spine[k][3] + (spine[k + 1][3] - spine[k][3]) * u, ny = T.z, nz = -T.y; // la normal del anillo, perpendicular a la línea
+    for (let j = 0; j <= radial; j++) {
+      const a = (j / radial) * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a), w = 1 + rough * Math.sin(a * 5 + t * 23) * Math.sin(t * 31 + a * 3); // mechones
+      pos.push(ca * rx * w, p.y + ny * sa * ry * w, p.z + nz * sa * ry * w); uv.push(j / radial, t * 2);
+      c.set(colorAt(t, sa, ca)); col.push(c.r, c.g, c.b);
+    }
   }
-  const neck = new THREE.Group(); neck.position.set(0, H + (weke ? 0.1 : 0.03), L * (weke ? 0.36 : 0.36)); g.add(neck);
-  const nl = weke ? 0.62 : 0.12; mesh(new THREE.CylinderGeometry(weke ? 0.07 : 0.045, weke ? 0.13 : 0.07, nl, 10), body, neck, 0, nl / 2, 0);
-  if (weke) ball(0.11, body, neck, 0, 0.08, -0.02, 1, 1.4, 1.05);                                  // lana en la base del cuello
-  const hd = new THREE.Group(); hd.position.y = nl; neck.add(hd);
-  if (weke) {
-    ball(0.078, body, hd, 0, 0.04, 0.02, 0.9, 0.95, 1.15); ball(0.05, legs, hd, 0, 0.012, 0.115, 0.85, 0.8, 1.25); // cráneo y hocico largo
-    ball(0.016, dark, hd, 0, 0.012, 0.178, 1.3, 0.7, 0.6); mesh(new THREE.BoxGeometry(0.035, 0.004, 0.02), dark, hd, 0, -0.012, 0.16); // nariz y boca partida
-    for (const sx of [-1, 1]) { const e = mesh(new THREE.ConeGeometry(0.022, 0.15, 6), legs, hd, sx * 0.045, 0.16, -0.03); e.rotation.z = -sx * 0.18; e.rotation.x = -0.15; ball(0.011, dark, hd, sx * 0.058, 0.055, 0.075); }
-  } else {
-    ball(0.055, body, hd, 0, 0.03, 0.03, 0.95, 0.95, 1.15); ball(0.03, legs, hd, 0, 0.012, 0.085, 0.9, 0.85, 1.2); ball(0.01, dark, hd, 0, 0.012, 0.118);
-    for (const sx of [-1, 1]) { ball(0.022, legs, hd, sx * 0.045, 0.08, -0.005, 0.5, 1.1, 0.9); ball(0.007, dark, hd, sx * 0.04, 0.045, 0.055); if (legs !== body) { const a = mesh(new THREE.ConeGeometry(0.007, 0.05, 4), 0x4a3c30, hd, sx * 0.02, 0.1, 0.0); a.rotation.z = -sx * 0.15; } }
+  for (let i = 0; i < rings; i++) for (let j = 0; j < radial; j++) { const a = i * (radial + 1) + j, b = a + radial + 1; idx.push(a, a + 1, b, a + 1, b + 1, b); }
+  const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); g.setIndex(idx); g.computeVertexNormals();
+  return new THREE.Mesh(g, furMat);
+}
+const mixHex = (a, b, t) => new THREE.Color(a).lerp(new THREE.Color(b), Math.min(1, Math.max(0, t))).getHex();
+
+// Weke (chilihueque): por los restos estudiados, lo más probable es que fuera un guanaco domesticado.
+// Porte de guanaco: 1,1 m a la cruz, esbelto, cuello largo, lomo canela y vientre blanco, cara gris.
+// Pudú: ciervo enano de 40 cm, cuerpo redondo con la grupa más alta que los hombros, patas cortas.
+const ANIMAL = {
+  weke: {
+    torso: [[1.04, -0.6, 0.02, 0.02], [1.07, -0.52, 0.14, 0.16], [1.05, -0.32, 0.19, 0.22], [1.0, -0.05, 0.2, 0.25], [0.98, 0.2, 0.19, 0.26], [1.0, 0.38, 0.15, 0.21], [1.02, 0.5, 0.08, 0.1], [1.02, 0.54, 0.02, 0.02]],
+    neckAt: [1.12, 0.36], neck: [[-0.14, -0.06, 0.13, 0.17], [0.02, 0.02, 0.1, 0.12], [0.25, 0.07, 0.07, 0.08], [0.48, 0.09, 0.058, 0.065], [0.6, 0.1, 0.055, 0.06], [0.66, 0.1, 0.03, 0.03]],
+    headAt: [0.63, 0.1], head: [[0, -0.08, 0.02, 0.02], [0.03, -0.03, 0.062, 0.07], [0.035, 0.04, 0.066, 0.072], [0.02, 0.11, 0.05, 0.05], [0.005, 0.18, 0.036, 0.034], [0, 0.215, 0.03, 0.026], [0, 0.232, 0.012, 0.012]],
+    hipY: 0.86, hipX: 0.11, hipZ: [0.34, -0.4], thigh: [[0, 0, 0.07, 0.1], [-0.18, 0, 0.05, 0.065], [-0.4, 0, 0.032, 0.036]], shin: [[0, 0, 0.032, 0.036], [-0.2, 0, 0.024, 0.026], [-0.4, 0, 0.022, 0.024], [-0.44, 0.01, 0.03, 0.034], [-0.46, 0.01, 0.01, 0.01]],
+    tailAt: [1.1, -0.56], tail: [[0, 0, 0.03, 0.03], [0.04, -0.07, 0.045, 0.05], [0.0, -0.15, 0.02, 0.02]], ear: 0.14, earAt: [0.04, 0.1, -0.005], eyeAt: [0.058, 0.05, 0.07, 0.011], rough: 0.035,
+  },
+  pudu: {
+    torso: [[0.4, -0.3, 0.01, 0.01], [0.42, -0.24, 0.09, 0.1], [0.41, -0.1, 0.115, 0.125], [0.38, 0.05, 0.11, 0.125], [0.36, 0.16, 0.085, 0.105], [0.36, 0.23, 0.04, 0.05], [0.36, 0.25, 0.01, 0.01]],
+    neckAt: [0.4, 0.17], neck: [[-0.06, -0.04, 0.07, 0.085], [0.02, 0.02, 0.05, 0.055], [0.09, 0.05, 0.042, 0.046], [0.12, 0.06, 0.02, 0.02]],
+    headAt: [0.1, 0.055], head: [[0, -0.045, 0.012, 0.012], [0.012, -0.015, 0.042, 0.046], [0.014, 0.03, 0.042, 0.044], [0.006, 0.075, 0.028, 0.027], [0, 0.1, 0.02, 0.018], [0, 0.11, 0.006, 0.006]],
+    hipY: 0.265, hipX: 0.055, hipZ: [0.15, -0.2], thigh: [[0, 0, 0.035, 0.05], [-0.07, 0, 0.024, 0.03], [-0.13, 0, 0.014, 0.016]], shin: [[0, 0, 0.014, 0.016], [-0.07, 0, 0.011, 0.012], [-0.12, 0, 0.01, 0.011], [-0.13, 0.004, 0.014, 0.016], [-0.135, 0.004, 0.004, 0.004]],
+    tailAt: [0.42, -0.28], tail: [[0, 0, 0.012, 0.012], [0.005, -0.03, 0.018, 0.018], [0, -0.05, 0.006, 0.006]], ear: 0.05, earAt: [0.03, 0.055, -0.005], eyeAt: [0.036, 0.03, 0.04, 0.007], rough: 0.02,
+  },
+};
+function buildQuad({ s = 1, kind = 'weke', body = 0xb07a4a, belly = 0xf0e8d8, legs = 0x7a6a5e, horns = false }) {
+  const A = ANIMAL[kind], g = new THREE.Group(), dark = 0x18130f, weke = kind === 'weke';
+  const coat = (t, sa) => mixHex(body, belly, (-sa - 0.25) * 2.2);                          // lomo de un color, vientre más claro
+  g.add(skin(A.torso, coat, { rings: 22, rough: A.rough }));
+  const tail = new THREE.Group(); tail.position.set(0, A.tailAt[0], A.tailAt[1]); tail.add(skin(A.tail, () => body, { rings: 6, radial: 8 })); g.add(tail);
+  const neck = new THREE.Group(); neck.position.set(0, A.neckAt[0], A.neckAt[1]); g.add(neck);
+  neck.add(skin(A.neck, (t, sa) => mixHex(body, belly, (-sa - 0.1) * 2.5 * (weke ? 1 : 0.5)), { rings: 12, rough: A.rough * 0.6 })); // garganta clara
+  const hd = new THREE.Group(); hd.position.set(0, A.headAt[0], A.headAt[1]); neck.add(hd);
+  hd.add(skin(A.head, (t, sa) => (t > 0.86 ? dark : mixHex(weke ? legs : body, belly, (t - 0.55) * (weke ? 0.6 : 0.3) + (-sa - 0.5))), { rings: 12, radial: 12 })); // cara y hocico oscuro
+  for (const sx of [-1, 1]) {
+    const e = mesh(new THREE.ConeGeometry(A.ear * 0.2, A.ear, 6), weke ? legs : body, hd, sx * A.earAt[0], A.earAt[1] + A.ear * 0.4, A.earAt[2]); e.scale.z = 0.45; e.rotation.z = -sx * 0.22; e.rotation.x = -0.12;
+    ball(A.eyeAt[3], dark, hd, sx * A.eyeAt[0], A.eyeAt[1], A.eyeAt[2]);
+    if (horns) { const a = mesh(new THREE.ConeGeometry(0.006, 0.05, 4), 0x4a3c30, hd, sx * 0.018, 0.075, -0.005); a.rotation.z = -sx * 0.18; }
   }
-  hd.rotation.x = -0.35; neck.rotation.x = 0.35;
   const Ls = [], Ks = [];
-  for (const [x, z] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
-    const hip = new THREE.Group(); hip.position.set(x * (weke ? 0.15 : 0.07), legLen + (weke ? 0.1 : 0.03), z * L * (weke ? 0.33 : 0.3)); g.add(hip);
-    seg(legLen * 0.5 + (weke ? 0.1 : 0.03), weke ? 0.06 : 0.03, weke ? 0.038 : 0.019, body, hip);                      // muslo, más grueso arriba
-    const knee = new THREE.Group(); knee.position.y = -legLen * 0.5 - (weke ? 0.1 : 0.03); hip.add(knee); seg(legLen * 0.5, weke ? 0.035 : 0.018, weke ? 0.028 : 0.013, legs, knee);
-    ball(weke ? 0.036 : 0.016, hoof, knee, 0, -legLen * 0.5 + 0.01, weke ? 0.012 : 0.005, 1, 0.6, 1.3); // pezuña
+  for (const z of A.hipZ) for (const x of [1, -1]) {
+    const hip = new THREE.Group(); hip.position.set(x * A.hipX, A.hipY, z); g.add(hip); hip.add(skin(A.thigh, (t) => mixHex(body, legs, t * 1.1 - 0.3), { rings: 8, radial: 10 }));
+    const knee = new THREE.Group(); knee.position.y = A.thigh[A.thigh.length - 1][0]; hip.add(knee); knee.add(skin(A.shin, (t) => (t > 0.86 ? dark : legs), { rings: 9, radial: 8 })); // la pezuña es oscura
     Ls.push(hip); Ks.push(knee);
   }
+  hd.rotation.x = -0.3; neck.rotation.x = 0.3;
   g.scale.setScalar(s); shadows(g);
-  return { g, legs: Ls, knees: Ks, neck, headPivot: hd };
+  return { g, legs: [Ls[0], Ls[1], Ls[2], Ls[3]], knees: Ks, neck, headPivot: hd, tail };
 }
 
 // Aves con sus colores reales:
@@ -166,10 +190,11 @@ export function buildLife({ scene, rng, emit, trees }) {
 
   // ---------- animales ----------
   const quad = (opts, x, z, beh) => { const q = buildQuad(opts); q.x = x; q.z = z; q.face = R(0, 6); q.phase = R(0, 6); q.wait = R(0, 4); q.tx = x; q.tz = z; q.speed = 0; Object.assign(q, beh); q.kind = opts.kind || 'weke'; scene.add(q.g); quads.push(q); };
-  for (const [body, legs, s] of [[0xe4dcc4, 0xb9ad94, 1], [0x6a4a34, 0x3a2a20, 1.05], [0xd9d0b6, 0x6a4a34, 0.95], [0x2e2622, 0x2e2622, 1], [0xcfa878, 0x8a6a4a, 0.68]])
-    quad({ body, legs, s }, CORRAL.x + R(-3, 3), CORRAL.z + R(-3, 3), { hx: CORRAL.x, hz: CORRAL.z, hr: CORRAL.r - 1.8, pace: 0.8 });
+  // weke: la mayoría con el pelaje del guanaco; el blanco era el más apreciado
+  for (const [body, belly, legs, s] of [[0xb07a4a, 0xf0e8d8, 0x7a6a5e, 1], [0xa87044, 0xece2d0, 0x74645a, 1.04], [0xeee6d8, 0xf8f2e6, 0x9a9088, 0.98], [0x6e4c36, 0xbfa88c, 0x3e322c, 1], [0xb8824e, 0xf0e8d8, 0x7a6a5e, 0.66]])
+    quad({ body, belly, legs, s }, CORRAL.x + R(-3, 3), CORRAL.z + R(-3, 3), { hx: CORRAL.x, hz: CORRAL.z, hr: CORRAL.r - 1.9, pace: 0.8 });
   for (const [x, z] of [[POI.viejo.x + 16, POI.viejo.z + 12], [-70, -70], [40, -52], [-60, 66], [70, 40], [-140, 20]])
-    quad({ kind: 'pudu', body: 0x8a5230, legs: 0x5a3420 }, x, z, { hx: x, hz: z, hr: 16, pace: 0.6, shy: true });
+    quad({ kind: 'pudu', body: 0x8a5230, belly: 0xa9764c, legs: 0x5a3420, horns: rng() < 0.5 }, x, z, { hx: x, hz: z, hr: 16, pace: 0.6, shy: true });
 
   // ---------- aves ----------
   const bird = (color, span, f, type) => { const b = buildBird(type); b.f = f; b.type = type; b.o = R(0, 6.28); scene.add(b.g); birds.push(b); };
@@ -209,13 +234,13 @@ export function buildLife({ scene, rng, emit, trees }) {
       const dp = Math.hypot(pp.x - q.x, pp.z - q.z), flee = q.shy && dp < api.shyR;
       if (flee) { q.tx = q.x + ((q.x - pp.x) / dp) * 14; q.tz = q.z + ((q.z - pp.z) / dp) * 14; q.wait = 0; }
       const d = Math.hypot(q.tx - q.x, q.tz - q.z), want = flee ? 5.2 : q.pace;
-      if (q.wait > 0) { q.wait -= dt; q.speed += (0 - q.speed) * Math.min(1, dt * 6); q.neck.rotation.x += ((q.graze ? 1.75 : 0.35) - q.neck.rotation.x) * Math.min(1, dt * 3); q.headPivot.rotation.x = -q.neck.rotation.x * 0.6; }
+      if (q.wait > 0) { q.wait -= dt; q.speed += (0 - q.speed) * Math.min(1, dt * 6); q.neck.rotation.x += ((q.graze ? 1.7 : 0.3) - q.neck.rotation.x) * Math.min(1, dt * 3); q.headPivot.rotation.x = -q.neck.rotation.x * 0.6; q.tail.rotation.x = Math.sin(q.phase * 3 + q.x) * 0.25; }
       else if (d < 0.4) { q.wait = R(2, 8); q.graze = rng() < 0.6; const a = R(0, 6.28), r = Math.sqrt(rng()) * q.hr; q.tx = q.hx + Math.cos(a) * r; q.tz = q.hz + Math.sin(a) * r; }
-      else { turn(q, q.tx, q.tz, dt, flee ? 9 : 3); q.speed += (want - q.speed) * Math.min(1, dt * 5); q.x += Math.sin(q.face) * q.speed * dt; q.z += Math.cos(q.face) * q.speed * dt; q.neck.rotation.x += (0.35 - q.neck.rotation.x) * Math.min(1, dt * 5); q.headPivot.rotation.x = -0.35; }
+      else { turn(q, q.tx, q.tz, dt, flee ? 9 : 3); q.speed += (want - q.speed) * Math.min(1, dt * 5); q.x += Math.sin(q.face) * q.speed * dt; q.z += Math.cos(q.face) * q.speed * dt; q.neck.rotation.x += (0.3 + Math.sin(q.phase) * 0.05 - q.neck.rotation.x) * Math.min(1, dt * 5); q.headPivot.rotation.x = -0.3; }
       q.phase += dt * (1 + q.speed * 5); const sw = Math.sin(q.phase) * Math.min(0.7, q.speed * 0.6);
       q.legs[0].rotation.x = sw; q.legs[3].rotation.x = sw; q.legs[1].rotation.x = -sw; q.legs[2].rotation.x = -sw;
       const kb = Math.max(0, Math.cos(q.phase)) * Math.min(0.9, q.speed * 0.7), kb2 = Math.max(0, -Math.cos(q.phase)) * Math.min(0.9, q.speed * 0.7); q.knees[0].rotation.x = q.knees[3].rotation.x = kb; q.knees[1].rotation.x = q.knees[2].rotation.x = kb2;
-      q.g.position.set(q.x, height(q.x, q.z), q.z); q.g.rotation.y = q.face;
+      q.g.position.set(q.x, height(q.x, q.z) + Math.abs(Math.sin(q.phase)) * Math.min(0.02, q.speed * 0.01), q.z); q.g.rotation.y = q.face;
     }
     for (const b of birds) {
       const [x, y, z, amp, fq] = b.f(t, b), [x2, y2, z2] = b.f(t + 0.05, b);

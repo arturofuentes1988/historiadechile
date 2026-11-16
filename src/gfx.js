@@ -167,6 +167,7 @@ export const TEX = {
   thatch: tex(streakCanvas(512, 512, [[176, 150, 92], [208, 184, 118], [140, 116, 66], [108, 88, 50]], 2600, { bands: 5, lw: [1, 2.4] })),
   wood: tex(streakCanvas(128, 256, [[140, 110, 78], [110, 84, 58], [166, 134, 96]], 300)),
   textile: tex(textileCanvas()), soft: tex(softCanvas(), { wrap: false }),
+  fur: tex(streakCanvas(256, 256, [[236, 236, 236], [205, 205, 205], [255, 255, 255], [176, 176, 176]], 2200, { lw: [0.6, 1.6] })), // pelaje: pelos cortos en la dirección del cuerpo
 };
 
 // ---------- materiales ----------
