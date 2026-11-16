@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
-import { shared, paintMaterial } from './strokes.js';
-import { buildWorld, height, PLAY_RADIUS } from './world.js';
+import { shared } from './strokes.js';
+import { buildWorld } from './world.js';
+import { height, inBounds, POI, CERRO } from './terrain.js';
+import { buildPerson, animatePerson } from './life.js';
 import { Cinematic } from './cinematic.js';
 import { createUI } from './ui.js';
 
@@ -23,31 +25,17 @@ addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); ca
 const world = buildWorld(scene, RAPIER, physics);
 
 // ---------- Leftraru niño (personaje provisional, hecho de formas pintadas) ----------
-function buildBoy() {
-  const g = new THREE.Group(), skin = paintMaterial({ color: 0xa9714b }), dark = paintMaterial({ color: 0x1d1a1c });
-  const poncho = paintMaterial({ color: 0x3a3440 }), band = paintMaterial({ color: 0xb3262e }), wool = paintMaterial({ color: 0x8a7a66 });
-  const limb = (mat, len, r) => { const p = new THREE.Group(), m = new THREE.Mesh(new THREE.CylinderGeometry(r, r * 0.85, len, 7), mat); m.position.y = -len / 2; p.add(m); return p; };
-  const legL = limb(skin, 0.5, 0.07), legR = limb(skin, 0.5, 0.07); legL.position.set(0.1, 0.5, 0); legR.position.set(-0.1, 0.5, 0);
-  const armL = limb(skin, 0.42, 0.055), armR = limb(skin, 0.42, 0.055); armL.position.set(0.27, 0.98, 0); armR.position.set(-0.27, 0.98, 0);
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.33, 0.6, 9), poncho); body.position.y = 0.76;
-  const stripe = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.335, 0.07, 9), band); stripe.position.y = 0.52;
-  const under = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.22, 0.2, 8), wool); under.position.y = 0.42;
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.155, 12, 10), skin); head.position.y = 1.2;
-  const hair = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 10), dark); hair.position.set(0, 1.23, -0.035); hair.scale.set(1, 1, 1.05);
-  const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.168, 0.168, 0.045, 12), band); tr.position.y = 1.26; // trarilonko
-  g.add(legL, legR, armL, armR, body, stripe, under, head, hair, tr);
-  return { g, legL, legR, armL, armR };
-}
-const boy = buildBoy(); scene.add(boy.g);
+const boy = buildPerson(); scene.add(boy.g);
+const START = [-6, -1];
 
 const RAD = 0.3, HALF = 0.36, FEET = HALF + RAD;
-const pBody = physics.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(0, height(0, 0) + FEET + 0.05, 0));
+const pBody = physics.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(START[0], height(...START) + FEET + 0.05, START[1]));
 const pCol = physics.createCollider(RAPIER.ColliderDesc.capsule(HALF, RAD), pBody);
 const ctrl = physics.createCharacterController(0.02);
 ctrl.enableAutostep(0.3, 0.2, true); ctrl.setMaxSlopeClimbAngle(0.95); ctrl.setMinSlopeSlideAngle(1.0);
 
-const player = { vy: 0, grounded: false, facing: Math.PI, phase: 0, speed: 0 };
-const cam = { yaw: 0.5, pitch: 0.22, dist: 5.2 };
+const player = { vy: 0, grounded: false, facing: 0.6, phase: 0, speed: 0 };
+const cam = { yaw: 0.2, pitch: 0.2, dist: 5.4 };
 const keys = {};
 let state = 'title', got = 0, time = 0;
 
@@ -56,12 +44,12 @@ const pp = () => pBody.translation();
 
 function intro() {
   state = 'cine'; $('title').classList.add('hide');
-  const p = V3(0, height(0, 0) + 1, 0);
+  const p = V3(START[0], height(...START) + 1, START[1]), top = V3(CERRO[0], height(...CERRO) + 4, CERRO[1]);
   cine.play([
-    { dur: 8, from: V3(70, 46, 120), to: V3(40, 34, 70), lookFrom: world.volcano, lookTo: world.volcano.clone().add(V3(0, -40, 0)), text: 'Tierras de Nahuelbuta. Invierno de 1545.' },
-    { dur: 8, from: V3(34, 24, 44), to: V3(12, 6, 15), lookFrom: V3(0, 14, 0), lookTo: p, text: 'Faltan pocos días para el We Tripantu, el regreso del sol. Leftraru tiene once años.' },
-    { dur: 7, from: V3(5, p.y + 1.2, 6), to: V3(2.4, p.y + 0.5, 3.2), lookFrom: p, text: 'Su padre le encargó reunir los últimos piñones del pewen para la celebración.' },
-  ], () => { state = 'play'; document.body.classList.add('playing'); $('hud').classList.add('on'); hint('Muévete con WASD · Espacio: saltar · Shift: correr', 7); ui.unlock('leftraru', 'curinancu', 'nahuelbuta'); });
+    { dur: 9, from: V3(-150, 62, 70), to: V3(-90, 44, 50), lookFrom: world.volcano, lookTo: top, text: 'Tierras de Nahuelbuta. Invierno de 1545.' },
+    { dur: 9, from: V3(-46, 20, 38), to: V3(-20, 7, 16), lookFrom: V3(8, 6, -6), lookTo: V3(0, 3, 0), text: 'Faltan pocos días para el We Tripantu, el regreso del sol. Leftraru tiene once años.' },
+    { dur: 7, from: V3(p.x + 5, p.y + 1.4, p.z + 6), to: V3(p.x + 2.4, p.y + 0.5, p.z + 3.2), lookFrom: p, text: 'Su padre le encargó reunir los últimos piñones del pewen para la celebración.' },
+  ], () => { state = 'play'; document.body.classList.add('playing'); $('hud').classList.add('on'); hint('Sigue el sendero hacia el norte, al bosque de pewenes · WASD para moverte', 9); ui.unlock('leftraru', 'curinancu', 'nahuelbuta'); });
 }
 function outro() {
   state = 'cine'; ui.show(null); document.body.classList.remove('playing'); $('hud').classList.remove('on');
@@ -79,6 +67,7 @@ addEventListener('keydown', (e) => {
   if (e.code === 'Enter') { if (state === 'title') intro(); else cine.skip(); }
   if (state === 'play' && e.code === 'KeyN') { ui.show('notas'); ui.seen(); }
   if (state === 'play' && e.code === 'KeyB') ui.show('bolsa');
+  if (state === 'play' && e.code === 'KeyM') ui.show('mapa');
   if (e.code === 'Escape') ui.show(null);
   if (['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
 });
@@ -110,8 +99,7 @@ function updatePlayer(dt) {
   const m = ctrl.computedMovement(), p = pp();
   player.grounded = ctrl.computedGrounded();
   if (player.grounded && player.vy < 0) player.vy = -1;
-  let nx = p.x + m.x, ny = p.y + m.y, nz = p.z + m.z; const r = Math.hypot(nx, nz);
-  if (r > PLAY_RADIUS) { nx *= PLAY_RADIUS / r; nz *= PLAY_RADIUS / r; }
+  let nx = p.x + m.x, ny = p.y + m.y, nz = p.z + m.z; [nx, nz] = inBounds(nx, nz);
   if (ny < height(nx, nz) - 2) ny = height(nx, nz) + FEET + 0.2; // red de seguridad
   pBody.setNextKinematicTranslation({ x: nx, y: ny, z: nz });
   physics.timestep = dt; physics.step();
@@ -119,9 +107,10 @@ function updatePlayer(dt) {
   // animación procedural
   const t = pp(); boy.g.position.set(t.x, t.y - FEET, t.z); boy.g.rotation.y = player.facing;
   player.phase += dt * (2.5 + player.speed * 1.9);
-  const amp = Math.min(1, player.speed / 3.3) * (player.speed > 4.5 ? 1.0 : 0.6), sw = Math.sin(player.phase) * amp;
-  if (player.grounded) { boy.legL.rotation.x = sw; boy.legR.rotation.x = -sw; boy.armL.rotation.x = -sw * 0.8; boy.armR.rotation.x = sw * 0.8; boy.armL.rotation.z = 0.12; boy.armR.rotation.z = -0.12; boy.g.position.y += Math.abs(Math.cos(player.phase)) * 0.04 * amp; }
-  else { boy.legL.rotation.x = 0.5; boy.legR.rotation.x = -0.35; boy.armL.rotation.x = boy.armR.rotation.x = -0.4; boy.armL.rotation.z = 0.9; boy.armR.rotation.z = -0.9; }
+  const amp = Math.min(1, player.speed / 3.3) * (player.speed > 4.5 ? 1.0 : 0.6);
+  animatePerson(boy, player.phase, amp, !player.grounded);
+  if (player.grounded) boy.g.position.y += Math.abs(Math.cos(player.phase)) * 0.04 * amp;
+  for (const k in POI) if (state === 'play' && Math.hypot(t.x - POI[k].x, t.z - POI[k].z) < 20) ui.discover(k);
 }
 
 function updateCamera(dt) {
@@ -144,26 +133,28 @@ function updateItems() {
       if (got === 1) ui.unlock('pinon', 'pewen', 'ngen'); if (got === 2) ui.unlock('copihue'); if (got === 3) ui.unlock('pewen-sagrado'); if (got === 4) ui.unlock('traro');
       $('count').textContent = got;
       if (got === world.items.length) outro();
-      else if (got === world.items.length - 1) hint('Falta uno. Busca las rocas escalonadas y sube saltando.', 8);
+      else if (got === world.items.length - 1) hint('Falta uno. Está sobre las rocas, al fondo del bosque: sube saltando.', 8);
     }
   }
 }
 
-const ui = createUI({ world, playRadius: PLAY_RADIUS, onToast: (t) => hint(t, 5) });
+const ui = createUI({ world, onToast: (t) => hint(t, 5) });
 $('total').textContent = world.items.length;
 $('loading').remove();
 window.__g = { ui, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, intro, paused: false, keys,
   tp(x, y, z) { pBody.setTranslation({ x, y, z }, true); player.vy = 0; },
+  view(x, y, z, lx, ly, lz) { camera.position.set(x, y, z); camera.lookAt(lx, ly, lz); world.update(0, time, camera.position, pp()); renderer.render(scene, camera); return renderer.domElement.toDataURL('image/jpeg', 0.9); },
   snap() { renderer.render(scene, camera); return renderer.domElement.toDataURL('image/jpeg', 0.9); } };
 
-const clock = new THREE.Clock();
+const clock = new THREE.Clock(); let fpsT = 0, fpsN = 0, pr = Math.min(devicePixelRatio, 1.5);
 function tick(dt) {
   time += dt; shared.uTime.value = time;
   updatePlayer(dt);
   if (cine.active) cine.update(dt);
-  else if (state === 'title') { const a = time * 0.05; camera.position.set(Math.sin(a) * 30, height(0, 0) + 9, Math.cos(a) * 30); camera.lookAt(0, height(0, 0) + 6, 0); }
+  else if (state === 'title') { const a = time * 0.04 + 2.4; camera.position.set(Math.sin(a) * 48, 15, Math.cos(a) * 48); camera.lookAt(0, 5, 0); }
   else updateCamera(dt);
   updateItems();
+  world.update(dt, time, camera.position, pp());
   if (state === 'play') ui.drawMap(pp(), player.facing);
   if (hintT > 0 && (hintT -= dt) <= 0) $('hint').classList.remove('on');
 }
@@ -174,5 +165,7 @@ function frame() {
   if (window.__g.paused) return;
   tick(dt);
   renderer.render(scene, camera);
+  // si el equipo va lento, baja la resolución de a poco
+  fpsT += dt; fpsN++; if (fpsT > 3) { if (fpsN / fpsT < 27 && pr > 0.6) { pr = Math.max(0.6, pr - 0.25); renderer.setPixelRatio(pr); } fpsT = fpsN = 0; }
 }
 frame();

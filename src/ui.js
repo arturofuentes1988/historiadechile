@@ -1,4 +1,6 @@
 // Interfaz: minimapa (abajo a la izquierda), notas y bolsa (abajo a la derecha).
+import { B, POI, PATHS, height, zone, WATER_Y } from './terrain.js';
+import { RUKAS, CORRAL } from './village.js';
 const $ = (id) => document.getElementById(id);
 const svg = (body, bg = '#e9dcb8') => `<svg viewBox="0 0 200 150" xmlns="http://www.w3.org/2000/svg"><rect width="200" height="150" fill="${bg}"/>${body}</svg>`;
 
@@ -34,20 +36,33 @@ export const NOTES = {
 const CATS = { mitologia: 'Mitología', personajes: 'Personajes', naturaleza: 'Naturaleza' };
 const ITEMS = { pinon: { name: 'Piñones', art: 'pinon', text: 'Semillas del pewen, para la celebración.' } };
 
-export function createUI({ world, playRadius, onToast }) {
+export function createUI({ world, onToast }) {
   const unlocked = new Set(), bag = {};
   let open = null, cat = 'naturaleza', sel = null;
 
-  // ---------- minimapa ----------
-  const cv = $('minimap'), S = cv.width, ctx = cv.getContext('2d'), k = S / 2 / (playRadius + 6);
-  const base = document.createElement('canvas'); base.width = base.height = S;
-  const b = base.getContext('2d'), P = (x, z) => [S / 2 + x * k, S / 2 + z * k];
-  b.fillStyle = '#b79f68'; b.fillRect(0, 0, S, S);
-  b.fillStyle = '#a9b45e'; b.beginPath(); b.arc(S / 2, S / 2, 30 * k, 0, 7); b.fill();
-  b.fillStyle = '#2f5530'; for (const t of world.trees) { const [x, y] = P(t.x, t.z); b.beginPath(); b.arc(x, y, 3.2, 0, 7); b.fill(); }
-  b.fillStyle = '#8b8d93'; for (const r of world.rocks) { const [x, y] = P(r.x, r.z); b.fillRect(x - 3, y - 3, 6, 6); }
-  const ZOOM = 2.4; // el mapa sigue al jugador, que queda siempre al centro
+  // ---------- minimapa: se pinta a partir del terreno real ----------
+  const cv = $('minimap'), S = cv.width, ctx = cv.getContext('2d'), k = 2; // 2 píxeles por metro
+  const base = document.createElement('canvas'); base.width = (B.x1 - B.x0) * k; base.height = (B.z1 - B.z0) * k;
+  const b = base.getContext('2d'), P = (x, z) => [(x - B.x0) * k, (z - B.z0) * k];
+  const MC = { forest: [150, 140, 96], grassy: [156, 162, 98], needles: [168, 132, 92], moss: [112, 138, 92], meadow: [186, 190, 110], marsh: [128, 160, 128], earth: [206, 178, 124], path: [226, 204, 158], pebble: [190, 186, 166], bed: [110, 160, 186], rock: [150, 148, 142], alpine: [176, 172, 118] };
+  { const img = b.createImageData(base.width, base.height), d = img.data;
+    for (let py = 0, o = 0; py < base.height; py++) for (let px = 0; px < base.width; px++, o += 4) {
+      const x = B.x0 + px / k, z = B.z0 + py / k, h = height(x, z), c = h < WATER_Y ? [104, 156, 186] : MC[zone(x, z, h, 1)], sh = 0.9 + Math.min(0.2, h * 0.004) + ((px * 7 + py * 13) % 5) * 0.012;
+      d[o] = c[0] * sh; d[o + 1] = c[1] * sh; d[o + 2] = c[2] * sh; d[o + 3] = 255;
+    }
+    b.putImageData(img, 0, 0);
+  }
+  b.strokeStyle = '#7a5a34'; b.lineWidth = 2; b.setLineDash([5, 5]);
+  for (const path of PATHS) { b.beginPath(); path.forEach(([x, z], n) => { const [a, c] = P(x, z); n ? b.lineTo(a, c) : b.moveTo(a, c); }); b.stroke(); }
+  b.setLineDash([]);
+  for (const t of world.trees) { const [x, y] = P(t.x, t.z); b.fillStyle = t.kind === 'roble' ? '#b98a2e' : t.kind === 'pewen' ? '#2c4f30' : '#3f6b3a'; b.beginPath(); b.arc(x, y, t.kind === 'giant' ? 5 : 3, 0, 7); b.fill(); }
+  b.fillStyle = '#6a4a2a'; b.strokeStyle = '#2a1c10'; b.lineWidth = 1.5;
+  for (const r of RUKAS) { const [x, y] = P(r.x, r.z); b.beginPath(); b.ellipse(x, y, 7 * r.s, 6 * r.s, 0, 0, 7); b.fill(); b.stroke(); }
+  { const [x, y] = P(CORRAL.x, CORRAL.z); b.beginPath(); b.arc(x, y, CORRAL.r * k, 0, 7); b.stroke(); }
+  const found = new Set(); let last = { x: 0, z: 0, f: 0 };
+  const ZOOM = 1.5; // el mapa sigue al jugador, que queda siempre al centro
   function drawMap(pos, facing) {
+    last = { x: pos.x, z: pos.z, f: facing };
     const [px, py] = P(pos.x, pos.z), R = S / 2 - 3;
     ctx.clearRect(0, 0, S, S); ctx.save();
     ctx.beginPath(); ctx.arc(S / 2, S / 2, R, 0, 7); ctx.clip();
@@ -71,7 +86,16 @@ export function createUI({ world, playRadius, onToast }) {
   // ---------- paneles ----------
   const panel = $('panel'), body = $('panel-body');
   function render() {
-    if (open === 'bolsa') {
+    if (open === 'mapa') {
+      $('panel-title').textContent = 'Mapa';
+      body.innerHTML = '<canvas id="bigmap" style="max-width:100%;max-height:62vh;border:3px solid #3a2c18;border-radius:8px;display:block;margin:auto"></canvas><p class="muted" style="margin:10px 0 0">Los lugares aparecen con su nombre cuando los visitas.</p>';
+      const c = $('bigmap'); c.width = base.width; c.height = base.height; const g = c.getContext('2d'); g.drawImage(base, 0, 0);
+      g.textAlign = 'center'; g.font = 'italic bold 19px Georgia'; g.lineWidth = 5; g.strokeStyle = '#e9dcb8'; g.fillStyle = '#3a2c18';
+      for (const key in POI) { const [x, y] = P(POI[key].x, POI[key].z), t = found.has(key) ? POI[key].name : '?'; g.strokeText(t, x, y - 14); g.fillText(t, x, y - 14); }
+      for (const it of world.items) if (!it.taken) { const [x, y] = P(it.base.x, it.base.z); g.fillStyle = '#ffd24a'; g.strokeStyle = '#5a3a08'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 6, 0, 7); g.fill(); g.stroke(); }
+      const [px, py] = P(last.x, last.z); g.translate(px, py); g.rotate(-last.f); g.fillStyle = '#fff'; g.strokeStyle = '#1b1f1a'; g.lineWidth = 3;
+      g.beginPath(); g.moveTo(0, 18); g.lineTo(11, -12); g.lineTo(0, -5); g.lineTo(-11, -12); g.closePath(); g.fill(); g.stroke();
+    } else if (open === 'bolsa') {
       const ids = Object.keys(bag);
       $('panel-title').textContent = 'Bolsa';
       body.innerHTML = '<div class="grid">' + (ids.length ? ids.map((id) => `<div class="slot" title="${ITEMS[id].text}">${ART[ITEMS[id].art]}<b>${ITEMS[id].name}</b><i>× ${bag[id]}</i></div>`).join('') : '') +
@@ -95,6 +119,7 @@ export function createUI({ world, playRadius, onToast }) {
   $('btn-notas').addEventListener('click', () => show('notas'));
   $('btn-bolsa').addEventListener('click', () => show('bolsa'));
   $('panel-close').addEventListener('click', () => show(null));
+  cv.addEventListener('click', () => show('mapa'));
 
   return {
     drawMap, show,
@@ -107,6 +132,7 @@ export function createUI({ world, playRadius, onToast }) {
       }
       $('btn-notas').classList.add('new'); if (open) render();
     },
+    discover(key) { if (found.has(key)) return; found.add(key); onToast(`Lugar descubierto: ${POI[key].name}`); },
     addItem(id) { bag[id] = (bag[id] || 0) + 1; if (open) render(); },
     seen() { $('btn-notas').classList.remove('new'); },
     state: { unlocked, bag },
