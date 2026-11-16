@@ -62,7 +62,7 @@ function enter() {
 }
 
 // ---------- opciones (se guardan en este navegador) ----------
-const opts = Object.assign({ calidad: 'auto', detalle: '1', sens: 1, inv: false, mini: true }, JSON.parse(localStorage.getItem('leftraru.opciones') || '{}'));
+const opts = Object.assign({ calidad: 'auto', detalle: '1', sens: 1, inv: false, mini: true, musica: 0.6 }, JSON.parse(localStorage.getItem('leftraru.opciones') || '{}'));
 // teclas: cada acción tiene una tecla que se puede cambiar en Menú → Controles
 const ACTIONS = [['adelante', 'Adelante', 'KeyW'], ['atras', 'Atrás', 'KeyS'], ['izquierda', 'Izquierda', 'KeyA'], ['derecha', 'Derecha', 'KeyD'], ['correr', 'Correr', 'ShiftLeft'], ['saltar', 'Saltar', 'Space'],
   ['observar', 'Observar o hablar', 'KeyE'], ['camIzq', 'Girar a la izquierda', 'KeyZ'], ['camDer', 'Girar a la derecha', 'KeyC'], ['cuaderno', 'Cuaderno', 'KeyN'], ['misiones', 'Misiones', 'KeyJ'], ['saberes', 'Saberes', 'KeyK'],
@@ -94,6 +94,7 @@ function setMenu(on) {
 }
 $('o-calidad').value = opts.calidad; $('o-detalle').value = opts.detalle; $('o-sens').value = opts.sens; $('o-inv').checked = opts.inv; $('o-mini').checked = opts.mini;
 $('o-calidad').onchange = (e) => { opts.calidad = e.target.value; applyOpts(); };
+$('o-musica').value = opts.musica; $('o-musica').oninput = (e) => { opts.musica = +e.target.value; applyOpts(); };
 $('o-detalle').onchange = (e) => { opts.detalle = e.target.value; applyOpts(); };
 $('o-sens').oninput = (e) => { opts.sens = parseFloat(e.target.value); applyOpts(); };
 $('o-inv').onchange = (e) => { opts.inv = e.target.checked; applyOpts(); };
@@ -336,8 +337,16 @@ function tick(dt) {
   if (hintT > 0 && (hintT -= dt) <= 0) $('hint').classList.remove('on');
 }
 window.__g.advance = (secs) => { for (let t = 0; t < secs; t += 1 / 60) tick(1 / 60); }; // para pruebas automáticas
+// ---------- música: una melodía en la portada y otra al estar en la aldea; se cruzan suavemente ----------
+const tracks = {}; for (const k of ['portada', 'aldea']) { const a = new Audio(`assets/musica/${k}.mp3`); a.loop = true; a.volume = 0; a.preload = k === 'portada' ? 'auto' : 'none'; tracks[k] = a; }
+let audioOK = false; for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { audioOK = true; }, { once: true }); // el navegador solo deja sonar después del primer gesto
+function updateMusic(dt) {
+  const p = pp(), want = state === 'title' ? 'portada' : Math.hypot(p.x, p.z) < 50 ? 'aldea' : null;
+  for (const k in tracks) { const a = tracks[k], goal = k === want ? opts.musica : 0, v = a.volume + Math.sign(goal - a.volume) * Math.min(Math.abs(goal - a.volume), dt * 0.25);
+    a.volume = Math.min(1, Math.max(0, v)); if (goal > 0 && a.paused && audioOK) a.play().catch(() => {}); if (goal === 0 && a.volume === 0 && !a.paused) a.pause(); }
+}
 function frame() {
-  requestAnimationFrame(frame);
+  requestAnimationFrame(frame); updateMusic(1 / 60);
   const dt = Math.min(0.05, clock.getDelta());
   if (window.__g.paused) return;
   if (!menuOpen || state === 'title') tick(dt); // el juego se detiene con el menú abierto

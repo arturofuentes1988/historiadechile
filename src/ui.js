@@ -1,7 +1,7 @@
 // Interfaz: minimapa, cuaderno de investigación (notas con foto y puntos), bolsa y mapa.
 import { B, POI, PATHS, height, zone, WATER_Y } from './terrain.js';
 import { RUKAS, CORRAL } from './village.js';
-import { NOTES, CATS, LEVELS, SKILLS, MISSIONS } from './notes.js';
+import { NOTES, CATS, LEVELS, SKILLS, MISSIONS, FOTOS } from './notes.js';
 const $ = (id) => document.getElementById(id);
 const BY = Object.fromEntries(NOTES.map((n) => [n.id, n]));
 const SAVE = 'leftraru.cuaderno';
@@ -71,7 +71,8 @@ export function createUI({ world, onToast, onClose, onSkill }) {
 
   // ---------- paneles ----------
   const panel = $('panel'), body = $('panel-body');
-  const thumb = (n) => found[n.id] ? `<img src="${found[n.id]}" alt="">` : '<span class="q">?</span>';
+  const pic = (id) => (found[id] === undefined ? '' : FOTOS.has(id) ? `assets/cuaderno/${id}.webp` : found[id]); // foto fija y detallada; los lugares, la que tomaste
+  const thumb = (n) => pic(n.id) ? `<img src="${pic(n.id)}" alt="" loading="lazy">` : '<span class="q">?</span>';
   function render() {
     panel.dataset.kind = open;
     if (open === 'mapa') {
@@ -120,7 +121,7 @@ export function createUI({ world, onToast, onClose, onSkill }) {
         '<div class="tabs">' + Object.keys(CATS).map((c) => `<button data-cat="${c}" class="${c === cat ? 'on' : ''}">${CATS[c].name}<small>${NOTES.filter((n) => n.cat === c && found[n.id] !== undefined).length} / ${NOTES.filter((n) => n.cat === c).length}</small></button>`).join('') + '</div>' +
         `<p class="muted how">${CATS[cat].how} Cada descubrimiento suma ${CATS[cat].pts} puntos.</p>` +
         '<div class="dex"><div class="cards">' + list.map((n) => `<button class="card${found[n.id] !== undefined ? '' : ' locked'}${n.id === sel ? ' on' : ''}" data-note="${n.id}">${thumb(n)}<span>${found[n.id] !== undefined ? n.title : 'Sin descubrir'}</span></button>`).join('') + '</div>' +
-        (cur ? (have ? `<article>${found[cur.id] ? `<img src="${found[cur.id]}" alt="${cur.title}">` : ''}<h3>${cur.title}</h3><h4>${cur.sub}</h4><p>${cur.text}</p><em>+${CATS[cur.cat].pts} puntos de investigación</em></article>`
+        (cur ? (have ? `<article>${pic(cur.id) ? `<img src="${pic(cur.id)}" alt="${cur.title}">` : ''}<h3>${cur.title}</h3><h4>${cur.sub}</h4><p>${cur.text}</p><em>+${CATS[cur.cat].pts} puntos de investigación</em></article>`
           : `<article class="unknown"><div class="big-q">?</div><h3>Sin descubrir</h3><p>${cur.hint || 'Sigue explorando.'}</p></article>`)
           : '<article class="unknown"><p>Elige una ficha. Las que aún no descubres te dan una pista de dónde buscar.</p></article>') + '</div>';
     }

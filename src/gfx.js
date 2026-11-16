@@ -489,19 +489,22 @@ export function createPost(renderer, scene, camera) {
 // ---------- llamas: láminas cruzadas con la forma del fuego animada en el shader ----------
 export function flameMaterial() {
   return new THREE.ShaderMaterial({
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: { uTime },
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, uniforms: { uTime, tFuego: { value: photo('fuego', { cut: true }) } },
     vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
-    fragmentShader: /* glsl */ `uniform float uTime; varying vec2 vUv;
+    fragmentShader: /* glsl */ `uniform float uTime; uniform sampler2D tFuego; varying vec2 vUv;
       float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7))) * 43758.5453); }
       float vn(vec2 p){ vec2 i = floor(p), f = fract(p); f = f*f*(3.-2.*f); return mix(mix(hash(i), hash(i+vec2(1,0)), f.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y); }
       void main(){
-        float t = uTime, x = vUv.x - 0.5 + (vn(vec2(vUv.y*3. - t*1.8, t*0.6)) - 0.5) * 0.22 * vUv.y;   // la llama se ladea al subir
-        float n = vn(vec2(x*5., vUv.y*3.5 - t*2.8))*0.6 + vn(vec2(x*11. + 3., vUv.y*8. - t*4.6))*0.4;
-        float body = (1. - vUv.y) * (1. - abs(x) * (2.3 + vUv.y*2.6));                                   // ancha abajo, en punta arriba
-        float f = smoothstep(0.2, 0.62, body*0.95 + n*0.5 - vUv.y*0.28) * smoothstep(0., 0.07, vUv.y);
-        vec3 col = mix(vec3(0.9, 0.16, 0.02), vec3(1.0, 0.62, 0.12), smoothstep(0.2, 0.7, f));
-        col = mix(col, vec3(1.0, 0.92, 0.6), smoothstep(0.75, 1., f) * (1. - vUv.y));                    // corazón casi blanco
-        gl_FragColor = vec4(col * f * 2.4, f);
+        // llamas fotografiadas: dos tomas superpuestas que se deforman hacia arriba, y un ruido que les come las puntas
+        float t = uTime; vec2 uv = vUv;
+        float w1 = (vn(vec2(uv.y*3.5 - t*2.2, t*0.7)) - 0.5) * 0.2 * uv.y, w2 = (vn(vec2(uv.y*5. - t*3.1 + 9., t*0.9)) - 0.5) * 0.26 * uv.y;
+        float s1 = 0.86 + 0.1*sin(t*5.3), s2 = 0.8 + 0.12*sin(t*4.1 + 2.);                              // cada toma se estira y encoge
+        vec3 a = texture2D(tFuego, vec2(uv.x + w1, min(uv.y / s1, 1.) * 0.96 + 0.02)).rgb * step(uv.y, s1);
+        vec3 b = texture2D(tFuego, vec2(1. - uv.x + w2, min(uv.y / s2, 1.) * 0.96 + 0.02)).rgb * step(uv.y, s2);
+        float n = vn(vec2(uv.x*6. + w1*8., uv.y*5. - t*3.4))*0.6 + vn(vec2(uv.x*13., uv.y*10. - t*5.5))*0.4;
+        float eat = smoothstep(0.0, 0.4, n + (1. - uv.y)*1.25 - 0.55);
+        vec3 col = max(a, b*0.85) * eat * smoothstep(0., 0.04, uv.y) * smoothstep(0., 0.12, uv.x) * smoothstep(0., 0.12, 1. - uv.x);
+        gl_FragColor = vec4(col * 1.9, 1.);
         ${END}
       }`,
   });

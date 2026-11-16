@@ -106,27 +106,27 @@ export function buildWorld(scene, RAPIER, physics) {
   const FL = [0xfff2a0, 0xffffff, 0xd9a8e6];
   for (let i = 0, n = 150000 * Q; i < n; i++) {
     const x = R(B.x0 + 2, B.x1 - 2), z = R(B.z0 + 2, B.z1 - 2), h = height(x, z);
-    if (h < WATER_Y + 0.05 || pathDist(x, z) < 1.3) continue;
+    if (h < WATER_Y + 0.05 || pathDist(x, z) < 1.3 || Math.hypot(x, z) < 15) continue; // el patio del fogón es tierra pisada: nada crece ahí
     const zk = zone(x, z, h, normalAt(x, z)[1]), u = rng();
-    if (zk === 'meadow') { if (u < 0.66) flora.scatter('grass', x, h, z, R(0.9, 1.5), 0xd8e8b0); else if (u < 0.9) flora.scatter('grass2', x, h, z, R(0.8, 1.3), 0xe8e4b8); else flora.scatter('flower', x, h, z, R(0.8, 1.2), FL[(u * 1000 | 0) % 3]); }
-    else if (zk === 'grassy') { if (u < 0.5) flora.scatter('grass', x, h, z, R(0.8, 1.3)); else if (u < 0.75) flora.scatter('grass2', x, h, z, R(0.7, 1.2), 0xe6dca8); else if (u < 0.78) flora.scatter('flower', x, h, z, R(0.7, 1), FL[(u * 1000 | 0) % 3]); }
+    if (zk === 'meadow') { if (u < 0.5) flora.scatter('grass', x, h, z, R(0.9, 1.5), 0xd8e8b0); else if (u < 0.72) flora.scatter('grass2', x, h, z, R(0.8, 1.3), 0xe8e4b8); else if (u < 0.8) flora.scatter('murtilla', x, h, z, R(0.9, 1.5)); else if (u < 0.9) continue; else flora.scatter('flower', x, h, z, R(0.8, 1.2), FL[(u * 1000 | 0) % 3]); }
+    else if (zk === 'grassy') { if (u < 0.3) flora.scatter('grass', x, h, z, R(0.8, 1.3)); else if (u < 0.5) flora.scatter('grass2', x, h, z, R(0.7, 1.2), 0xe6dca8); else if (u < 0.56) flora.scatter('michay', x, h, z, R(0.8, 1.3)); else if (u < 0.64) flora.scatter('murtilla', x, h, z, R(0.9, 1.6)); else if (u < 0.68) flora.scatter('flower', x, h, z, R(0.7, 1), FL[(u * 1000 | 0) % 3]); }
     else if (zk === 'alpine') { if (u < 0.35) flora.scatter('grass', x, h, z, R(0.6, 1.0), 0xe6dc9a); else if (u < 0.6) flora.scatter('grass2', x, h, z, R(0.6, 1.0), 0xe8d898); }
-    else if (zk === 'marsh') { if (u < 0.45) flora.scatter('reed', x, h, z, R(0.8, 1.3)); else if (u < 0.75) flora.scatter('grass', x, h, z, R(1, 1.5), 0xb8d8a8); }
-    else if (zk === 'pebble') { if (u < 0.1) flora.scatter('reed', x, h, z, R(0.7, 1.1)); }
-    else if (zk === 'earth') { if (u < 0.14 && Math.hypot(x, z) > 9) flora.scatter(u < 0.1 ? 'grass' : 'grass2', x, h, z, R(0.4, 0.8), 0xe0d8a0); } // matas ralas donde la tierra no está tan pisada
-    else if (zk === 'forest') { if (u < 0.2) flora.scatter('grass', x, h, z, R(0.6, 1.0), 0xc8d8a0); else if (u < 0.27) flora.scatter('fern', x, h, z, R(0.8, 1.3)); else if (u < 0.55) flora.scatter('litter', x, h, z, R(0.7, 1.3), near(x, z, 6) && rng() < 0.5 ? 0xf0d890 : 0xb09070); }
-    else if (zk === 'moss') { if (u < 0.3) flora.scatter('fern', x, h, z, R(1, 1.9)); else if (u < 0.36) flora.scatter('grass', x, h, z, R(0.6, 1), 0xa8c090); else if (u < 0.55) flora.scatter('litter', x, h, z, R(0.7, 1.3), 0x8a8a5a); }
+    else if (zk === 'marsh') { if (u < 0.45) flora.scatter('reed', x, h, z, R(0.8, 1.3)); else if (u < 0.65) flora.scatter('grass', x, h, z, R(1, 1.5), 0xb8d8a8); else if (u < 0.71) flora.scatter('nalca', x, h, z, R(0.9, 1.6)); else if (u < 0.74) flora.scatter('chilco', x, h, z, R(0.8, 1.2)); }
+    else if (zk === 'pebble') { if (u < 0.1) flora.scatter('reed', x, h, z, R(0.7, 1.1)); else if (u < 0.125) flora.scatter('nalca', x, h, z, R(0.8, 1.4)); }
+    else if (zk === 'earth') { if (u < 0.06) flora.scatter(u < 0.04 ? 'grass' : 'grass2', x, h, z, R(0.4, 0.8), 0xe0d8a0); } // matas ralas donde la tierra no está tan pisada
+    else if (zk === 'forest') { if (u < 0.1) flora.scatter('grass', x, h, z, R(0.6, 1.0), 0xc8d8a0); else if (u < 0.2) flora.scatter('fern', x, h, z, R(0.8, 1.3)); else if (u < 0.225) flora.scatter('chilco', x, h, z, R(0.8, 1.3)); else if (u < 0.25) flora.scatter('murtilla', x, h, z, R(0.9, 1.5)); else if (u < 0.27) flora.scatter('michay', x, h, z, R(0.8, 1.2)); else if (u < 0.55) flora.scatter('litter', x, h, z, R(0.7, 1.3), near(x, z, 6) && rng() < 0.5 ? 0xf0d890 : 0xb09070); }
+    else if (zk === 'moss') { if (u < 0.3) flora.scatter('fern', x, h, z, R(1, 1.9)); else if (u < 0.33) flora.scatter('chilco', x, h, z, R(0.9, 1.4)); else if (u < 0.345) flora.scatter('nalca', x, h, z, R(0.9, 1.5)); else if (u < 0.36) flora.scatter('grass', x, h, z, R(0.6, 1), 0xa8c090); else if (u < 0.55) flora.scatter('litter', x, h, z, R(0.7, 1.3), 0x8a8a5a); }
     else if (zk === 'needles') { if (u < 0.05) flora.scatter('fern', x, h, z, R(0.7, 1.1)); else if (u < 0.09) flora.scatter('grass', x, h, z, R(0.5, 0.8), 0xd8d0a0); else if (u < 0.2) flora.scatter('litter', x, h, z, R(0.7, 1.2), 0x9a7050); }
   }
   for (let i = 0, n = 2600 * Q; i < n; i++) {
     const x = R(B.x0 + 2, B.x1 - 2), z = R(B.z0 + 2, B.z1 - 2), h = height(x, z);
     if (h < WATER_Y - 0.9 || Math.hypot(x, z) < 34 || pathDist(x, z) < 4 || pin.some((p) => Math.hypot(x - p.x, z - p.z) < 4)) continue;
     const zk = zone(x, z, h, normalAt(x, z)[1]), u = rng();
-    if (zk === 'forest' || zk === 'grassy') { if (u < 0.3) flora.tree('bush', x, h, z, R(0.9, 1.9)); else if (u < 0.45) flora.scatter('quila', x, h, z, R(0.8, 1.3)); else if (u < 0.6) flora.rock(x, h - 0.1, z, R(0.4, 1.3)); else if (u < 0.66) flora.log(x, h, z, R(3, 6), R(0.25, 0.45), R(0, 3.14)); }
+    if (zk === 'forest' || zk === 'grassy') { if (u < 0.2) flora.tree('bush', x, h, z, R(0.9, 1.9)); else if (u < 0.45) flora.scatter('quila', x, h, z, R(0.8, 1.3)); else if (u < 0.6) flora.rock(x, h - 0.1, z, R(0.4, 1.3)); else if (u < 0.66) flora.log(x, h, z, R(3, 6), R(0.25, 0.45), R(0, 3.14)); }
     else if (zk === 'moss') { if (u < 0.18) flora.tree('bush', x, h, z, R(1.2, 2.2)); else if (u < 0.3) flora.scatter('quila', x, h, z, R(1, 1.5)); else if (u < 0.45) flora.log(x, h, z, R(4, 8), R(0.4, 0.7), R(0, 3.14)); else if (u < 0.65) flora.rock(x, h - 0.1, z, R(0.6, 1.6), { color: 0xa4b094 }); }
     else if (zk === 'needles') { if (u < 0.25) flora.rock(x, h - 0.1, z, R(0.4, 1.1)); }
     else if (zk === 'pebble' || zk === 'bed') { if (u < 0.8) flora.rock(x, h - 0.15, z, R(0.3, 1.0), { squash: 0.6, color: 0xc4c0b4 }); }
-    else if (zk === 'meadow') { if (u < 0.5) flora.tree('bush', x, h, z, R(1, 1.8)); }
+    else if (zk === 'meadow') { if (u < 0.25) flora.tree('bush', x, h, z, R(1, 1.8)); }
     else if (zk === 'alpine' || zk === 'rock') { if (u < 0.7) flora.rock(x, h - 0.15, z, R(0.5, 1.9)); }
   }
 
@@ -142,11 +142,12 @@ export function buildWorld(scene, RAPIER, physics) {
   const life = buildLife({ scene, rng, emit, trees, physics, RAPIER });
 
   // ---------- piñones (coleccionables) ----------
-  const pm = new THREE.MeshStandardMaterial({ color: 0xd99a2c, emissive: 0xb86a10, emissiveIntensity: 1.3, roughness: 0.5 }), gm = new THREE.MeshBasicMaterial({ color: 0xffe9a0, transparent: true, opacity: 0.28, depthWrite: false });
+  const pm = new THREE.MeshStandardMaterial({ color: 0xd99a2c, emissive: 0xb86a10, emissiveIntensity: 1.3, roughness: 0.5 }), gm = new THREE.MeshBasicMaterial({ color: 0xffe9a0, transparent: true, opacity: 0.1, depthWrite: false });
   const items = pin.map((p) => {
     const g = new THREE.Group(); g.position.copy(p);
-    const core = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.5, 8), pm); core.rotation.z = Math.PI; core.castShadow = true;
-    g.add(core, new THREE.Mesh(new THREE.SphereGeometry(0.42, 12, 8), gm)); scene.add(g);
+    // tres piñones de verdad: alargados, en cuña, con la punta clara
+    const core = new THREE.Group(); for (let i = 0; i < 3; i++) { const sd = new THREE.Mesh(new THREE.LatheGeometry([[0, 0], [0.035, 0.03], [0.06, 0.14], [0.07, 0.26], [0.05, 0.36], [0.02, 0.4], [0, 0.41]].map(([r, y]) => new THREE.Vector2(r, y)), 10), pm); sd.scale.z = 0.62; sd.rotation.set(0.5, i * 2.1, 0.35 * (i - 1)); sd.position.set(Math.cos(i * 2.1) * 0.07, -0.2, Math.sin(i * 2.1) * 0.07); sd.castShadow = true; core.add(sd); }
+    g.add(core, new THREE.Mesh(new THREE.SphereGeometry(0.42, 24, 16), gm)); scene.add(g);
     return { mesh: g, base: p.clone(), taken: false };
   });
 

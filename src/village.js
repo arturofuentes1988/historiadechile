@@ -53,9 +53,12 @@ export function buildVillage({ scene, rng, bag, flora, physics, RAPIER, fixed })
   // ---------- fogón central ----------
   { const { x, z } = FOGON, y = height(x, z);
     for (let i = 0; i < 9; i++) { const a = (i / 9) * 6.28; flora.rock(x + Math.cos(a) * 0.95, y - 0.05, z + Math.sin(a) * 0.95, R(0.24, 0.34), { squash: 0.8, color: 0xa8a298 }); }
-    for (let i = 0; i < 4; i++) bag.add(cyl, M(x, y + 0.14, z, i * 0.8, 0.07, 1.3, 0.07, PI / 2 - 0.25), 0x241a12);
-    for (let i = 0; i < 5; i++) { const a = 0.6 + i * 1.2; bag.add(cyl, M(x + Math.cos(a) * 2.9, y + 0.2, z + Math.sin(a) * 2.9, PI / 2 - a, 0.22, 1.7, 0.22, PI / 2), WOOD); } // troncos para sentarse
-    const ash = add(new THREE.CircleGeometry(1.5, 20), new THREE.MeshStandardMaterial({ color: 0x2a2622, roughness: 1 }), x, y + 0.03, z); ash.rotation.x = -PI / 2; ash.castShadow = false;
+    // leños del fuego, carbonizados, y troncos con corteza para sentarse alrededor
+    const corte = new THREE.MeshStandardMaterial({ map: photo('madera'), color: 0xd8c0a0, roughness: 1 }), lg = new THREE.CylinderGeometry(1, 1, 1, 14);
+    const tronco = [MAT.bark(0xb0a898, photo('corteza-roble')), corte, corte], quemado = [MAT.bark(0x4a4038, photo('corteza-roble')), new THREE.MeshStandardMaterial({ map: photo('madera'), color: 0x3a3028, roughness: 1 })]; quemado.push(quemado[1]);
+    for (let i = 0; i < 5; i++) { const l = add(lg, quemado, x + Math.cos(i * 1.26) * 0.28, y + 0.13 + (i % 2) * 0.1, z + Math.sin(i * 1.26) * 0.28); l.scale.set(0.085, 1.25, 0.085); l.rotation.set(PI / 2 - 0.22, 0, 0); l.rotation.order = 'YXZ'; l.rotation.y = -i * 1.26 + PI / 2; }
+    for (let i = 0; i < 5; i++) { const a = 0.6 + i * 1.2, l = add(lg, tronco, x + Math.cos(a) * 2.9, y + 0.2, z + Math.sin(a) * 2.9); l.scale.set(0.22 + (i % 2) * 0.03, 1.7, 0.22); l.rotation.order = 'YXZ'; l.rotation.set(PI / 2, -a, 0); }
+    const ash = add(new THREE.CircleGeometry(1.5, 20), new THREE.MeshStandardMaterial({ map: photo('suelo-tierra'), color: 0x5a5856, roughness: 1 }), x, y + 0.03, z); ash.rotation.x = -PI / 2; ash.castShadow = false;
     emit.fire.push([x, y + 0.2, z]); emit.smoke.push([x, y + 0.9, z, 1]);
     physics.createCollider(RAPIER.ColliderDesc.cylinder(0.35, 1.05).setTranslation(x, y + 0.35, z), fixed); // el fuego no se cruza
     for (let i = 0; i < 5; i++) { const a = 0.6 + i * 1.2; physics.createCollider(RAPIER.ColliderDesc.capsule(0.62, 0.21).setTranslation(x + Math.cos(a) * 2.9, y + 0.2, z + Math.sin(a) * 2.9).setRotation(new THREE.Quaternion().setFromEuler(new THREE.Euler(PI / 2, 0, a - PI / 2, 'ZYX'))), fixed); }

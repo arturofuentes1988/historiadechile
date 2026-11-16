@@ -43,6 +43,14 @@ export const NOTES = [
     text: 'Bambú nativo que crece en matas espesas de cañas delgadas y arqueadas. Forma marañas difíciles de cruzar, donde se esconden el pudú y los pájaros. Con sus cañas se hacen lanzas, flautas y canastos. Florece muy rara vez, y cuando lo hace, toda la mata muere.' },
   { id: 'copihue', cat: 'naturaleza', title: 'Copihue', sub: 'Kopiwe · Lapageria rosea', hint: 'Trepa por algunos troncos del bosque. Busca sus flores rojas.',
     text: 'Enredadera del bosque húmedo que trepa por los troncos buscando la luz. Sus flores rojas con forma de campana cuelgan desde el final del verano hasta el invierno, cuando casi nada más florece. Su fruto es dulce y se come.' },
+  { id: 'murtilla', cat: 'naturaleza', title: 'Murtilla', sub: 'Üñü · Ugni molinae', hint: 'Mata baja de frutos rojos, en claros y laderas soleadas.',
+    text: 'Arbusto bajo de hojas chicas y brillantes. A fines del verano se llena de frutos rojos, redondos y muy perfumados, que se comen frescos o se guardan secos para el invierno. Crece en los claros y en los bordes del bosque, donde llega el sol.' },
+  { id: 'michay', cat: 'naturaleza', title: 'Michay', sub: 'Berberis darwinii', hint: 'Arbusto espinoso de flores anaranjadas, en lo más soleado.',
+    text: 'Arbusto de hojas duras y oscuras, con espinas en el borde, que se cubre de racimos de flores anaranjadas. Sus frutos son pequeños y azulados, y se comen. De la raíz y la corteza se saca un tinte amarillo para la lana.' },
+  { id: 'chilco', cat: 'naturaleza', title: 'Chilco', sub: 'Fuchsia magellanica', hint: 'Flores colgantes rojas y moradas, cerca del agua.',
+    text: 'Arbusto de ramas delgadas y arqueadas que crece donde hay humedad: junto a los esteros y en lo más sombrío del bosque. Sus flores cuelgan como gotas, rojas por fuera y moradas por dentro, y los picaflores las visitan todo el día. Donde hay chilco, hay agua cerca.' },
+  { id: 'nalca', cat: 'naturaleza', title: 'Nalca', sub: 'Pangue · Gunnera tinctoria', hint: 'Hojas enormes junto al agua y en el menoko.',
+    text: 'Planta de hojas enormes, ásperas y redondas, tan grandes que sirven para taparse de la lluvia. Los tallos tiernos se pelan y se comen, ácidos y frescos. Con las hojas se cubre la comida que se cuece bajo tierra, y de la raíz se saca un tinte oscuro para la lana.' },
   { id: 'weke', cat: 'naturaleza', title: 'Weke', sub: 'Chilihueque', hint: 'En el corral de la aldea.',
     text: 'El animal doméstico del pueblo mapuche antes de la llegada de los caballos y las ovejas. No se sabe con certeza qué animal era: pudo ser una llama traída del norte, pero el estudio de huesos antiguos hallados en la isla Mocha apunta a un guanaco domesticado. Da lana para tejer y es señal de riqueza: se entrega en acuerdos y matrimonios, y se sacrifica en ceremonias importantes. Los blancos son los más apreciados. Una familia tiene pocos, y su carne solo se come en ocasiones especiales.' },
   { id: 'pudu', cat: 'naturaleza', title: 'Pudú', sub: 'Püdu · Pudu puda', hint: 'Entre los árboles, lejos de la aldea. Huye si te acercas rápido.',
@@ -142,3 +150,6 @@ export const MISSIONS = [
   { id: 's8', title: 'El monte soleado', pts: 30, text: 'Observa los árboles de hoja dura de las laderas con sol: peumo, boldo, quillay y litre.', check: set(['peumo', 'boldo', 'quillay', 'litre']) },
   { id: 's7', title: 'Plantas del suelo', pts: 30, text: 'Observa las plantas pequeñas: helecho, juncos, flores, maqui, quila y copihue.', check: set(['helecho', 'junco', 'flores', 'maqui', 'quila', 'copihue']) },
 ];
+
+// Entradas del cuaderno que tienen una fotografía fija y detallada (assets/cuaderno); los lugares se fotografían en el juego.
+export const FOTOS = new Set(NOTES.filter((n) => n.cat !== 'lugares').map((n) => n.id));
