@@ -3,6 +3,7 @@
 //
 // Uso:  node tools/kie-personaje.mjs millaray        pide todas las opciones de Millaray
 //       node tools/kie-personaje.mjs millaray 1      pide solo esa
+//       node tools/kie-personaje.mjs curinancu       pide las de Curiñancu
 //       node tools/kie-personaje.mjs leftraru c      (sin nombre, se entiende Leftraru)
 //
 // La clave se lee de la variable de entorno KIE_API_KEY o del archivo .env.local de la carpeta del juego (git lo ignora).
@@ -33,12 +34,23 @@ const LEFTRARU = POSE
 const MILLARAY = POSE
   + 'The figure is a Mapuche woman of about thirty-five from southern Chile in the year 1545, a weaver and mother: medium height, about 1.56 m, strong arms and shoulders from working at the loom, warm brown skin. Lively dark eyes, arched eyebrows, a dry half-smile. Her fingertips are stained with red and ochre plant dye. '
   + 'She wears a black hand-woven wool wrap dress (küpam): one rectangular cloth wrapped around the body and fastened over the left shoulder, leaving both arms bare and fully visible, reaching mid-calf so that the ankles and bare feet show. A wide red hand-woven sash with small geometric white and black figures is wound around her waist. Barefoot. ';
+// Curiñancu: el padre, lonko de la aldea. Lo más elaborado de la aldea va en su makuñ, pero corto y abierto a los lados, para
+// que al hacer el modelo se distingan los brazos. El bastón de mando no va en la imagen (las manos, vacías): se le pone después.
+const CURINANCU = POSE
+  + 'The figure is a Mapuche man of about forty from southern Chile in the year 1545, the head of his community (lonko) and a father: tall for his people, about 1.68 m, broad back and shoulders, large strong hands, warm brown skin, calm upright posture. Firm jaw, marked cheekbones, deep wrinkles beside the eyes, a steady serene gaze, closed mouth. No beard, no moustache. Straight thick black hair, long, reaching the middle of the back, with the first grey hairs at the temples. '
+  + 'A light cream hand-woven wool headband (trarilonko) across the forehead. He wears a short black hand-woven wool poncho (makuñ), open at the sides and reaching only to the waist so that both arms are bare and fully visible from the shoulders, over a dark brown wool wrap (chamal) tied at the waist with a woven sash and reaching just below the knees, so that the calves and bare feet show. Barefoot. ';
 const PERSONAJES = {
   leftraru: { a: `${LEFTRARU} ${FOTO}`, c: `${LEFTRARU} ${PINTADO}` },
   millaray: {
     // 1: tal como la ficha. 2: con el cintillo rojo que lleva hoy en el juego y cobre, que las crónicas sí mencionan en las mujeres.
     1: `${MILLARAY}Black hair in two long thick braids hanging in front over the shoulders down to the waist, each tied at the end with red wool yarn; no headband. A short black wool shawl with a red border (ikülla) hangs behind her shoulders down her back like a short cape, not covering the arms. A necklace of dark seeds and small white shells. ${SIN} ${PINTADO}`,
     2: `${MILLARAY}Black hair in two long thick braids hanging down her back, a red hand-woven wool headband across the forehead like her son's. Small hammered copper disc earrings and a thin copper bracelet on one wrist. A short black wool shawl with a red border (ikülla) rests on her shoulders and is knotted at the chest, short enough that the arms are visible from above the elbow. A necklace of small white shells and green stone beads. ${SIN} ${PINTADO}`,
+  },
+  curinancu: {
+    // 1: tal como la ficha: franjas rojas y blancas, pelo suelto, collar de llanka. 2: con figuras escalonadas blancas en el makuñ
+    // (el poncho de los lonkos; que sea así de antiguo está por confirmar), el pelo amarrado atrás y un disco de cobre al cuello.
+    1: `${CURINANCU}His hair hangs loose behind the shoulders. The black poncho has three horizontal woven bands across the chest and back: red, white and red, each a few centimetres wide, finely woven. A necklace of polished green stone beads (llanka) lies on his chest. ${SIN} ${PINTADO}`,
+    2: `${CURINANCU}His hair is gathered behind and tied low at the nape with a cream wool cord, falling down his back. The black poncho carries one wide horizontal band of white stepped-diamond figures between two thin red stripes across the chest and back, the most elaborate weaving of the village; the headband has small red stepped figures. A necklace of green stone beads (llanka) with one small hammered copper disc at the centre. The woven sash at his waist is red and white. ${SIN} ${PINTADO}`,
   },
 };
 
