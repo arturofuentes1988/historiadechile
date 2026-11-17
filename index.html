@@ -182,7 +182,7 @@
   .opt select { font: inherit; font-size: 15px; width: 190px; background: #0c0a08; color: var(--cream); border: 1px solid #c98a4a88; padding: 7px 8px; }
   .opt input[type=range] { width: 190px; accent-color: var(--copper); } .opt input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--copper); }
   .opt .btn { padding: 9px 16px; font-size: 14px; }
-  #o-reload { font-size: 14px; margin: 8px 0 0; color: #e9b03a; } #o-reload button { margin-left: 8px; }
+  #o-reload, .o-reload { font-size: 14px; margin: 8px 0 0; color: #e9b03a; } #o-reload button, .o-reload button { margin-left: 8px; }
   h3.sec { margin: 20px 0 8px; font-weight: normal; color: var(--copper); letter-spacing: .14em; text-transform: uppercase; font-size: 14px; }
   .keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 15px; margin: 0; align-items: center; } .keys dt { color: var(--copper); white-space: nowrap; } .keys dd { margin: 0; color: var(--cream); }
   .mrow { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 22px; } .mrow.top { grid-template-columns: 1fr 1fr 1fr; margin: 0 0 6px; } .mrow .btn { padding: 12px 10px; font-size: 15px; }
@@ -293,6 +293,7 @@
   <h3 class="sec">Imagen</h3>
   <label class="opt"><div><b>Calidad de imagen</b><small>Nitidez de la imagen. Bájala si el juego va lento.</small></div><select id="o-calidad"><option value="auto">Automática</option><option value="0.6">Baja (más rápido)</option><option value="1">Media</option><option value="1.5">Alta</option></select></label>
   <label class="opt"><div><b>Detalle del mundo</b><small>Cantidad de árboles, pasto y piedras. Se aplica al recargar.</small><p id="o-reload" hidden>Falta recargar para aplicarlo. <button id="o-recargar" class="btn">Recargar ahora</button></p></div><select id="o-detalle"><option value="0.5">Bajo (más rápido)</option><option value="1">Normal</option><option value="1.5">Alto</option></select></label>
+  <label class="opt"><div><b>Texturas livianas</b><small>Usa las imágenes del suelo, las cortezas y las telas a la mitad de tamaño: ocupa menos memoria y carga más rápido, pero de muy cerca se ven menos nítidas. Para equipos modestos. Se aplica al recargar.</small><p id="o-reload-tex" class="o-reload" hidden>Falta recargar para aplicarlo. <button id="o-recargar-tex" class="btn">Recargar ahora</button></p></div><input id="o-tex" type="checkbox"></label>
   <label class="opt"><div><b>Pantalla completa</b><small>Oculta la barra del navegador. También con su tecla.</small></div><input id="o-full" type="checkbox"></label>
   <label class="opt"><div><b>Mostrar minimapa</b><small>El mapa redondo de la esquina inferior izquierda.</small></div><input id="o-mini" type="checkbox"></label>
   <label class="opt"><div><b>Medidor de rendimiento</b><small>Un recuadro arriba a la derecha con los cuadros por segundo y cuánto le cuesta a este equipo dibujar el juego.</small></div><input id="o-medidor" type="checkbox"></label>

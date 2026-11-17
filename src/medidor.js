@@ -4,7 +4,7 @@
 // procesador (preparar cada cuadro) o la tarjeta de video (pintarlo).
 const num = (v, d = 1) => v.toFixed(d).replace('.', ',');
 
-export function createMeter(renderer, { calidad = () => '' } = {}) {
+export function createMeter(renderer, { calidad = () => '', texturas = () => '' } = {}) {
   const gl = renderer.getContext(), timer = gl.getExtension('EXT_disjoint_timer_query_webgl2'), dbg = gl.getExtension('WEBGL_debug_renderer_info');
   // el nombre de la tarjeta, sin los datos técnicos que le agrega el navegador
   let card = dbg ? String(gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL)) : ''; const m = card.match(/^ANGLE \([^,]*,\s*([^,]*)/); if (m) card = m[1];
@@ -35,6 +35,7 @@ export function createMeter(renderer, { calidad = () => '' } = {}) {
       fila('Triángulos', `${num(acc.tris / n / 1e6, 2)} millones`) +
       fila('Órdenes de dibujo', `${Math.round(acc.calls / n)}`) +
       fila('Imagen', `${cv.width} × ${cv.height}${calidad() === 'auto' ? ' (automática)' : ''}`) +
+      (texturas() ? fila('Texturas', texturas()) : '') +
       fila('Tarjeta', card) +
       `<div style="margin-top:5px;padding-top:5px;border-top:1px solid #f1e4c433;color:${color};max-width:290px">${frase}</div>`;
     zero();

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import RAPIER from '@dimforge/rapier3d-compat';
-import { uTime, uPlayer, buildLights, createPost, assets } from './gfx.js';
+import { uTime, uPlayer, buildLights, createPost, assets, TEX_LIVIANAS, texLivianasPorDefecto } from './gfx.js';
 import { buildWorld } from './world.js';
 import { height, inBounds, POI, CERRO } from './terrain.js';
 import { buildPerson, animatePerson, slopeAhead } from './life.js';
@@ -110,9 +110,9 @@ function intro() {
 
 // ---------- opciones (se guardan en este navegador) ----------
 const snd = createSound();
-const opts = Object.assign({ calidad: 'auto', detalle: '1', sens: 1, inv: false, mini: true, medidor: false, musica: 0.6, efectos: 0.7 }, JSON.parse(localStorage.getItem('leftraru.opciones') || '{}')); snd.volume = opts.efectos;
+const opts = Object.assign({ calidad: 'auto', detalle: '1', sens: 1, inv: false, mini: true, medidor: false, texLivianas: texLivianasPorDefecto, musica: 0.6, efectos: 0.7 }, JSON.parse(localStorage.getItem('leftraru.opciones') || '{}')); snd.volume = opts.efectos;
 // medidor de rendimiento: se enciende en Opciones, o con ?medir en la dirección (para probar en otro equipo sin entrar al menú)
-const medidor = createMeter(renderer, { calidad: () => opts.calidad }), MEDIR = new URLSearchParams(location.search).has('medir');
+const medidor = createMeter(renderer, { calidad: () => opts.calidad, texturas: () => (TEX_LIVIANAS ? 'livianas' : 'nítidas') }), MEDIR = new URLSearchParams(location.search).has('medir');
 // teclas: cada acción tiene una tecla que se puede cambiar en Menú → Controles
 const ACTIONS = [['adelante', 'Adelante', 'KeyW'], ['atras', 'Atrás', 'KeyS'], ['izquierda', 'Izquierda', 'KeyA'], ['derecha', 'Derecha', 'KeyD'], ['correr', 'Correr', 'ShiftLeft'], ['saltar', 'Saltar', 'Space'],
   ['observar', 'Observar o hablar', 'KeyE'], ['accion', 'Recoger, usar, hacer', 'KeyR'], ['camIzq', 'Girar a la izquierda', 'KeyZ'], ['camDer', 'Girar a la derecha', 'KeyC'], ['cuaderno', 'Cuaderno', 'KeyN'], ['misiones', 'Misiones', 'KeyJ'], ['saberes', 'Saberes', 'KeyK'],
@@ -135,7 +135,7 @@ let menuOpen = false, pr = Math.min(devicePixelRatio, 1.5);
 function applyOpts() {
   pr = opts.calidad === 'auto' ? Math.min(devicePixelRatio, 1.5) : Math.min(parseFloat(opts.calidad), Math.max(1, devicePixelRatio));
   renderer.setPixelRatio(pr); post.resize(); document.body.classList.toggle('nomini', !opts.mini); medidor.show(opts.medidor || MEDIR);
-  $('o-reload').hidden = opts.detalle === detalleInicial;
+  $('o-reload').hidden = opts.detalle === detalleInicial; $('o-reload-tex').hidden = opts.texLivianas === TEX_LIVIANAS; // las texturas se eligen al cargar: si la opción ya no calza con lo cargado, falta recargar
   localStorage.setItem('leftraru.opciones', JSON.stringify(opts));
 }
 function setMenu(on) {
@@ -152,6 +152,7 @@ $('o-sens').oninput = (e) => { opts.sens = parseFloat(e.target.value); applyOpts
 $('o-inv').onchange = (e) => { opts.inv = e.target.checked; applyOpts(); };
 $('o-mini').onchange = (e) => { opts.mini = e.target.checked; applyOpts(); };
 $('o-medidor').checked = opts.medidor; $('o-medidor').onchange = (e) => { opts.medidor = e.target.checked; applyOpts(); };
+$('o-tex').checked = opts.texLivianas; $('o-tex').onchange = (e) => { opts.texLivianas = e.target.checked; applyOpts(); }; $('o-recargar-tex').onclick = () => location.reload();
 $('o-recargar').onclick = () => location.reload();
 $('m-portada').onclick = () => { try { if (document.fullscreenElement) document.exitFullscreen(); } catch { /* nada */ } location.reload(); }; // salir del juego: vuelve a la portada
 $('m-continuar').onclick = () => setMenu(false);
