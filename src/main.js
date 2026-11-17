@@ -54,33 +54,39 @@ let state = 'title', got = 0, time = 0;
 const cine = new Cinematic(camera);
 const pp = () => pBody.translation();
 
-// De la portada al juego: «Entrar al mundo» lleva a elegir «Historia», y el capítulo parte con un relato breve
-// que cuenta dónde estamos y a quién vamos a acompañar. Si ya habías empezado, se entra directo al juego.
-let coverT = 0;
+// De la portada al juego: «Entrar al mundo» lleva a elegir «Historia». El capítulo parte con un prólogo —una hoja
+// escrita que va pasando y cuenta dónde estamos— y dos planos que llevan del relato al juego. Si ya habías empezado, se entra directo.
+let coverT = 0, prologo = false;
 function coverPage(n) { coverT = performance.now(); $('cover-1').hidden = n !== 1; $('cover-2').hidden = n !== 2; }
 function enter() {
   if (state !== 'title' || performance.now() - coverT < 250) return;
   setMenu(false); $('title').classList.add('hide');
   if (!document.fullscreenElement) { try { document.documentElement.requestFullscreen?.()?.catch?.(() => {}); } catch { /* el navegador no lo permitió */ } }
   lock();
-  if (acc.f.m1) play(); else intro();
+  if (acc.f.m1 || acc.f.tu) play(); else abrirPrologo();
 }
 function play() {
   state = 'play'; document.body.classList.add('playing'); $('hud').classList.add('on'); lock();
-  hint(`${keyName(opts.keys.adelante)}${keyName(opts.keys.izquierda)}${keyName(opts.keys.atras)}${keyName(opts.keys.derecha)} para caminar · ${keyName(opts.keys.observar)} para hablar con alguien u observar algo de cerca`, 7);
   if (!ui.has('leftraru')) { const t = pp(); ui.discover('leftraru', photo({ x: t.x, y: t.y + 0.25, z: t.z }, { dist: 2.3, up: 0.2, fov: 40, self: true })); }
 }
-// Capítulo 1: el relato de entrada. Cada plano es una frase; Enter lo salta.
+// Prólogo: la hoja sube sola y se aleja hacia el fondo, con la aldea a oscuras detrás. Dura lo que tarda en pasar
+// entera, a un ritmo que se alcanza a leer; Enter o un clic la saltan.
+function abrirPrologo() {
+  state = 'cine'; prologo = true; const el = $('prologo'), hoja = el.querySelector('.papel');
+  el.style.setProperty('--dur', `${Math.round(Math.max(36, (hoja.offsetHeight + innerHeight) / 40))}s`);
+  el.classList.add('on'); hoja.addEventListener('animationend', cerrarPrologo, { once: true });
+}
+function cerrarPrologo() { if (!prologo) return; prologo = false; $('prologo').classList.remove('on'); intro(); }
+$('prologo').addEventListener('click', cerrarPrologo);
+// Del relato al juego: Leftraru, y su madre que lo llama.
 function intro() {
-  state = 'cine'; const cap = $('capitulo'); cap.classList.add('on'); setTimeout(() => cap.classList.remove('on'), 5600);
-  const G = (x, y, z) => V3(x, height(x, z) + y, z), b = pp(), fx = Math.sin(player.facing), fz = Math.cos(player.facing), eye = V3(b.x, b.y - FEET + 1.02, b.z), c0 = camera.position.clone();
+  state = 'cine';
+  const G = (x, y, z) => V3(x, height(x, z) + y, z), b = pp(), fx = Math.sin(player.facing), fz = Math.cos(player.facing), eye = V3(b.x, b.y - FEET + 1.02, b.z);
   const front = (d, side, up) => V3(b.x + fx * d + fz * side, b.y - FEET + up, b.z + fz * d - fx * side);
   cine.play([
-    { dur: 8, from: c0, to: V3(c0.x * 1.3, 21, c0.z * 1.3), lookFrom: V3(0, 4, 0), lookTo: V3(0, 6, 0), text: 'Nahuelbuta, invierno de 1545. Entre el mar y la cordillera, un valle de bosques y pewenes.' },
-    { dur: 10, from: G(13.5, 3.4, 11), to: G(7.5, 2.1, 6.2), lookFrom: G(0, 1.0, 0), text: 'Aquí vive un lof mapuche: unas pocas familias alrededor de un fuego que nunca se apaga. Lejos, al norte, han llegado hombres extraños. Aquí nadie los ha visto todavía.' },
-    { dur: 9, from: front(3.6, 0.9, 1.35), to: front(2.1, 0.35, 1.1), lookFrom: eye, text: 'Este es Leftraru, «traro veloz». Tiene once años y es hijo de Curiñancu, el lonko. Un día, la historia lo llamará Lautaro.' },
-    { dur: 9, from: G(-6.7, 1.75, -1.9), to: G(-7.9, 1.45, -3.5), lookFrom: G(-9.9, 1.15, -5.1), text: 'Faltan pocos días para el We Tripantu, la noche más larga del año, y toda la aldea se prepara. Su madre lo está llamando.' },
-  ], () => { cap.classList.remove('on'); play(); });
+    { dur: 5.5, from: front(3.6, 0.9, 1.35), to: front(2.2, 0.4, 1.1), lookFrom: eye, text: 'Leftraru.' },
+    { dur: 6.5, from: G(-6.7, 1.75, -1.9), to: G(-7.9, 1.45, -3.5), lookFrom: G(-9.9, 1.15, -5.1), text: '—¡Leftraru! Ven acá, que te necesito.' },
+  ], play);
 }
 
 // ---------- opciones (se guardan en este navegador) ----------
@@ -184,9 +190,9 @@ const herePhoto = () => { draw(); return grab(); };
 // ---------- observar y conversar (tecla E) ----------
 let near = null, scanT = 0, talk = null, misT = 0, lastAviso = null, still = 0;
 function applySkills() { explorer.reach = ui.skill('vista') ? 1.7 : 1; world.life.shyR = ui.skill('pudu') ? 3.5 : 9; }
-function say() { snd.play(talk.i ? 'hablar-sigue' : 'hablar', talk.i ? 0.5 : 0.6, 0.95 + Math.random() * 0.1); document.body.classList.add('talking'); const t = talk; $('dlg-name').textContent = t.name; $('dlg-text').textContent = t.lines[t.i]; $('dlg-more').textContent = `${keyName(opts.keys.observar)} · ${t.i < t.lines.length - 1 ? 'seguir' : 'cerrar'}`; $('dialogo').classList.add('on'); }
+function say() { snd.play(talk.i ? 'hablar-sigue' : 'hablar', talk.i ? 0.4 : 0.55, 0.96 + Math.random() * 0.08); document.body.classList.add('talking'); const t = talk; $('dlg-name').textContent = t.name; $('dlg-text').textContent = t.lines[t.i]; $('dlg-more').textContent = `${keyName(opts.keys.observar)} · ${t.i < t.lines.length - 1 ? 'seguir' : 'cerrar'}`; $('dialogo').classList.add('on'); }
 function interact() {
-  if (talk) { if (++talk.i < talk.lines.length) return say(); const t = talk; talk = null; $('dialogo').classList.remove('on'); document.body.classList.remove('talking'); if (t.done) t.done(); return; }
+  if (talk) { if (++talk.i < talk.lines.length) return say(); const t = talk; talk = null; $('dialogo').classList.remove('on'); document.body.classList.remove('talking'); snd.play('hablar-fin', 0.3); if (t.done) t.done(); return; }
   if (!near || state !== 'play' || ui.open || focus) return;
   const c = near; near = null; $('prompt').classList.remove('on');
   if (c.person) {
@@ -201,33 +207,51 @@ $('dialogo').addEventListener('click', () => interact());
 
 
 // Escenas dentro del juego: se quita la interfaz, corre la lista de planos y se vuelve a jugar
-function playScene(shots) {
+function playScene(shots, after) {
   setMenu(false); state = 'cine'; ui.show(null); document.body.classList.remove('playing'); $('hud').classList.remove('on');
   near = doable = null; for (const id of ['prompt', 'prompt2', 'hint']) $(id).classList.remove('on'); // nada de la interfaz queda encima de la escena
-  cine.play(shots, () => { state = 'play'; document.body.classList.add('playing'); $('hud').classList.add('on'); lock(); });
+  cine.play(shots, () => { state = 'play'; document.body.classList.add('playing'); $('hud').classList.add('on'); lock(); if (after) after(); });
 }
-function outro() { // al recoger el último piñón
-  const p = V3(pp().x, pp().y + 0.6, pp().z), dir = world.volcano.clone().sub(p).setY(0).normalize();
+// Al recoger el último piñón: Leftraru agradece al pewen y, en la aldea, su madre lo espera. (Se muestra cuando ya pisa el suelo.)
+let outroPend = false;
+function outro() {
+  const b = pp(), fx = Math.sin(player.facing), fz = Math.cos(player.facing), eye = V3(b.x, b.y - FEET + 1.0, b.z), G = (x, y, z) => V3(x, height(x, z) + y, z);
+  const front = (d, side, up) => V3(b.x + fx * d + fz * side, b.y - FEET + up, b.z + fz * d - fx * side);
   playScene([
-    { dur: 6, from: p.clone().addScaledVector(dir, 3.5).add(V3(0, 0.6, 0)), to: p.clone().addScaledVector(dir, 2.6).add(V3(0, 0.3, 0)), lookFrom: p, text: 'El último piñón. Suficientes para todos.' },
-    { dur: 9, from: p.clone().addScaledVector(dir, -4).add(V3(0, 2, 0)), to: p.clone().addScaledVector(dir, -8).add(V3(0, 36, 0)), lookFrom: p.clone().add(V3(0, 6, 0)), lookTo: world.volcano, text: 'En la aldea, su madre lo espera junto al telar.' },
+    { dur: 7, from: front(2.7, -1.3, 0.95), to: front(2.1, 1.1, 1.2), lookFrom: eye, text: 'El último piñón. Leftraru le da las gracias al pewen: se llevó lo que el árbol dejó caer, y nada más.' },
+    { dur: 7, from: G(-7.2, 1.7, -2.4), to: G(-8.2, 1.45, -3.7), lookFrom: G(-9.9, 1.15, -5.1), text: 'En la aldea, su madre ya puso el agua al fuego. Es hora de volver.' },
   ]);
 }
 // Momentos de la historia que piden una escena. 'cima': lo que el padre le muestra desde el cerro Treng Treng.
-function story(kind) {
+// Los dos se paran juntos en el borde de la cima y se los ve de espaldas, con lo que miran al frente:
+// primero el valle y el mar, después el volcán; al final, de frente, cuando le explica su nombre.
+function story(kind, after) {
   if (kind !== 'cima') return;
-  const c = top();
+  const pa = world.life.actors.find((a) => a.name === 'Curiñancu'), sx = pa.x, sz = pa.z, sy = height(sx, sz), vol = world.volcano;
+  const unit = (x, z) => { const l = Math.hypot(x, z) || 1; return [x / l, z / l]; }, dV = unit(vol.x - sx, vol.z - sz), dA = unit(-sx, -sz); // hacia el volcán y hacia la aldea
+  const turn = ([dx, dz]) => () => { // los dos, hombro con hombro, mirando hacia (dx, dz)
+    const bx = sx - dz * 0.95, bz = sz + dx * 0.95, f = Math.atan2(dx, dz);
+    pBody.setTranslation({ x: bx, y: height(bx, bz) + FEET + 0.05, z: bz }, true); player.vy = 0; player.speed = 0; player.facing = f; pa.face = f; pa.quieto = true;
+  };
+  const back = ([dx, dz], d, up) => V3(sx - dz * 0.45 - dx * d, sy + up, sz + dx * 0.45 - dz * d); // detrás de ellos, entre los dos
   playScene([
-    { dur: 8, from: V3(c.x + 2, c.y + 3, c.z + 1), to: V3(c.x, c.y + 7, c.z + 2), lookFrom: V3(-3000, 160, c.z + 700), lookTo: V3(-3000, -40, c.z + 300), text: 'Hacia donde se esconde el sol, el lafken: el mar y su gente.' },
-    { dur: 8, from: V3(c.x - 1, c.y + 1, c.z), to: V3(c.x - 4, c.y + 3, c.z + 1), lookFrom: world.volcano.clone().add(V3(0, -260, 500)), lookTo: world.volcano, text: 'Hacia donde nace, el volcán. Y en medio, el humo de las rukas: todo su mundo.' },
-  ]);
+    { dur: 8, on: turn(dA), from: back(dA, 4.4, 2.3), to: back(dA, 3.3, 2.0), lookFrom: V3(sx + dA[0] * 60, sy - 7, sz + dA[1] * 60), text: '—Mira. Hacia donde se esconde el sol está el lafken, el mar. Y allá abajo, el humo de nuestras rukas.' },
+    { dur: 9, on: turn(dV), from: back(dV, 7.2, 2.75), to: back(dV, 5.6, 2.4), lookFrom: V3(vol.x, 140, vol.z), lookTo: V3(vol.x, 185, vol.z), text: '—Hacia donde nace, el volcán, la casa del pillán. Todo lo que hay entre uno y otro es tu mundo.' },
+    { dur: 9, from: back(dV, -3.0, 1.25), to: back(dV, -2.3, 1.2), lookFrom: V3(sx - dV[1] * 0.45, sy + 1.25, sz + dV[0] * 0.45), text: '—¿Ves al traro, dando vueltas sobre el cerro? Mira mucho antes de bajar, y cuando baja, no falla. Por él te llamas Leftraru: traro veloz.' },
+  ], after);
 }
+// Lo que alguien dice al pasar, sin detener el juego (el padre mientras suben al cerro): aparece abajo unos segundos.
+let subT = 0;
+function murmur(name, text, secs = 7) { const s = $('sub'); s.textContent = `${name}: ${text}`; s.classList.add('on'); subT = secs; snd.play('hablar-sigue', 0.35, 0.9); }
 // Mensajes de arriba. hint lo muestra de inmediato; los avisos que llegan juntos (un hallazgo, una misión
 // cumplida, la misión que sigue) hacen fila para que cada uno alcance a leerse.
 let hintT = 0, toastGap = 0; const toasts = [];
 function showHint(txt, secs) { $('hint').textContent = txt; $('hint').classList.add('on'); hintT = secs; toastGap = Math.min(secs, 2.8); }
 function hint(txt, secs) { if (toasts.length) toasts.push([txt, secs]); else showHint(txt, secs); }
-function toast(txt, secs = 5, ding = false) { toasts.push([txt, secs, ding]); }
+function toast(txt, secs = 5, sound = null) { toasts.push([txt, secs, sound]); } // sound: qué toque lo acompaña
+// cada tipo de aviso suena distinto: algo nuevo en el cuaderno, un encargo o una misión por hacer, algo logrado
+const TOQUE = { hallazgo: ['ui-hallazgo', 0.5], encargo: ['ui-mision', 0.5], mision: ['ui-mision', 0.5], logro: ['ui-logro', 0.55], foto: ['ui-cuaderno', 0.5] };
+const teclas = (s) => s.replace(/\{(\w+)\}/g, (_, a) => keyName(opts.keys[a] || a)); // {observar} → la tecla que tenga esa acción
 
 addEventListener('keydown', (e) => {
   if (rebinding) { // se está eligiendo una tecla nueva para una acción
@@ -235,7 +259,7 @@ addEventListener('keydown', (e) => {
     if (e.code !== 'Escape') { const old = opts.keys[rebinding]; for (const a in opts.keys) if (opts.keys[a] === e.code) opts.keys[a] = old; opts.keys[rebinding] = e.code; applyOpts(); } // si ya estaba en uso, se intercambian
     rebinding = null; drawKeys(); return;
   }
-  if (e.code === 'Enter' && !e.repeat) { if (state === 'title') { if (!menuOpen) { if ($('cover-2').hidden) coverPage(2); else enter(); } } else if (!talk) cine.skip(); }
+  if (e.code === 'Enter' && !e.repeat) { if (state === 'title') { if (!menuOpen) { if ($('cover-2').hidden) coverPage(2); else enter(); } } else if (prologo) cerrarPrologo(); else if (!talk) cine.skip(); }
   if (is(e, 'pantalla') && !e.repeat) toggleFull();
   if (is(e, 'menu') && !e.repeat && state !== 'cine') { if (ui.open) ui.show(null); setMenu(!menuOpen); return; }
   if (menuOpen) { if (e.code === 'Escape') { if (page === 'controles') menuPage('opciones'); else setMenu(false); } return; }
@@ -293,7 +317,9 @@ function updatePlayer(dt) {
     $('mis-title').textContent = m ? m.title : 'Explora libremente'; $('mis-prog').textContent = m && m.prog[2] > 1 ? `${m.prog[1]} / ${m.prog[2]}` : '';
     // cuando la historia avanza un paso, se avisa qué sigue (después de los avisos de lo recién logrado)
     const av = m ? m.aviso : 'Hasta aquí llega la historia por ahora: pronto llegarán los invitados de la costa. Mientras tanto, explora el valle y termina tus encargos.';
-    if (av && av !== lastAviso) { lastAviso = av; toast(av, 10); }
+    const list = (Array.isArray(av) ? av : [av]).map(teclas), key = list.join('|');
+    if (key !== lastAviso) { lastAviso = key; list.forEach((t, n) => toast(t, 10, n ? null : 'mision')); }
+    else if (m && m.fijo && hintT < 0.6 && !toasts.length) showHint(list[0], 8); // el paso del tutorial sigue a la vista hasta que lo haces
     ui.marks = ui.skill('rastro') ? explorer.hints(t) : [];
   }
   // ¿hay algo cerca que observar o alguien con quien hablar?
@@ -349,20 +375,21 @@ function updateFocus(dt) {
 
 function updateItems() {
   const t = pp(), on = acc.f.m1 === 1; // los piñones se recogen mientras dura el encargo de Millaray
+  if (outroPend && player.grounded && state === 'play' && !talk) { outroPend = false; outro(); }
   for (const [i, it] of world.items.entries()) {
     it.off = !on; it.mesh.visible = on && !it.taken; if (it.taken || !on) continue;
     it.mesh.position.y = it.base.y + Math.sin(time * 2 + it.base.x) * 0.15; it.mesh.rotation.y = time * 1.5;
     if (state === 'play' && Math.hypot(t.x - it.base.x, t.y - it.base.y + 0.3, t.z - it.base.z) < 1.25) {
       if (!ui.has('pinon')) ui.discover('pinon', photo({ x: it.base.x, y: it.mesh.position.y, z: it.base.z }, { dist: 1.5, up: 0.25, fov: 34 }));
-      it.taken = true; it.mesh.visible = false; got++; ui.addItem('pinon'); acc.pin(i);
-      if (got === world.items.length) outro();
+      it.taken = true; it.mesh.visible = false; got++; ui.addItem('pinon'); acc.pin(i); snd.play('pinon', 0.6, 1 + (got - 1) * 0.06);
+      if (got === world.items.length) outroPend = true;
       else if (got === world.items.length - 1) hint('Falta uno. Está sobre las rocas, al fondo del bosque: sube saltando.', 8);
     }
   }
 }
 
-const ui = createUI({ world, onToast: (t) => toast(t, 5, true), onClose: () => { if (state === 'play' && !menuOpen) lock(); }, onSkill: () => applySkills() });
-const acc = createActions({ world, ui, snd, scene, hint, player, story, pinones: () => [got, world.items.length],
+const ui = createUI({ world, onToast: (t, kind) => toast(t, 5, kind || 'hallazgo'), onClose: () => { if (state === 'play' && !menuOpen) lock(); }, onSkill: () => applySkills() });
+const acc = createActions({ world, ui, snd, scene, hint, murmur, player, story, pinones: () => [got, world.items.length],
   place: (x, z, facing) => { pBody.setTranslation({ x, y: height(x, z) + FEET + 0.05, z }, true); player.vy = 0; player.speed = 0; player.facing = facing; },
   speak: (name, lines, done) => { talk = { name, lines, i: 0, done: done || null }; say(); },
   ripple: (x, z) => { const r = ripples[ripI++ % ripples.length]; r.position.set(x, WATER_Y + 0.03, z); r.userData.t = 0; r.visible = true; } });
@@ -370,7 +397,7 @@ const explorer = createExplorer({ world, ui }); explorer.urgent = (id) => acc.wa
 for (const i of acc.pins) { const it = world.items[i]; if (it && !it.taken) { it.taken = true; it.mesh.visible = false; got++; if (acc.f.m1 === 1) ui.addItem('pinon'); } } // piñones recogidos en una sesión anterior
 drawKeys(); applySkills();
 await assets.whenLoaded(); bar(1, 'Listo'); assets.onProgress = null; $('loading').classList.add('hide'); setTimeout(() => $('loading').remove(), 700);
-window.__g = { snd, height, ui, explorer, acc, story, toasts, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
+window.__g = { snd, height, ui, explorer, acc, story, toasts, murmur, abrirPrologo, cerrarPrologo, get prologo() { return prologo; }, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
   tp(x, y, z) { pBody.setTranslation({ x, y, z }, true); player.vy = 0; },
   view(x, y, z, lx, ly, lz) { camera.position.set(x, y, z); camera.lookAt(lx, ly, lz); world.update(0, time, camera.position, pp()); draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); },
   snap() { draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); } };
@@ -381,7 +408,7 @@ function tick(dt) {
   time += dt; uTime.value = time;
   updatePlayer(dt);
   if (cine.active) cine.update(dt);
-  else if (state === 'title') { const a = time * 0.04 + 2.4; camera.position.set(Math.sin(a) * 31, 12, Math.cos(a) * 31); camera.lookAt(0, 4, 0); }
+  else if (state === 'title' || prologo) { const a = time * 0.04 + 2.4; camera.position.set(Math.sin(a) * 31, 12, Math.cos(a) * 31); camera.lookAt(0, 4, 0); }
   else if (focus) updateFocus(dt);
   else updateCamera(dt);
   updateItems();
@@ -394,17 +421,18 @@ function tick(dt) {
     // ondas en el agua al vadear
     ripT -= dt; if (player.wade > 0.05 && player.speed > 0.5 && ripT <= 0) { ripT = 0.22; const r = ripples[ripI++ % ripples.length]; r.position.set(p.x, WATER_Y + 0.03, p.z); r.userData.t = 0; r.visible = true; }
     for (const r of ripples) if (r.visible) { const k = (r.userData.t += dt) / 1.6; r.scale.setScalar(0.4 + k * 2.6); r.material.opacity = 0.5 * (1 - k); if (k >= 1) r.visible = false; } }
-  world.update(dt, time, camera.position, pp(), player.speed); lights.follow(state === 'title' ? { x: 0, y: 3, z: 0 } : pp());
+  world.update(dt, time, camera.position, pp(), player.speed); lights.follow(state === 'title' || prologo ? { x: 0, y: 3, z: 0 } : cine.active ? camera.position : pp());
   if (state === 'play') ui.drawMap(pp(), player.facing);
   if (hintT > 0 && (hintT -= dt) <= 0) $('hint').classList.remove('on');
-  toastGap -= dt; if (toasts.length && toastGap <= 0 && state === 'play' && !talk) { const [txt, secs, ding] = toasts.shift(); showHint(txt, secs); if (ding) snd.play('ui-hallazgo', 0.5); }
+  toastGap -= dt; if (toasts.length && toastGap <= 0 && state === 'play' && !talk) { const [txt, secs, sound] = toasts.shift(); showHint(txt, secs); if (TOQUE[sound]) snd.play(...TOQUE[sound]); }
+  if (subT > 0 && (subT -= dt) <= 0 && !cine.active) $('sub').classList.remove('on');
 }
 window.__g.advance = (secs) => { for (let t = 0; t < secs; t += 1 / 60) tick(1 / 60); }; // para pruebas automáticas
 // ---------- música: una melodía en la portada y otra al estar en la aldea; se cruzan suavemente ----------
 const tracks = {}; for (const k of ['portada', 'aldea', 'bosque']) { const a = new Audio(`assets/musica/${k}.mp3`); a.loop = true; a.volume = 0; a.preload = k === 'portada' ? 'auto' : 'none'; tracks[k] = a; }
 let audioOK = false; for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { audioOK = true; }, { once: true }); // el navegador solo deja sonar después del primer gesto
 function updateMusic(dt) {
-  const p = pp(), want = state === 'title' ? 'portada' : Math.hypot(p.x, p.z) < 50 ? 'aldea' : 'bosque';
+  const p = pp(), want = state === 'title' || prologo ? 'portada' : Math.hypot(p.x, p.z) < 50 ? 'aldea' : 'bosque';
   for (const k in tracks) { const a = tracks[k], goal = k === want ? opts.musica : 0, v = a.volume + Math.sign(goal - a.volume) * Math.min(Math.abs(goal - a.volume), dt * 0.25);
     a.volume = Math.min(1, Math.max(0, v)); if (goal > 0 && a.paused && audioOK) a.play().catch(() => {}); if (goal === 0 && a.volume === 0 && !a.paused) a.pause(); }
 }
@@ -419,7 +447,7 @@ function updateSound(dt) {
     if (stepD > stride) { stepD = 0; const s = player.wade > 0.05 ? 'agua' : SUELO[zone(p.x, p.z, height(p.x, p.z), normalAt(p.x, p.z)[1])] || 'tierra'; snd.play(`paso-${s}-${Math.random() < 0.5 ? 1 : 2}`, (s === 'agua' ? 0.16 : 0.1) * (player.speed > 4.5 ? 1.2 : 1), 0.9 + Math.random() * 0.2); }
     roceT -= dt; if (roceT <= 0 && (world.nearBush(p.x, p.z, 1.0) || ROCE.some((k) => world.nearPlant(k, p.x, p.z, 0.6)))) { roceT = 0.55; snd.play(`arbusto-${Math.random() < 0.5 ? 1 : 2}`, 0.16, 0.85 + Math.random() * 0.3); } // roce al pasar entre las plantas
   }
-  const k = play || state === 'cine' ? 1 : 0, bosque = Math.min(1, Math.max(0, (d0 - 30) / 40));
+  const k = (play || state === 'cine') && !prologo ? 1 : 0, bosque = Math.min(1, Math.max(0, (d0 - 30) / 40));
   snd.loop('rio', k * 0.75 * Math.max(0, 1 - Math.abs(p.z - riverZ(p.x)) / 32) ** 2);
   snd.loop('viento', k * (0.1 + bosque * 0.22));
   snd.loop('pajaros', k * (0.12 + bosque * 0.3));

@@ -14,7 +14,8 @@ Guion de trabajo (borrador 3). Un acto de **inmersión**: Leftraru es un niño q
 - **Un mapa pequeño y abierto.** La aldea al centro; alrededor, el bosque, el cerro, el humedal y el río. Todo se alcanza caminando en pocos minutos.
 - **La historia es lineal.** Las misiones principales (1 a 6) siguen la preparación del We Tripantu y van en orden: cada una se abre al terminar la anterior, y la persona con quien sigue la historia lleva una estrella dorada sobre la cabeza.
 - **Los encargos son libres.** Las misiones secundarias son opcionales y no tienen orden. No están a la vista desde el comienzo: se consiguen conversando con la gente de la aldea, y cada persona encarga las suyas.
-- **Cómo empieza:** en la portada, «Entrar al mundo» lleva a «Historia». El capítulo 1 parte con un relato breve (dónde estamos, quién es Leftraru, qué se está preparando) y termina con su madre llamándolo.
+- **Cómo empieza:** en la portada, «Entrar al mundo» lleva a «Historia». El capítulo 1 parte con un prólogo: una hoja escrita que va pasando y se aleja, y que cuenta dónde estamos, quién es Leftraru y qué se está preparando. Termina con su madre llamándolo.
+- **Se aprende jugando:** la primera conversación con Millaray enseña a moverse, hablar, observar (el telar), ayudar con las manos (la lana) y leer una misión. Cada paso queda escrito arriba hasta que se cumple.
 - **Sin presión:** nada tiene tiempo límite ni se puede fallar. Lo que mueve al jugador es la curiosidad.
 - **El mapa se va pintando:** al inicio es un pergamino casi vacío. Cada lugar visitado aparece dibujado, y los puntos de interés se marcan cuando alguien los menciona en una conversación.
 
@@ -64,7 +65,7 @@ La pregunta que mueve el capítulo es sencilla: **¿qué tiene que aprender un n
 
 ### 1 — Los piñones del pewen *(jugable)*
 **Lugar:** la aldea y el bosque de pewenes. **Con:** Millaray.
-Su madre lo llama desde el telar: vienen los parientes de la costa y los piñones no alcanzan. Hay que ir al bosque del norte, recoger los que quedan (uno está sobre unas rocas) y **volver a entregárselos**.
+Su madre lo llama desde el telar. Antes de mandarlo al bosque le pide dos cosas que sirven de tutorial: mirar bien el telar y alcanzarle la lana. Después viene el encargo: vienen los parientes de la costa y los piñones no alcanzan. Hay que ir al bosque del norte, recoger los que quedan (uno está sobre unas rocas) y **volver a entregárselos**. Al tomar el último, una escena breve lo muestra agradeciendo al pewen y a su madre esperándolo en la aldea.
 - **Enseña:** moverse, saltar, conversar, recoger.
 - **Muestra:** el pewen como árbol que alimenta; la costumbre de no sacudirlo.
 - **Enlace:** Millaray le dice que su padre subió al Treng Treng y preguntó por él.
@@ -72,7 +73,7 @@ Su madre lo llama desde el telar: vienen los parientes de la costa y los piñone
 
 ### 2 — El traro *(jugable)*
 **Lugar:** cerro Treng Treng. **Con:** Curiñancu.
-Curiñancu sale caminando de la aldea y lo espera en la cima. Arriba le muestra el mar, el volcán y el humo de las rukas, y le explica por qué se llama como el traro.
+Curiñancu lo lleva al cerro: va adelante por el sendero, a su paso, le cuenta cosas mientras suben y lo espera si se queda atrás. Arriba se paran juntos y, en una escena, le muestra el valle y el mar, el volcán, y le explica por qué se llama como el traro.
 - **Enseña:** trepar y **mirar**.
 - **Muestra:** todo su mundo desde arriba, en una escena breve.
 - **Enlace:** el padre le avisa que Ñamku amaneció con fiebre y que la machi lo anda buscando.

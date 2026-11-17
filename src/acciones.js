@@ -22,7 +22,7 @@ const FUEGO = [
 const LUGARES = { viejo: 'el bosque viejo', menoko: 'el menoko', antiguos: 'el lugar de los antiguos' };
 const HUELLAS = [[-70, -70], [40, -52], [-60, 66]];
 
-export function createActions({ world, ui, snd, scene, hint, speak, ripple, player, place, pinones, story }) {
+export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripple, player, place, pinones, story }) {
   const TRONCOS = [0, 1, 2, 3, 4].map((i) => { const a = 0.6 + i * 1.2; return { x: FOGON.x + Math.cos(a) * 2.9, z: FOGON.z + Math.sin(a) * 2.9, a }; }); // los troncos alrededor del fogón
   const S = Object.assign({ f: {}, inv: {} }, JSON.parse(localStorage.getItem(KEY) || '{}')), save = () => localStorage.setItem(KEY, JSON.stringify(S));
   const f = S.f, inv = S.inv, have = (id) => inv[id] || 0, d2 = (p, x, z) => Math.hypot(p.x - x, p.z - z), actor = (name) => world.life.actors.find((a) => a.name === name);
@@ -34,12 +34,31 @@ export function createActions({ world, ui, snd, scene, hint, speak, ripple, play
   { const d = ui.state.done; if (f.m3 || d.m2) { f.m1 = 2; f.m2 = 2; } else if (d.m1 && f.m1 !== 2) f.m1 = 2; } // partidas guardadas antes de que la historia fuera lineal
   S.pin = S.pin || []; // piñones ya recogidos
 
-  // ---------- Curiñancu sube al cerro cuando llevas los piñones, y te espera en la cima ----------
-  const padre = actor('Curiñancu'), CIMA = [CERRO[0] + 4.6, CERRO[1] - 2.6], CASA = [2, -9], SUBIDA = [[5, -4], [22, -17], [40, -30]];
-  const enCima = () => !!padre && !padre.yendo && d2(padre, CERRO[0], CERRO[1]) < 12;
-  function ponPadre(arriba) { padre.mode = 'idle'; padre.yendo = false; [padre.x, padre.z] = arriba ? CIMA : CASA; padre.face = arriba ? -Math.PI / 2 : Math.PI; padre.speed = 0; }
-  function padreSube() { if (!padre) return; padre.mode = 'walk'; padre.pts = SUBIDA; padre.i = 0; padre.wait = 0; padre.pace = 2.6; padre.yendo = true; }
-  if (padre && f.m1 === 2 && f.m2 !== 2) ponPadre(true);
+  // ---------- Curiñancu te lleva al cerro: va adelante por el sendero, a tu paso, y si te quedas atrás te espera ----------
+  // f.m2: 1 mientras suben (o te espera arriba), 2 cuando ya te mostró lo que quería.
+  const padre = actor('Curiñancu'), CIMA = [CERRO[0] + 4.6, CERRO[1] - 2.6], CASA = [2, -9];
+  // el camino: el sendero del nororiente y, arriba, un rodeo por el borde para no pasar por encima de las rocas del mirador
+  const RUTA = [[6, -5], [40, -30], [70, -55], [90, -74], [97, -81], [97.5, -90], [101, -93.5], [106.5, -93.6], CIMA];
+  const DICHOS = { 2: '¿Oyes a los choroyes? Donde gritan, hay piñones. El bosque avisa todo, si uno sabe escuchar.', 3: 'Por aquí subía yo con mi padre, cuando tenía tu edad. Y él, con el suyo.', 4: 'Este cerro salvó a nuestra gente cuando subió el mar. Por eso se llama Treng Treng.' }; // lo que va diciendo al pasar cada tramo
+  const volcan = () => Math.atan2(world.volcano.x - CIMA[0], world.volcano.z - CIMA[1]); // arriba queda mirando hacia el volcán
+  const enCima = () => !!padre && !padre.yendo && d2(padre, CIMA[0], CIMA[1]) < 3;
+  function ponPadre(arriba) { padre.mode = 'idle'; padre.yendo = false; padre.quieto = arriba; [padre.x, padre.z] = arriba ? CIMA : CASA; padre.face = arriba ? volcan() : Math.PI; padre.speed = 0; }
+  function padreSube() { if (!padre) return; padre.mode = 'lead'; padre.yendo = true; padre.ri = 0; padre.speed = 0; padre.aviso = 0; }
+  function guia(dt, p) {
+    const a = padre, [tx, tz] = RUTA[a.ri], d = d2(a, tx, tz), lejos = d2(p, a.x, a.z), vaAdelante = d2(p, CIMA[0], CIMA[1]) < d2(a, CIMA[0], CIMA[1]) - 1;
+    const espera = lejos > 13 && !vaAdelante; a.aviso -= dt;
+    // a tu paso: más lento si vienes rezagado, más vivo si te adelantaste; detenido y mirándote si te quedaste lejos
+    const want = espera ? 0 : vaAdelante ? 3.9 : lejos < 5 ? 3.2 : 2.5, to = espera ? Math.atan2(p.x - a.x, p.z - a.z) : Math.atan2(tx - a.x, tz - a.z);
+    let df = to - a.face; df = Math.atan2(Math.sin(df), Math.cos(df)); a.face += df * Math.min(1, dt * (espera ? 2.5 : 5));
+    a.speed += (want - a.speed) * Math.min(1, dt * 3);
+    if (!espera) { const k = Math.max(0, Math.cos(df)); a.x += Math.sin(a.face) * a.speed * k * dt; a.z += Math.cos(a.face) * a.speed * k * dt; }
+    else if (a.aviso <= 0 && lejos < 60) { a.aviso = 14; murmur('Curiñancu', 'Por aquí, hijo. Te espero.'); }
+    if (d < 0.8) {
+      if (a.ri === RUTA.length - 1) { ponPadre(true); if (lejos < 30) murmur('Curiñancu', 'Llegamos. Ven, párate aquí, a mi lado.'); return; }
+      a.ri++; if (DICHOS[a.ri] && lejos < 22) murmur('Curiñancu', DICHOS[a.ri]);
+    }
+  }
+  if (padre && f.m2 === 1) ponPadre(true); // si se cierra el juego a medio camino, al volver te espera arriba
 
   // ---------- lo que hace falta ahora, según los encargos abiertos ----------
   function needs() {
@@ -57,20 +76,32 @@ export function createActions({ world, ui, snd, scene, hint, speak, ripple, play
   // ---------- conversaciones de la historia y de los encargos ----------
   // Devuelve lo que esta persona tiene que decirte ahora, o nada si no hay nada pendiente.
   // main: es parte de la historia principal (si aún no la conocías, se presenta con estas mismas palabras).
+  const LLAMA = 'Leftraru, ven. Deja de mirar pájaros un momento, que te necesito.', LANA = 'Ahora ayúdame con las manos: alcánzame la lana roja, que no quiero soltar el hilo.';
+  const ENCARGO = ['Faltan pocos días para el We Tripantu, la noche más larga, y vienen los parientes de la costa. Los piñones no van a alcanzar para tanta gente.', 'Anda al bosque de pewenes, por el sendero del norte, y tráeme los que queden. Recoge los que cayeron solos: no sacudas el árbol, que él decide cuánto da.', 'Uno quedó arriba de unas rocas: vas a tener que correr y saltar. Y no te quedes mirando las nubes, que la olla no espera.'];
   function talk(id) {
     const [got, total] = pinones();
     if (id === 'millaray') {
-      if (!f.m1) return { main: true, lines: ['Leftraru, ven. Deja de mirar pájaros un momento, que te necesito.', 'Faltan pocos días para el We Tripantu, la noche más larga, y vienen los parientes de la costa. Los piñones no van a alcanzar para tanta gente.', 'Anda al bosque de pewenes, por el sendero del norte, y tráeme los que queden. Recoge los que cayeron solos: no sacudas el árbol, que él decide cuánto da.', 'Y no te quedes mirando las nubes, que la olla no espera.'], done: () => set('m1', 1) };
-      if (f.m1 === 1 && got >= total) return { main: true, lines: ['¿Los trajiste todos? A ver… Sí. Con estos alcanza para la noche más larga.', 'Cuando yo era niña, mi madre me mandaba por los mismos piñones al mismo bosque. El pewen no se ha olvidado de nosotros ni un solo invierno.', 'Ahora anda con tu padre. Subió al Treng Treng y preguntó por ti: dice que hay algo que solo se ve desde arriba.'], done: () => { set('m1', 2); ui.takeItem('pinon', total); padreSube(); } };
+      if (!f.m1) { // la primera misión también enseña a jugar: acercarse y hablar, observar, ayudar con las manos y recibir un encargo
+        if (!f.tu) return ui.has('witral')
+          ? { main: true, lines: [LLAMA, 'Ya vi que estuviste mirando mi telar. Así me gusta: lo que se mira con calma no se olvida.', LANA], done: () => set('tu', 2) }
+          : { main: true, lines: [LLAMA, 'Aunque mirar es lo que mejor haces… A ver: acércate al telar y míralo bien. Después me cuentas qué viste.'], done: () => set('tu', 1) };
+        if (f.tu === 1) return ui.has('witral')
+          ? { main: true, lines: ['¿Viste? Cada dibujo dice de dónde viene quien lleva la manta. Lo que se mira con calma no se olvida: se queda contigo.', LANA], done: () => set('tu', 2) }
+          : { lines: ['Primero el telar, hijo. Acércate y obsérvalo con calma.'] };
+        return f.lana ? { main: true, lines: ENCARGO, done: () => set('m1', 1) } : { lines: ['La lana roja, hijo. Está ahí mismo, junto al telar.'] };
+      }
+      if (f.m1 === 1 && got >= total) return { main: true, lines: ['¿Los trajiste todos? A ver… Sí. Con estos alcanza para la noche más larga.', 'Cuando yo era niña, mi madre me mandaba por los mismos piñones al mismo bosque. El pewen no se ha olvidado de nosotros ni un solo invierno.', 'Ahora anda con tu padre. Te está esperando para subir al Treng Treng: dice que hay algo que solo se ve desde arriba.'], done: () => { set('m1', 2); ui.takeItem('pinon', total); } };
       if (!f.mi) return { lines: ['Hijo, me quedé sin amarillo para la manta. Se saca de la raíz del michay, ese arbusto de espinas y flores anaranjadas.', 'Tráeme dos raíces. Escarba con cuidado y deja la mata en pie: tiene que seguir dando.'], done: () => set('mi', 1) };
       if (f.mi === 1 && listo(['michay'])) return { lines: ['Estas sirven. Mira: se hierven con la lana y sale un amarillo como de sol de invierno.', 'Cada color viene de un lugar. Cuando te pongas esta manta vas a llevar encima el monte entero, aunque estés lejos.'], done: () => { take('michay', 2); set('mi', 2); } };
       if (f.m1 === 1) return { lines: [`Todavía faltan piñones: llevas ${got} de ${total}. Están en el bosque del norte, siguiendo el sendero.`] };
       if (f.mi === 1) return { lines: [`Aún falta: ${falta()}. Crece en las laderas donde pega el sol.`] };
     }
     if (id === 'curinancu') {
-      if (f.m1 === 2 && f.m2 !== 2) {
-        if (!enCima()) return { lines: ['Voy subiendo al Treng Treng. Alcánzame arriba, hijo: hay algo que quiero mostrarte.'] };
-        return { main: true, lines: ['Llegaste. Ven, párate aquí, donde no tapa ningún árbol.', 'Mira. Hacia donde se esconde el sol está el lafken, el mar. Hacia donde nace, el volcán, la casa del pillán. Y allá abajo, el humo de nuestras rukas.', '¿Ves al traro, dando vueltas sobre el cerro? Mira mucho antes de bajar, y cuando baja, no falla. Por él te llamas Leftraru: traro veloz.', 'El que va a cuidar a su gente tiene que aprender a mirar así: primero todo, después lo suyo.', 'Ahora baja. Ñamku amaneció con fiebre y la machi anda preguntando por ti. Yo me quedo un rato más: desde aquí se ve venir a los invitados de la costa.'], done: () => { set('m2', 2); story('cima'); } };
+      if (f.m1 === 2 && !f.m2) return { main: true, lines: ['Ahí estás. Tu madre dice que cumpliste con los piñones. Bien.', 'Ven conmigo, hijo. Vamos a subir al Treng Treng: hay algo que solo se ve desde arriba, y ya tienes edad de verlo.', 'Camina a mi lado. No hay apuro: el cerro no se va a ninguna parte.'], done: () => { set('m2', 1); padreSube(); } };
+      if (f.m2 === 1) {
+        if (!enCima()) return { lines: ['Vamos, hijo. Sigue subiendo conmigo.'] };
+        // arriba: una frase, la escena de lo que le muestra, y al terminar la despedida
+        return { main: true, lines: ['Ven, párate aquí, a mi lado, donde no tapa ningún árbol.'], done: () => story('cima', () => speak('Curiñancu', ['El que va a cuidar a su gente tiene que aprender a mirar así: primero todo, después lo suyo.', 'Ahora baja. Ñamku amaneció con fiebre y la machi anda preguntando por ti. Yo me quedo un rato más: desde aquí se ve venir a los invitados de la costa.'], () => { set('m2', 2); padre.quieto = false; })) };
       }
       if (ui.has('nalca')) {
         if (!f.na) return { lines: ['Para el We Tripantu vamos a cocer la comida bajo tierra, y hay que taparla con hojas grandes.', 'Tráeme dos tallos de nalca con su hoja. Crece junto al agua, en el menoko y a la orilla del río.'], done: () => set('na', 1) };
@@ -100,9 +131,10 @@ export function createActions({ world, ui, snd, scene, hint, speak, ripple, play
   // ¿esta persona tiene algo pendiente contigo? 'main' = la historia sigue con ella, 'sec' = tiene un encargo secundario
   const wants = (id) => {
     const [got, total] = pinones();
-    if ((id === 'millaray' && (!f.m1 || (f.m1 === 1 && got >= total))) || (id === 'curinancu' && f.m1 === 2 && f.m2 !== 2)
+    const madre = !f.m1 ? !f.tu || (f.tu === 1 && ui.has('witral')) || (f.tu === 2 && !!f.lana) : f.m1 === 1 && got >= total; // en el tutorial, la estrella vuelve a ella cuando ya hiciste lo que pidió
+    if ((id === 'millaray' && madre) || (id === 'curinancu' && f.m1 === 2 && f.m2 !== 2)
       || (id === 'machi' && f.m2 === 2 && (!f.m3 || (f.m3 === 1 && listo(['canelo', 'quillay', 'maqui'])))) || (id === 'namku' && f.m3 === 2)) return 'main';
-    const sec = { abuela: !f.ab || (f.ab === 1 && listo(['murtilla'])), millaray: !f.mi || (f.mi === 1 && listo(['michay'])), curinancu: ui.has('nalca') && (!f.na || (f.na === 1 && listo(['nalca']))), rayen: !f.palin }[id];
+    const sec = { abuela: !f.ab || (f.ab === 1 && listo(['murtilla'])), millaray: !!f.m1 && (!f.mi || (f.mi === 1 && listo(['michay']))), curinancu: ui.has('nalca') && (!f.na || (f.na === 1 && listo(['nalca']))), rayen: !f.palin }[id];
     return sec ? 'sec' : null;
   };
 
@@ -174,7 +206,7 @@ export function createActions({ world, ui, snd, scene, hint, speak, ripple, play
     const tr = TRONCOS.map((l) => ({ l, d: d2(p, l.x, l.z) })).sort((a, b) => a.d - b.d)[0];
     if (tr.d < 1.5) add(tr.d, 'Sentarse en el tronco', () => sentarse(tr.l, here));
     // tareas de la aldea
-    if (ui.has('millaray') && !f.lana && d2(p, -10.6, -4.2) < 3) add(1, 'Alcanzarle la lana a Millaray', () => { set('lana', 1); speak('Millaray', ['Gracias, hijo. La roja primero… esa. Así no tengo que soltar el hilo.']); });
+    if (ui.has('millaray') && !f.lana && (f.m1 || f.tu === 2) && d2(p, -10.6, -4.2) < 3) add(1, 'Alcanzarle la lana a Millaray', () => { set('lana', 1); const gracias = 'Gracias, hijo. La roja primero… esa. Así no tengo que soltar el hilo.'; if (f.m1) speak('Millaray', [gracias]); else speak('Millaray', [gracias, ...ENCARGO], () => set('m1', 1)); }); // la primera vez, con esto te da la misión
     const rz = riverZ(p.x), dr = Math.abs(p.z - rz);
     if (!f.agua && !have('agua') && dr < 5 && p.y < WATER_Y + 1.6) add(2, 'Llenar la vasija con agua', () => { inv.agua = 1; save(); snd.play('paso-agua-1', 0.5); hint('Llenaste la vasija. Llévala a la olla del fogón.', 5); });
     if (!f.agua && have('agua') && df < 4.2) add(0.5, 'Echar el agua a la olla', () => { inv.agua = 0; set('agua', 1); snd.play('paso-agua-2', 0.5); speak('La abuela', ['¡Agua fresca! Con esto alcanza para el caldo. Así da gusto.']); });
@@ -196,9 +228,9 @@ export function createActions({ world, ui, snd, scene, hint, speak, ripple, play
   function update(dt, t, p) {
     here = p; if (palin) updatePalin(dt, p);
     if (sit) updateSit(dt);
-    if (padre) { // sale caminando de la aldea y, cuando ya no lo ves, te espera en la cima; hecha la misión, vuelve a la aldea
-      if (padre.yendo) { const [ex, ez] = SUBIDA[SUBIDA.length - 1]; padre.wait = Math.min(padre.wait, 0.3); if (d2(padre, ex, ez) < 1.5 || d2(p, padre.x, padre.z) > 38) ponPadre(true); }
-      else if (f.m2 === 2 && d2(padre, CERRO[0], CERRO[1]) < 12 && d2(p, padre.x, padre.z) > 70) ponPadre(false);
+    if (padre) {
+      if (padre.yendo) guia(dt, p);
+      else if (f.m2 === 2 && d2(padre, CIMA[0], CIMA[1]) < 3 && d2(p, padre.x, padre.z) > 70) ponPadre(false); // hecha la misión, cuando ya no lo ves vuelve a la aldea
     }
     if (luzT > 0) { luzT -= dt; const k = Math.min(1, luzT, (8 - luzT) * 2); luces.forEach((s, i) => { const a = t * (0.5 + (i % 4) * 0.12) + i * 0.9, r = 1.1 + (i % 5) * 0.35; s.visible = luzT > 0; s.position.set(p.x + Math.cos(a) * r, p.y + 0.2 + Math.sin(t * 0.8 + i) * 0.5 + (i % 3) * 0.3, p.z + Math.sin(a) * r); s.material.opacity = Math.max(0, k) * 0.9; }); }
     if (tiro) { tiro.t += dt / 0.9; const u = tiro.t, x = tiro.x0 + (tiro.x1 - tiro.x0) * u, z = tiro.z0 + (tiro.z1 - tiro.z0) * u, y = tiro.y0 + (WATER_Y - tiro.y0) * u + Math.sin(Math.PI * u) * 2.2; piedra.position.set(x, y, z); if (u >= 1) { piedra.visible = false; ripple(tiro.x1, tiro.z1); snd.play('paso-agua-1', 0.6, 0.8); tiro = null; } }

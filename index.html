@@ -39,12 +39,22 @@
   .bar.top { top: 0; } .bar.bot { bottom: 0; } body.cine .bar { height: 11vh; }
   #sub { position: fixed; left: 8%; right: 8%; bottom: 13vh; text-align: center; font-size: clamp(16px, 2.3vw, 28px); font-style: italic; text-shadow: 0 2px 8px #000, 0 0 2px #000; opacity: 0; transition: opacity .8s; z-index: 3; pointer-events: none; }
   #sub.on { opacity: 1; }
-  /* título del capítulo, al empezar la historia */
-  #capitulo { position: fixed; left: 0; right: 0; top: 19vh; text-align: center; opacity: 0; transition: opacity 1.4s; pointer-events: none; z-index: 3; text-shadow: 0 3px 14px #000, 0 0 3px #000; }
-  #capitulo.on { opacity: 1; }
-  #capitulo small { display: block; letter-spacing: .5em; padding-left: .5em; text-transform: uppercase; font-size: clamp(13px, 1.5vw, 18px); color: var(--copper); }
-  #capitulo b { display: block; font-weight: normal; font-size: clamp(30px, 5vw, 64px); letter-spacing: .08em; margin-top: 8px; }
-  #capitulo i { display: block; width: min(300px, 50vw); height: 10px; margin: 16px auto 0; background: var(--greca) center / auto 10px repeat-x; }
+  /* prólogo: una hoja escrita que va pasando y se aleja hacia el fondo, sobre la aldea a oscuras */
+  #prologo { position: fixed; inset: 0; z-index: 6; overflow: hidden; opacity: 0; pointer-events: none; transition: opacity 1.4s; perspective: 460px; perspective-origin: 50% 12%;
+    background: radial-gradient(ellipse at 50% 70%, #0a0806d9 0%, #050403f2 60%, #000 100%); }
+  #prologo.on { opacity: 1; pointer-events: auto; }
+  #prologo .hoja { position: absolute; left: 50%; top: 0; height: 100%; width: min(880px, 90vw); margin-left: calc(min(880px, 90vw) / -2); transform-origin: 50% 100%; transform: rotateX(27deg); }
+  #prologo .papel { position: absolute; left: 0; right: 0; top: 100%; padding: 70px clamp(28px, 6vw, 84px) 90px; color: #2c1c10; text-align: justify; font-size: clamp(19px, 2.55vw, 33px); line-height: 1.5;
+    background: linear-gradient(90deg, #cdb98e 0%, #e9dcbd 9%, #efe4c8 50%, #e9dcbd 91%, #cdb98e 100%); box-shadow: 0 0 60px #000, inset 0 0 90px #a8875566; }
+  #prologo.on .papel { animation: pasar var(--dur, 58s) linear forwards; }
+  @keyframes pasar { from { transform: translateY(0); } to { transform: translateY(calc(-100% - 100vh)); } }
+  #prologo .papel::before, #prologo .papel::after { content: ''; display: block; height: 12px; background: var(--greca) center / auto 12px repeat-x; filter: brightness(.35) sepia(1); opacity: .8; }
+  #prologo .papel::before { margin-bottom: 44px; } #prologo .papel::after { margin-top: 44px; }
+  #prologo small { display: block; text-align: center; letter-spacing: .5em; padding-left: .5em; text-transform: uppercase; font-size: .62em; color: #8a3a22; }
+  #prologo h2 { margin: 6px 0 34px; text-align: center; font-weight: normal; font-size: 1.75em; letter-spacing: .06em; line-height: 1.15; }
+  #prologo p { margin: 0 0 1.05em; } #prologo p.fin { text-align: center; font-style: italic; margin-top: 1.6em; }
+  #prologo .velo { position: absolute; left: 0; right: 0; top: 0; height: 46%; background: linear-gradient(#000 12%, #000c 45%, transparent); pointer-events: none; }
+  #prologo .saltar { position: absolute; right: 18px; bottom: 3.5vh; font-size: 13px; letter-spacing: .08em; opacity: .6; color: var(--cream); }
   #skip { position: fixed; right: 18px; bottom: 3.5vh; font-size: 13px; opacity: 0; z-index: 3; letter-spacing: .08em; pointer-events: none; } body.cine #skip { opacity: .65; }
   #end { position: fixed; left: 0; right: 0; top: 9vh; text-align: center; font-style: italic; font-size: clamp(16px, 2.4vw, 26px); text-shadow: 0 2px 8px #000; opacity: 0; pointer-events: none; transition: opacity 1s; } #end.on { opacity: 1; }
 
@@ -182,7 +192,15 @@
 <div id="hudbox" class="shadow"><div id="hud" class="chip"><span><small>Misión ·</small> <span id="mis-title"></span> <b id="mis-prog"></b></span></div><div class="chip"><span><b id="score-n">0</b> <small>puntos para gastar en saberes</small></span></div></div>
 <div id="hint"></div>
 <div id="sub"></div>
-<div id="capitulo"><small>Capítulo 1</small><b>El mundo de Leftraru</b><i></i></div>
+<div id="prologo"><div class="hoja"><div class="papel">
+  <small>Capítulo I</small><h2>El mundo de Leftraru</h2>
+  <p>Año 1545. Al sur del mundo, entre la cordillera y el mar, está la tierra de los mapuche, la gente de la tierra.</p>
+  <p>No tienen reyes ni ciudades. Cada lof, un puñado de familias y sus rukas, vive de lo que dan el bosque y el río, y pide permiso antes de tomar.</p>
+  <p>Hace dos generaciones detuvieron a los ejércitos del inca. Ahora, por el mismo camino del norte, avanzan hombres de barba y metal, montados en animales que nadie conoce. Aquí, en Nahuelbuta, todavía son solo un rumor.</p>
+  <p>En este valle vive Leftraru, «traro veloz», hijo del lonko Curiñancu. Tiene once años y prefiere mirar pájaros antes que cumplir mandados.</p>
+  <p>Faltan pocos días para el We Tripantu, la noche más larga del año. La aldea entera se prepara…</p>
+  <p class="fin">…y su madre lo está llamando.</p>
+</div></div><div class="velo"></div><div class="saltar">ENTER · saltar</div></div>
 <div id="skip">ENTER · saltar</div>
 <div id="end">Fin del prototipo — continuará…</div>
 <canvas id="minimap" width="340" height="340" title="Abrir el mapa (M)"></canvas>

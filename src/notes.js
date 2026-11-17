@@ -139,11 +139,22 @@ const count = (c, ids) => ids.filter((id) => c.has(id)).length;
 const set = (ids) => (c) => { const n = count(c, ids); return [n === ids.length, n, ids.length]; };
 const met = (id) => (c) => c.has(id);
 export const MISSIONS = [
+  // m1 parte con un tutorial dentro de la historia: f.tu 1 = mirar el telar, 2 = alcanzar la lana; después viene el encargo.
+  // Los avisos pueden nombrar teclas entre llaves ({observar}); "fijo" deja el aviso a la vista mientras dure ese paso.
   { id: 'm1', main: true, n: 1, title: 'Los piñones del pewen', who: 'Millaray, tu madre', pts: 40,
-    text: (c) => (!c.f.m1 ? 'Faltan pocos días para el We Tripantu y toda la aldea se prepara. Tu madre, Millaray, te está llamando: teje en el telar, junto a la ruka de la familia.' : c.got < c.total ? 'Tu madre te mandó a reunir los últimos piñones para la celebración. Están en el bosque de pewenes, siguiendo el sendero hacia el norte. Uno quedó sobre unas rocas.' : 'Ya tienes todos los piñones. Llévaselos a tu madre, en el telar.'),
-    aviso: (c) => (!c.f.m1 ? 'Tu madre, Millaray, te está llamando: teje junto a la ruka de la familia. Acércate y háblale.' : c.got < c.total ? 'Nueva misión: Los piñones del pewen. Sigue el sendero del norte hasta el bosque de pewenes.' : 'Ya tienes todos los piñones. Llévaselos a tu madre, en el telar.'),
-    check: (c) => { const s = c.f.m1 || 0; return [s >= 2, s >= 2 ? c.total : s === 1 ? c.got : 0, c.total]; } }, // el avance cuenta piñones; se cumple al entregarlos
-  { id: 'm2', main: true, n: 2, title: 'El traro', who: 'Curiñancu, tu padre', pts: 40, pide: 'm1', text: 'Tu padre subió al cerro Treng Treng y quiere mostrarte algo. Toma el sendero del nororiente y búscalo en la cima. Dicen que desde arriba se ve el mundo entero.', aviso: 'Nueva misión: El traro. Tu padre te espera en la cima del cerro Treng Treng, por el sendero del nororiente.', check: (c) => [c.f.m2 === 2, c.f.m2 === 2 ? 1 : 0, 1] },
+    text: (c) => (c.f.m1 ? (c.got < c.total ? 'Tu madre te mandó a reunir los últimos piñones para la celebración. Están en el bosque de pewenes, siguiendo el sendero hacia el norte. Uno quedó sobre unas rocas: hay que correr y saltar.' : 'Ya tienes todos los piñones. Llévaselos a tu madre, en el telar.')
+      : !c.f.tu ? 'Faltan pocos días para el We Tripantu y toda la aldea se prepara. Tu madre, Millaray, te está llamando: teje en el telar, junto a la ruka de la familia.'
+        : c.f.tu === 1 ? 'Tu madre quiere que mires bien su telar antes de mandarte al bosque. Obsérvalo y vuelve a hablar con ella.' : 'Tu madre necesita que le alcances la lana roja, junto al telar.'),
+    aviso: (c) => (c.f.m1 ? (c.got < c.total ? ['Nueva misión: Los piñones del pewen. Arriba a la izquierda ves tu misión y cuánto llevas; {misiones} abre la lista y {mapa}, el mapa.', 'Sigue el sendero del norte hasta el bosque de pewenes. {correr} para correr, {saltar} para saltar.'] : 'Ya tienes todos los piñones. Llévaselos a tu madre, en el telar.')
+      : !c.f.tu ? 'Camina con {adelante} {izquierda} {atras} {derecha} y mira alrededor con el ratón. Tu madre te llama: ve hacia la estrella dorada y pulsa {observar} para hablarle.'
+        : c.f.tu === 1 ? (c.has('witral') ? 'Lo que observas queda en tu cuaderno ({cuaderno}). Ahora vuelve a hablar con tu madre.' : 'Acércate al telar y pulsa {observar} para observarlo.')
+          : c.f.lana ? 'Vuelve a hablar con tu madre.' : 'Junto al telar, pulsa {accion} para alcanzarle la lana. Con {accion} recoges cosas y ayudas.'),
+    fijo: (c) => !c.f.m1,
+    check: (c) => { const s = c.f.m1 || 0; return s ? [s >= 2, s >= 2 ? c.total : c.got, c.total] : [false, 0, 1]; } }, // el avance cuenta piñones; se cumple al entregarlos
+  { id: 'm2', main: true, n: 2, title: 'El traro', who: 'Curiñancu, tu padre', pts: 40, pide: 'm1',
+    text: (c) => (!c.f.m2 ? 'Tu padre quiere mostrarte algo que solo se ve desde lo alto del cerro Treng Treng. Búscalo en la aldea, cerca del sendero del norte.' : 'Sube con tu padre por el sendero del nororiente hasta la cima del cerro Treng Treng. Si te quedas atrás, te espera. Arriba, vuelve a hablarle.'),
+    aviso: (c) => (!c.f.m2 ? 'Nueva misión: El traro. Tu padre te espera en la aldea, cerca del sendero del norte.' : 'Sigue a tu padre por el sendero del nororiente hasta la cima del cerro. Arriba, háblale.'),
+    check: (c) => [c.f.m2 === 2, c.f.m2 === 2 ? 1 : 0, 1] },
   { id: 'm3', main: true, n: 3, title: 'Las plantas de la machi', who: 'la machi', pts: 50, pide: 'm2',
     text: (c) => (!c.f.m3 ? 'Ñamku, el anciano, amaneció enfermo y la machi pregunta por ti. Búscala junto al rewe, al suroriente de la aldea.' : c.f.m3 === 1 ? 'La machi necesita hojas de canelo de dos árboles, un trozo de corteza de quillay y hojas de maqui para prepararle un lawen a Ñamku. Reúne las plantas con la tecla de acción y vuelve con ella.' : 'La machi preparó el lawen. Llévaselo a Ñamku, en su ruka al oriente de la aldea, mientras está tibio.'),
     aviso: (c) => (!c.f.m3 ? 'Nueva misión: Las plantas de la machi. Baja a la aldea y búscala junto al rewe, al suroriente.' : c.f.m3 === 1 ? (c.hierbas < 5 ? 'Reúne hojas de canelo, corteza de quillay y hojas de maqui con la tecla de acción.' : 'Ya tienes las plantas. Vuelve con la machi.') : 'Recibiste el lawen. Llévaselo a Ñamku, en su ruka al oriente de la aldea.'),

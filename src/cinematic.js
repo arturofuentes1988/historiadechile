@@ -10,12 +10,12 @@ export class Cinematic {
     this.sub = document.getElementById('sub'); this.body = document.body;
     this._p = new THREE.Vector3(); this._l = new THREE.Vector3();
   }
-  // shots: [{ dur, from, to, lookFrom, lookTo, text }]
+  // shots: [{ dur, from, to, lookFrom, lookTo, text, on }]; "on" se llama al empezar el plano (para acomodar a los personajes)
   play(shots, onEnd) {
     this.shots = shots; this.i = 0; this.t = 0; this.onEnd = onEnd; this.active = true;
     this.body.classList.add('cine'); this._show();
   }
-  _show() { this.sub.textContent = this.shots[this.i].text || ''; this.sub.classList.toggle('on', !!this.shots[this.i].text); }
+  _show() { const s = this.shots[this.i]; this.sub.textContent = s.text || ''; this.sub.classList.toggle('on', !!s.text); if (s.on) s.on(); }
   skip() { if (this.active) this._finish(); }
   _finish() {
     this.active = false; this.body.classList.remove('cine'); this.sub.classList.remove('on');

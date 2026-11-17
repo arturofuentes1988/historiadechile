@@ -152,7 +152,7 @@ export function createUI({ world, onToast, onClose, onSkill }) {
     const c = e.target.closest('[data-cat]'), n = e.target.closest('[data-note]'), k = e.target.closest('[data-skill]'), mi = e.target.closest('[data-mis]'), nd = e.target.closest('[data-node]');
     if (mi) { selM = mi.dataset.mis; return render(); } if (nd) { selK = nd.dataset.node; return render(); }
     if (c) { cat = c.dataset.cat; sel = null; render(); } else if (n) { sel = n.dataset.note; render(); }
-    else if (k && avail() >= SK[k.dataset.skill].cost) { skills.push(k.dataset.skill); save(); refreshScore(); onToast(`Aprendiste: ${SK[k.dataset.skill].name}`); onSkill?.(); render(); }
+    else if (k && avail() >= SK[k.dataset.skill].cost) { skills.push(k.dataset.skill); save(); refreshScore(); onToast(`Aprendiste: ${SK[k.dataset.skill].name}`, 'logro'); onSkill?.(); render(); }
   });
   $('btn-notas').addEventListener('click', () => show('notas'));
   $('btn-bolsa').addEventListener('click', () => show('bolsa'));
@@ -172,9 +172,9 @@ export function createUI({ world, onToast, onClose, onSkill }) {
       const n = BY[id]; if (!n || found[id] !== undefined) return false;
       const bonus = skills.includes('memoria') ? 5 : 0; extra += bonus;
       found[id] = img; save(); cat = n.cat; sel = id; refreshScore();
-      onToast(`${n.title} · +${CATS[n.cat].pts + bonus} puntos de investigación`); $('btn-notas').classList.add('new'); if (open) render(); return true;
+      onToast(`${n.title} · +${CATS[n.cat].pts + bonus} puntos de investigación`, 'hallazgo'); $('btn-notas').classList.add('new'); if (open) render(); return true;
     },
-    retake(id, img) { if (found[id] === undefined) return; found[id] = img; save(); onToast(`Foto actualizada: ${BY[id].title}`); if (open) render(); },
+    retake(id, img) { if (found[id] === undefined) return; found[id] = img; save(); onToast(`Foto actualizada: ${BY[id].title}`, 'foto'); if (open) render(); },
     place(key) { places.add(key); },
     addItem(id) { bag[id] = (bag[id] || 0) + 1; if (open) render(); },
     takeItem(id, n = 1) { bag[id] = (bag[id] || 0) - n; if (bag[id] <= 0) delete bag[id]; if (open) render(); },
@@ -190,11 +190,11 @@ export function createUI({ world, onToast, onClose, onSkill }) {
         if (!m.main && !seen[m.id]) { if (m.ver && !m.ver(mctx)) continue; seen[m.id] = 1; fresh.push(m.title); } // un encargo no corre hasta que te lo dan
         if (m.check(mctx)[0]) { done[m.id] = 1; won.push(m); }
       }
-      if (fresh.length) { onToast(fresh.length > 3 ? `Tienes ${fresh.length} encargos nuevos: míralos en Misiones` : `${fresh.length === 1 ? 'Nuevo encargo' : 'Nuevos encargos'}: ${fresh.join(' · ')}`); $('btn-misiones').classList.add('new'); }
-      for (const m of won) onToast(`Misión completada: ${m.title} · +${m.pts} puntos`);
+      if (fresh.length) { onToast(fresh.length > 3 ? `Tienes ${fresh.length} encargos nuevos: míralos en Misiones` : `${fresh.length === 1 ? 'Nuevo encargo' : 'Nuevos encargos'}: ${fresh.join(' · ')}`, 'encargo'); $('btn-misiones').classList.add('new'); }
+      for (const m of won) onToast(`Misión completada: ${m.title} · +${m.pts} puntos`, 'logro');
       if (fresh.length || won.length) { save(); refreshScore(); if (open) render(); }
       const act = MISSIONS.find((m) => m.main && m.check && !done[m.id] && (!m.pide || done[m.pide]));
-      return act ? { title: act.title, prog: act.check(mctx), aviso: typeof act.aviso === 'function' ? act.aviso(mctx) : act.aviso } : null;
+      return act ? { title: act.title, prog: act.check(mctx), aviso: typeof act.aviso === 'function' ? act.aviso(mctx) : act.aviso, fijo: !!(act.fijo && act.fijo(mctx)) } : null;
     },
     marks: [], people: [],
     state: { get found() { return found; }, bag, get skills() { return skills; }, get done() { return done; } },
