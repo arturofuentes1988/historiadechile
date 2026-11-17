@@ -109,6 +109,14 @@
   /* instrucciones de cómo jugar: al centro, en blanco y sin recuadro, para distinguirlas de los demás avisos */
   #ayuda { position: fixed; left: 50%; top: 34%; transform: translate(-50%, -50%); max-width: 94vw; white-space: nowrap; text-align: center; color: #fff; font-size: clamp(16px, 1.55vw, 22px); line-height: 1.45; text-shadow: 0 2px 5px #000, 0 0 3px #000, 0 0 16px #000c; opacity: 0; transition: opacity .5s; pointer-events: none; z-index: 3; }
   #ayuda.on { opacity: 1; } body.talking #ayuda { opacity: 0; }
+  /* la mira del arco: un aro al centro, que se cierra y se aclara cuando el arco ya está tenso; debajo, las flechas que quedan */
+  #mira { position: fixed; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; opacity: 0; z-index: 6; }
+  #mira.on { opacity: 1; }
+  #mira i { position: absolute; left: -15px; top: -15px; width: 30px; height: 30px; box-sizing: border-box; border: 2px solid rgba(255, 255, 255, 0.55); border-radius: 50%; box-shadow: 0 0 3px rgba(0, 0, 0, 0.8), inset 0 0 3px rgba(0, 0, 0, 0.6); transition: all 0.25s; }
+  #mira i::after { content: ''; position: absolute; left: 50%; top: 50%; width: 3px; height: 3px; margin: -1.5px; border-radius: 50%; background: #fff; box-shadow: 0 0 2px #000; }
+  #mira.lista i { left: -9px; top: -9px; width: 18px; height: 18px; border-color: #f2c14e; }
+  #mira.sin i { border-color: #c0392b; }
+  #mira-n { position: absolute; left: -60px; top: 26px; width: 120px; text-align: center; color: #fff; font-size: 13px; text-shadow: 0 1px 3px #000, 0 0 2px #000; white-space: nowrap; }
   #ayuda.larga { white-space: normal; text-wrap: balance; width: max(300px, min(700px, 84vw, calc(100vw - 2 * min(390px, 40vw) - 64px))); } /* las largas se reparten en varias líneas, sin meterse sobre el panel de estado */
   #ayuda kbd { font: inherit; font-size: .8em; font-weight: bold; padding: .08em .5em .12em; margin: 0 .14em; border: 1.5px solid #fff; border-radius: 6px; background: #0007; white-space: nowrap; text-shadow: none; }
   #hint.grande { font-size: 21px; line-height: 1.3; padding: 13px 30px; box-shadow: inset 0 -3px 0 #e9b03a; } /* los avisos de misión se leen de lejos */
@@ -278,6 +286,7 @@
 <div id="aviso-error">El juego tuvo un problema y no puede seguir. Recarga la página (F5): tu avance está guardado.</div>
 <div id="hint"></div>
 <div id="ayuda"></div>
+<div id="mira"><i></i><span id="mira-n"></span></div>
 <div id="apuntes"></div>
 <div id="sub"><b id="sub-name"></b><span id="sub-text"></span></div>
 <div id="prologo"><div class="aviso"><div class="papel"><div class="marco">

@@ -1,5 +1,7 @@
 # Guion de las misiones 4, 5 y 6 — cierre del Acto I
 
+> **Cambio de numeración (17 de noviembre de 2026):** se agregó a la historia una misión 4 nueva, «El arco de Ñamku» (era el encargo de la primera caza). Las tres misiones de este guion pasan a ser la **5, la 6 y la 7**; al programarlas, sus etapas se guardarían como `f.m5`, `f.m6` y `f.m7`. La frase con que Ñamku abre «Los invitados» ahora la dice al recibir el pudú, no al tomar el lawen. El resto del guion vale tal como está.
+
 Borrador 1. Continúa `docs/acto-1.md` y respeta lo que ya está en el juego: las misiones 1 a 3 no cambian.
 Este documento es solo guion: dice qué pasa, quién habla y qué se ve, para que después se pueda programar sin inventar nada.
 

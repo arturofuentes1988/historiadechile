@@ -372,6 +372,7 @@ function markTexture(kind) {
   else { x.fillStyle = '#1c1410'; x.beginPath(); x.arc(0, 0, 34, 0, 7); x.fill(); x.fillStyle = '#f1e4c4'; x.beginPath(); x.arc(0, 0, 26, 0, 7); x.fill(); x.fillStyle = '#1c1410'; for (const dx of [-11, 0, 11]) { x.beginPath(); x.arc(dx, 0, 4, 0, 7); x.fill(); } }
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t;
 }
+const CARICIA_Z = -1.5; // cuánto abre el brazo derecho hacia el costado
 export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
   const R = (a, b) => a + (b - a) * rng(), actors = [], quads = [], birds = [];
   // personas y animales tienen cuerpo: ya no se los atraviesa
@@ -386,7 +387,7 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
     return p; };
   const man = { kind: 'man', h: 1.66, skin: 0x96603c, cloth: 0x2a2630 }, woman = { kind: 'woman', h: 1.56, skin: 0xa0683f, cloth: 0x1f1c26, trim: 0xb3262e, band: 0xc23a36 };
   person({ ...man, band: 0xe9dcb8, trim: 0xb3262e }, 2, -9, { name: 'Curiñancu', mode: 'idle', face: Math.PI });
-  { const m = person(woman, -9.6, -5.4, { name: 'Millaray', mode: 'work', face: 2.2 }); // lleva un palo de revolver, que solo se ve cuando está junto a la olla
+  { const m = person(woman, -10.27, -4.59, { name: 'Millaray', mode: 'work', face: -0.5 }); // de frente al telar, a un paso de la tela, con las manos en la urdimbre; // lleva un palo de revolver, que solo se ve cuando está junto a la olla
     const mano = new THREE.Group(); mano.position.set(0, -0.175, 0.004); mano.rotation.x = 0.99; m.foreR.add(mano); // el palo cuelga derecho de la mano aunque el brazo vaya estirado
     m.palo = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.011, 0.36, 6), new THREE.MeshStandardMaterial({ color: 0x7a5a38, roughness: 1 })); m.palo.position.y = -0.14; m.palo.castShadow = true; m.palo.visible = false; mano.add(m.palo); }
   person({ ...woman, h: 1.46, hair: 0xb9b4a4, cloth: 0x2e2a36, trim: 0x8a4a2c }, 2.6, 1.6, { name: 'la abuela', mode: 'idle', face: -2.2 });
@@ -513,7 +514,8 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
         if (p.oficio === 'moler') { p.shinL.rotation.x = p.shinR.rotation.x = 1.55; p.body.position.y = -0.24; p.body.rotation.x = 0.42 + sw * 0.07; p.armL.rotation.x = p.armR.rotation.x = -0.75 + sw * 0.22; p.foreL.rotation.x = p.foreR.rotation.x = -0.25; p.head.rotation.x = 0.25; } // de rodillas, empujando la piedra de moler o alisando la greda
         else { p.armL.rotation.x = -1.05; p.armR.rotation.x = -1.2; p.foreL.rotation.x = -1.5; p.foreR.rotation.x = -1.35; p.body.rotation.z = sw * 0.025; p.head.rotation.x = -0.04 + Math.sin(p.phase * 0.5) * 0.04; } } // tocando: las manos frente a la boca
       else if (p.mode === 'lead') { p.phase += dt * (1.5 + p.speed * 3.4 / Math.sqrt(p.h)); animatePerson(p, p.phase, Math.min(1, p.speed / 2.4) * 0.75 + (p.speed > 0.1 ? 0.2 : 0), false, slopeOf(p, dt)); p.head.rotation.y += ((p.mira || 0) - p.head.rotation.y) * Math.min(1, dt * 4); } // va guiando: su paso lo decide acciones.js
-      else { p.phase += dt; animatePerson(p, 0, 0); p.armL.rotation.x = Math.sin(p.phase * 0.6) * 0.05; p.body.rotation.z = Math.sin(p.phase * 0.35) * 0.015; p.head.rotation.y = Math.sin(p.phase * 0.23) * 0.3; if (p.quieto) p.head.rotation.y *= 0.2; else if (Math.hypot(pp.x - p.x, pp.z - p.z) < 6) { turn(p, pp.x, pp.z, dt, 2.5); p.head.rotation.y *= 0.3; } }
+      else { p.phase += dt; animatePerson(p, 0, 0); p.armL.rotation.x = Math.sin(p.phase * 0.6) * 0.02; p.body.rotation.z = Math.sin(p.phase * 0.35) * 0.006; p.head.rotation.y = Math.sin(p.phase * 0.23) * 0.08; // de pie y quieta: apenas se mece y mira un poco a los lados
+        if (p.quieto) p.head.rotation.y *= 0.2; else if (Math.hypot(pp.x - p.x, pp.z - p.z) < 6) { turn(p, pp.x, pp.z, dt, 2.5); p.head.rotation.y *= 0.3; } }
       // Conversando con Leftraru (p.habla: dónde está su cara, y si además se vuelve entera hacia él): lo mira a los ojos y
       // deja lo que tenía entre manos. Al terminar, la cabeza vuelve a lo suyo y quien trabajaba se vuelve otra vez a su trabajo.
       const hk = p.hablaK = Math.max(0, Math.min(1, (p.hablaK || 0) + (p.habla ? dt : -dt) * 4)); if (p.habla) p.hablaP = p.habla;
@@ -529,6 +531,9 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
       if (p.mano > 0) { p.armR.rotation.x += (-1.2 - p.armR.rotation.x) * p.mano; p.foreR.rotation.x += (-0.3 - p.foreR.rotation.x) * p.mano; }
       if (p.obra > 0) { const w = Math.sin(t * 7), k2 = p.obra; p.armL.rotation.x += (-0.8 + w * 0.12 - p.armL.rotation.x) * k2; p.armR.rotation.x += (-0.8 - w * 0.12 - p.armR.rotation.x) * k2; p.foreL.rotation.x += (-0.95 - w * 0.25 - p.foreL.rotation.x) * k2; p.foreR.rotation.x += (-0.95 + w * 0.25 - p.foreR.rotation.x) * k2; p.head.rotation.x += (0.32 - p.head.rotation.x) * k2; }
       if (p.bebe > 0) { p.armR.rotation.x += (-0.85 - p.armR.rotation.x) * p.bebe; p.foreR.rotation.x += (-2.0 - p.foreR.rotation.x) * p.bebe; p.head.rotation.x += (-0.22 - p.head.rotation.x) * p.bebe; }
+      // caricia: suelta lo que tenía en la mano derecha y se la pasa por la cabeza a Leftraru, que está a su lado.
+      if (p.caricia > 0) { const k2 = p.caricia, w = Math.sin(t * 5.5); p.armR.rotation.x += (-0.25 - p.armR.rotation.x) * k2; p.armR.rotation.z += (CARICIA_Z - p.armR.rotation.z) * k2; p.foreR.rotation.x += (-0.35 + w * 0.1 - p.foreR.rotation.x) * k2; p.foreR.rotation.z = -0.6 * k2; p.body.rotation.x += (0.04 - p.body.rotation.x) * k2; }
+      else if (p.caricia === 0) { p.foreR.rotation.z = 0; if (p.mode !== 'cook') p.armR.rotation.z = 0; p.caricia = undefined; }
       const gy = height(p.x, p.z); p.g.position.set(p.x, gy + Math.sin(p.phase * 0.8) * 0.008, p.z); p.g.rotation.y = p.face;
       if (p.mark) { p.mark.position.set(p.x, gy + p.h + 0.36 + Math.sin(t * 2.2 + p.x) * 0.045, p.z); p.mark.material.rotation = Math.sin(t * 0.9) * 0.12; }
     }

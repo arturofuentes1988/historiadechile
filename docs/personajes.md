@@ -62,6 +62,7 @@ Todo lo físico es propuesta nuestra. Solo Leftraru y el nombre de su padre vien
 | **Ropa** | Küpam negro, trarüwe roja con dibujos, ikülla negra con borde rojo. Collar de semillas y concha. Manos teñidas de colores. |
 | **Color propio** | Rojo intenso. |
 | **Gesto** | Nunca deja de mover las manos: hila mientras conversa. |
+| **En el juego** | Modelo 3D pintado a mano (boceto 1). Teje de frente al telar; cuando Leftraru junta los piñones, lo espera revolviendo la olla. |
 
 ## La abuela (kuku)
 
