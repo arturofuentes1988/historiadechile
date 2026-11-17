@@ -47,6 +47,7 @@ Todo lo físico es propuesta nuestra. Solo Leftraru y el nombre de su padre vien
 | **Ropa** | Makuñ negro con franjas rojas y blancas, el más elaborado de la aldea. Trarilonko claro. Collar de llanka. Lleva un bastón de mando de madera. |
 | **Color propio** | Negro con blanco. |
 | **Gesto** | Antes de responder, mira hacia el cerro. |
+| **En el juego** | Modelo 3D pintado a mano (boceto 1). Camina, habla y escucha con movimientos traspasados de Leftraru y Millaray. El bastón de mando todavía no lo lleva. |
 
 ## Millaray — la madre
 

@@ -21,12 +21,14 @@ export function createSound() {
   const bells = (d, sr, t0, dur, count, amp) => { for (let k = 0; k < count; k++) { const f = R(3000, 6200), i0 = Math.floor((t0 + R(0, dur)) * sr), n = Math.floor(0.14 * sr), a = R(0.3, 1) * amp; let ph = 0; for (let i = 0; i < n && i0 + i < d.length; i++) { const t = i / sr; ph += 6.283 * f / sr; d[i0 + i] += (Math.sin(ph) + 0.5 * Math.sin(ph * 1.47)) * a * Math.min(1, t / 0.002) * Math.exp(-t * 50); } } };
   // un "toc" corto y afinado: madera contra madera, o una semilla que cae en la bolsa
   const tock = (d, sr, t0, f, amp, dec = 60, len = 0.18) => { let ph = 0; const i0 = Math.floor(t0 * sr), n = Math.floor(len * sr); for (let i = 0; i < n && i0 + i < d.length; i++) { const t = i / sr; ph += 6.283 * f / sr; d[i0 + i] += ((Math.sin(ph) + 0.4 * Math.sin(ph * 2.76)) * Math.exp(-t * dec) + (rnd() * 2 - 1) * 0.55 * Math.exp(-t * 420)) * amp; } };
-  // la voz de Leftraru cuando hace fuerza: un zumbido de garganta que baja de tono, pasado por las resonancias de una vocal
-  // abierta (forma: dónde resuena, con qué ancho y cuánto), con un poco de aire al empezar
-  const voz = (d, sr, t0, dur, f0, f1, amp, forma) => { const i0 = Math.floor(t0 * sr), n = Math.floor(dur * sr), ph = new Float64Array(16); let tiembla = 0;
-    for (let i = 0; i < n && i0 + i < d.length; i++) { const t = i / sr, u = i / n; tiembla += (rnd() - 0.5) * 0.02 - tiembla * 0.01; const f = (f0 + (f1 - f0) * u ** 0.7) * (1 + tiembla * 0.3), e = Math.min(1, t / 0.02) * Math.min(1, (dur - t) / 0.08) ** 1.4; let v = 0;
-      for (let h = 1; h < 16 && f * h < sr * 0.45; h++) { ph[h] += 6.283 * f * h / sr; let g = 0; for (const [F, B, A] of forma) g += A / (1 + ((f * h - F) / B) ** 2); v += Math.sin(ph[h]) * g / h; }
-      d[i0 + i] += (v + (rnd() * 2 - 1) * 0.1 * Math.exp(-t * 28)) * amp * e; } };
+  // La voz de Leftraru: un zumbido de garganta pasado por las resonancias de la boca. tono(u): la altura a lo largo del grito
+  // (u va de 0 a 1); de, a: dónde resuena la boca al empezar y ya abierta (cada resonancia: dónde, con qué ancho y cuánto), y
+  // abre: en qué parte del grito termina de abrirse; brillo: menos es más brillo (voz apretada, de grito); ronca: cuánto raspa.
+  const voz = (d, sr, t0, dur, tono, amp, de, a, abre = 0.2, brillo = 1, ronca = 0) => { const i0 = Math.floor(t0 * sr), n = Math.floor(dur * sr), ph = new Float64Array(26); let tiembla = 0;
+    for (let i = 0; i < n && i0 + i < d.length; i++) { const t = i / sr, u = i / n, k = Math.min(1, u / abre); tiembla += (rnd() - 0.5) * 0.02 - tiembla * 0.01;
+      const f = tono(u) * (1 + tiembla * 0.3), e = Math.min(1, t / 0.014) * Math.min(1, (dur - t) / 0.07) ** 1.3 * (1 - ronca * (0.5 + 0.5 * Math.sin(t * 452)) * (1 - u)); let v = 0;
+      for (let h = 1; h < 26 && f * h < sr * 0.45; h++) { ph[h] += 6.283 * f * h / sr; let g = 0; for (let q = 0; q < a.length; q++) g += (de[q][2] + (a[q][2] - de[q][2]) * k) / (1 + ((f * h - (de[q][0] + (a[q][0] - de[q][0]) * k)) / (de[q][1] + (a[q][1] - de[q][1]) * k)) ** 2); v += Math.sin(ph[h]) * g / h ** brillo; }
+      d[i0 + i] += (v + (rnd() * 2 - 1) * 0.16 * Math.exp(-t * 34)) * amp * e; } };
   // el aire del bosque: tres ecos cortos que se van apagando, para que nada suene pegado al oído
   const air = (d, sr, mix = 0.25) => { for (const [ms, g] of [[83, 0.5], [137, 0.36], [211, 0.26]]) { const k = Math.floor(ms / 1000 * sr); for (let i = k; i < d.length; i++) d[i] += d[i - k] * g * mix; } };
   const grains = (d, sr, count, len, amp) => { for (let k = 0; k < count; k++) { const i0 = Math.floor(rnd() * (d.length - len * sr)), n = Math.floor(R(0.3, 1) * len * sr), a = R(0.3, 1) * amp; for (let i = 0; i < n; i++) d[i0 + i] += (rnd() * 2 - 1) * a * Math.exp(-i / (n * 0.3)); } };
@@ -39,8 +41,10 @@ export function createSound() {
       buf[`paso-agua-${v}`] = make(0.5, (d, sr) => { noise(d); lp(d, sr, 1200); hp(d, sr, 300); env(d, sr, 0.03, 0.12); for (let k = 0; k < 7; k++) tone(d, sr, R(0.03, 0.3), R(0.02, 0.05), R(500, 1400), R(900, 2200), 0.12); });
       buf[`arbusto-${v}`] = make(0.6, (d, sr) => { grains(d, sr, 40, 0.04, 1); hp(d, sr, 1200); lp(d, sr, 3800); for (let i = 0; i < d.length; i++) { const t = i / sr; d[i] *= Math.sin(Math.PI * t / 0.6) ** 1.5 * (0.6 + 0.4 * Math.sin(t * 40 + v)); } });
     }
-    // el esfuerzo de un salto: un «¡hop!» corto, de niño, que no llega a grito
-    buf.esfuerzo = make(0.24, (d, sr) => { voz(d, sr, 0.005, 0.17, 350, 250, 1, [[760, 110, 1], [1400, 140, 0.55], [3100, 240, 0.2]]); lp(d, sr, 4600); air(d, sr, 0.1); });
+    // el grito del salto: un «¡já!» corto y decidido, de niño valiente. La voz sube de golpe y se queda arriba (si bajara, sonaría
+    // a queja), con la boca abriéndose a una «a» y la garganta apretada
+    buf.grito = make(0.36, (d, sr) => { voz(d, sr, 0.004, 0.29, (u) => 430 + 100 * Math.sin(Math.min(1, u / 0.28) * Math.PI / 2) - 55 * Math.max(0, (u - 0.6) / 0.4) ** 2, 1,
+      [[760, 120, 1], [1380, 150, 0.7], [3000, 250, 0.3]], [[1060, 130, 1], [1620, 160, 0.85], [3200, 260, 0.45]], 0.2, 0.72, 0.14); lp(d, sr, 5600); air(d, sr, 0.1); });
     // rodar por el suelo: el golpe sordo del hombro en la tierra, el roce del cuerpo y las hojas, y los pies que vuelven a caer
     buf.rodar = make(0.66, (d, sr) => { noise(d);
       for (let i = 0; i < d.length; i++) { const t = i / sr, golpe = (t < 0.04 ? t / 0.04 : Math.exp(-(t - 0.04) * 36)) + (t > 0.4 ? 0.8 * Math.exp(-(t - 0.4) * 32) : 0), roce = 0.3 * Math.sin(Math.PI * Math.min(1, t / 0.6)) * (0.6 + 0.4 * Math.sin(t * 46)); d[i] *= golpe + roce; }

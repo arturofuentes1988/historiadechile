@@ -508,7 +508,7 @@ function updatePlayer(dt) {
       yaw = Math.max(-0.9, Math.min(0.9, c)); pit = Math.max(-0.4, Math.min(0.3, -Math.atan2(a.g.position.y + a.h * 0.94 - (q.y - FEET + boy.h * 0.94), Math.hypot(a.x - q.x, a.z - q.z) || 1))); } // y levanta o baja la vista hasta su cara
     player.giro = (player.giro || 0) + (giro - (player.giro || 0)) * Math.min(1, dt * 10); // cuánto está girando en el lugar: da los pasitos
     player.miraY = (player.miraY || 0) + (yaw - (player.miraY || 0)) * Math.min(1, dt * 6); player.miraX = (player.miraX || 0) + (pit - (player.miraX || 0)) * Math.min(1, dt * 6); }
-  if (player.grounded && state === 'play' && !ui.open && !talk && !focus && !acc.sitting && !auto && !apunta && !rueda && down('saltar')) { player.vy = 6.6 * (ui.skill('salto') ? 1.22 : 1); player.grounded = false; snd.play('esfuerzo', 0.32, 0.95 + Math.random() * 0.1); } /* al saltar se le escapa un quejido corto, de esfuerzo */
+  if (player.grounded && state === 'play' && !ui.open && !talk && !focus && !acc.sitting && !auto && !apunta && !rueda && down('saltar')) { player.vy = 6.6 * (ui.skill('salto') ? 1.22 : 1); player.grounded = false; snd.play('grito', 0.45, 0.96 + Math.random() * 0.09); } /* al saltar suelta un grito corto, de valiente */
   player.vy = Math.max(-25, player.vy - 18 * dt);
   if (player.vy > 0) ctrl.disableSnapToGround(); else ctrl.enableSnapToGround(0.3);
   const mvx = (player.dirX || 0) * player.speed * dt, mvz = (player.dirZ || 0) * player.speed * dt;
@@ -687,18 +687,22 @@ for (const i of acc.pins) { const it = world.items[i]; if (it && !it.taken) { it
 // La línea parte siempre de Leftraru: a medida que avanza, lo recorrido deja de dibujarse.
 let guia = null, guiaT = null, guiaVia = false, guiaNo = null; // guiaNo: la misión de la historia a la que el jugador le quitó la guía (no se le vuelve a poner sola)
 // ---------- el casillero del arco, sobre los botones de abajo a la derecha ----------
-// Aparece cuando Leftraru ya tiene el arco. Arriba, el arco (en la mano o guardado) con las flechas que quedan: un clic lo saca
-// o lo guarda. Abajo, hacer una flecha: dice lo que pide y lo que llevas; si falta algo, queda marcado en el mapa dónde buscarlo.
-let armaFirma = null;
+// Aparece cuando Leftraru ya tiene el arco: dos casillas chicas, como los botones de abajo. La del arco lleva en la esquina las
+// flechas que quedan, y una raya de cobre cuando va en la mano: un clic lo saca o lo guarda. La otra hace una flecha; un punto
+// rojo avisa que falta algo, y si se usa así queda marcado en el mapa dónde buscarlo. Al señalarlas sale escrito el detalle.
+let armaFirma = null, armaSobre = null;
 $('arma-arco').addEventListener('click', () => { if (state === 'play' && !talk) acc.equipar(); });
 $('arma-hacer').addEventListener('click', () => { if (state === 'play' && !talk) acc.hacerFlecha(); });
+for (const id of ['arma-arco', 'arma-hacer']) { const b = $(id); b.addEventListener('mouseenter', () => { armaSobre = b; $('arma-nombre').textContent = b.dataset.nombre || ''; }); b.addEventListener('mouseleave', () => { if (armaSobre === b) armaSobre = null; }); }
 function updateArma() {
   const a = acc.arma, firma = a.tiene ? `${a.eq}|${a.flechas}|${a.quila}|${a.pluma}` : ''; if (firma === armaFirma) return; armaFirma = firma;
   $('arma').classList.toggle('hay', a.tiene); if (!a.tiene) return;
   const cuantas = (n, una, varias) => `${n} ${n === 1 ? una : varias}`, lleno = a.flechas >= a.tope;
-  $('arma-arco').classList.toggle('on', a.eq); $('arma-arco').classList.toggle('sin', !a.flechas); $('arma-estado').textContent = a.eq ? 'en la mano' : 'guardado'; $('arma-n').textContent = a.flechas; $('arma-nt').textContent = a.flechas === 1 ? 'flecha' : 'flechas';
-  $('arma-llevas').innerHTML = lleno ? 'Ya llevas todas las que caben' : `Llevas <span class="${a.quila ? '' : 'falta'}">${cuantas(a.quila, 'caña', 'cañas')}</span> y <span class="${a.pluma ? '' : 'falta'}">${cuantas(a.pluma, 'pluma', 'plumas')}</span>`;
+  $('arma-arco').classList.toggle('on', a.eq); $('arma-arco').classList.toggle('sin', !a.flechas); $('arma-n').textContent = a.flechas;
+  $('arma-arco').dataset.nombre = `Arco ${a.eq ? 'en la mano' : 'guardado'} · ${cuantas(a.flechas, 'flecha', 'flechas')}`;
   $('arma-hacer').classList.toggle('no', lleno || !a.quila || !a.pluma);
+  $('arma-hacer').dataset.nombre = lleno ? 'Ya llevas todas las flechas que caben' : `Hacer flecha · pide 1 caña de quila y 1 pluma · llevas ${cuantas(a.quila, 'caña', 'cañas')} y ${cuantas(a.pluma, 'pluma', 'plumas')}`;
+  if (armaSobre) $('arma-nombre').textContent = armaSobre.dataset.nombre;
 }
 function setGuia(g, quien) { // quien: 'jugador' si la puso o la quitó él en el mapa o en la lista; 'sola' si la pone la historia
   if (quien === 'jugador') guiaNo = !g && guia && guia.kind === 'mision' ? guia.id : null;
@@ -845,7 +849,11 @@ if (!ANTIGUO) import('three/examples/jsm/loaders/GLTFLoader.js').then(({ GLTFLoa
 // movs: sus otros movimientos (archivos chicos, como los de Leftraru) y cuánto se deja de cada uno: mueve las manos al hablar,
 // escucha con atención cuando calla, y camina. paso: a qué velocidad avanza, en metros por segundo, el caminar tal como viene.
 const GENTE3D = { Millaray: { archivo: 'millaray', mate: [0.2, 0.3], movs: { habla: 0.6, escucha: 0.35, camina: 1 }, paso: 1.25, cara: { piel: 0x9c6240, boca: [[0.32, 5.6, 9.97], [-3.04, 5.53, 8.32], [3.41, 6.13, 7.86], [0.29, 6.28, 10.1], [0.37, 4.7, 9.94]],
-  ojos: [[[-4.43, 11.85, 7.51], [-6.58, 11.64, 6.26], [-2.42, 11.62, 6.95], [-4.49, 12.86, 7.44], [-4.36, 10.77, 7.58]], [[3.62, 12.47, 6.9], [1.75, 11.93, 6.68], [5.7, 12.5, 5.39], [3.55, 13.48, 6.76], [3.69, 11.39, 6.91]]] } } }, gente3d = [];
+  ojos: [[[-4.43, 11.85, 7.51], [-6.58, 11.64, 6.26], [-2.42, 11.62, 6.95], [-4.49, 12.86, 7.44], [-4.36, 10.77, 7.58]], [[3.62, 12.47, 6.9], [1.75, 11.93, 6.68], [5.7, 12.5, 5.39], [3.55, 13.48, 6.76], [3.69, 11.39, 6.91]]] } },
+  // Curiñancu no trae movimientos pedidos para él: hablar y escuchar son los de Millaray y caminar es el de Leftraru, traspasados
+  // a su cuerpo con tools/glb-traspasa.py (el esqueleto es el mismo, pero cada modelo nace con otra postura).
+  Curiñancu: { archivo: 'curinancu', mate: [0.2, 0.3], movs: { habla: 0.6, escucha: 0.35, camina: 1 }, paso: 0.75, cara: { piel: 0x9b6a52, boca: [[0.77, 6.25, 12.94], [-3.4, 5.5, 11.51], [4.69, 6.25, 11.1], [0.76, 6.7, 13.18], [0.81, 5.48, 12.92]],
+    ojos: [[[-3.57, 13.84, 11.03], [-5.17, 13.86, 11.36], [-1.92, 13.82, 10.67], [-3.52, 14.53, 11.82], [-3.49, 13.3, 11.08]], [[4.21, 14.45, 10.31], [2.39, 14.11, 10.12], [5.98, 14.54, 10.04], [4.22, 15.12, 11.18], [4.25, 13.85, 10.44]]] } } }, gente3d = [];
 if (!ANTIGUO) import('three/examples/jsm/loaders/GLTFLoader.js').then(({ GLTFLoader }) => { for (const a of world.life.actors) { const def = GENTE3D[a.name]; if (!def) continue;
   new GLTFLoader().load(`assets/modelos/${def.archivo}.glb`, (gl) => {
     const m = gl.scene; m.updateMatrixWorld(true); const caja = new THREE.Box3().setFromObject(m), e = 1 / (caja.max.y - caja.min.y); // a.g ya va a la escala de su altura: adentro, el modelo mide 1
@@ -942,14 +950,14 @@ function pisa(C, dt, o) { // C: el cuerpo 3D; o: la altura del suelo donde está
   const H = C.H, m = C.m, suelo = o.suelo, apoyado = o.apoyado, d = [0, 0], fx = Math.sin(o.f), fz = Math.cos(o.f);
   if (apoyado) ['Left', 'Right'].forEach((l, i) => { const a = H[l + 'Foot'].getWorldPosition(PA); d[i] = Math.max(-0.4, Math.min(0.4, height(a.x, a.z) - suelo)); });
   for (let i = 0; i < 2; i++) C.pie[i] += (d[i] - C.pie[i]) * Math.min(1, dt * 14);
-  C.junta += ((apoyado ? o.quieto * 0.72 : 0) - C.junta) * Math.min(1, dt * 8);
+  C.junta += ((apoyado ? o.quieto * (o.junta || 0.72) : 0) - C.junta) * Math.min(1, dt * 8); /* o.junta: cuánto se juntan los pies al estar parado (la gente de la aldea, casi del todo) */
   const junta = C.junta, baja = Math.min(C.pie[0], C.pie[1], 0) + junta * 0.045;
   m.position.y = C.y0 + baja / o.h; m.rotation.x += ((apoyado ? Math.max(-0.14, Math.min(0.2, (o.slope || 0) * 0.3)) : 0) - m.rotation.x) * Math.min(1, dt * 6);
   if (junta < 0.02 && Math.abs(C.pie[0]) + Math.abs(C.pie[1]) < 0.012) return; // en lo plano y andando no hay nada que corregir
-  m.updateMatrixWorld(true);
+  m.updateMatrixWorld(true); if (o.centro) { C.medio = C.medio || V3(); H.LeftUpLeg.getWorldPosition(C.medio).add(H.RightUpLeg.getWorldPosition(PA)).multiplyScalar(0.5); }
   ['Left', 'Right'].forEach((l, i) => { const sube = C.pie[i] - baja; if (junta < 0.02 && Math.abs(sube) < 0.008) return; // este pie queda donde lo dejó el movimiento
     const pie = H[l + 'Foot'], cad = H[l + 'UpLeg'].getWorldPosition(PA), rod = H[l + 'Leg'].getWorldPosition(PB), tob = pie.getWorldPosition(PC), L1 = cad.distanceTo(rod), L2 = rod.distanceTo(tob); pie.getWorldQuaternion(QF);
-    const T = PD.copy(tob); T.y += sube; if (junta > 0) { const ad = (tob.x - cad.x) * fx + (tob.z - cad.z) * fz; T.x -= fx * ad * junta; T.z -= fz * ad * junta; } // dónde debe quedar el tobillo
+    const T = PD.copy(tob); T.y += sube; if (junta > 0) { const ad = (tob.x - (o.centro ? C.medio.x : cad.x)) * fx + (tob.z - (o.centro ? C.medio.z : cad.z)) * fz; T.x -= fx * ad * junta; T.z -= fz * ad * junta; } // dónde debe quedar el tobillo: bajo su cadera (o.centro: bajo el medio de las dos, para que un pie no quede delante del otro)
     const eje = PE.copy(T).sub(cad), dist = Math.min(L1 + L2 - 0.004, Math.max(0.05, eje.length())); eje.normalize();
     const a = (L1 * L1 - L2 * L2 + dist * dist) / (2 * dist), hh = Math.sqrt(Math.max(0, L1 * L1 - a * a));
     const polo = PF.copy(rod).sub(cad); polo.x += fx * 0.05; polo.z += fz * 0.05; polo.addScaledVector(eje, -polo.dot(eje)).normalize(); // la rodilla dobla hacia donde ya doblaba (y, ante la duda, hacia adelante)
@@ -1111,11 +1119,11 @@ function updateGente3D(dt) {
     if (H.Spine02) { const b = Math.sin(time * 1.25 + P.fase) * 0.012; H.Spine02.rotateX(b); if (H.neck) H.neck.rotateX(-b); } // respira
     a.g.updateMatrixWorld(true); // el cuerpo de siempre, ya con la postura de este cuadro
     const fx = Math.sin(a.face), fz = Math.cos(a.face);
-    pisa(P, dt, { suelo: a.g.position.y, apoyado: true, f: a.face, quieto: 1 - P.w.camina, slope: 0, h: a.h });
+    pisa(P, dt, { suelo: a.g.position.y, apoyado: true, f: a.face, quieto: 1 - P.w.camina, slope: 0, h: a.h, junta: 0.93, centro: true });
     const inc = a.body.rotation.x; if (Math.abs(inc) > 0.004 && H.Spine02) tuerce(H.Spine02, QR.setFromAxisAngle(VC.set(fz, 0, -fx), inc), 1); // el tronco se inclina igual
     [['Left', a.armL, a.foreL, 1], ['Right', a.armR, a.foreR, -1]].forEach(([l, br, an, sx], i) => { // las manos van a donde están las del cuerpo de siempre; con los brazos caídos, se queda la postura de reposo
-      const uso = suave(0.06, 0.3, Math.abs(br.rotation.x) + Math.abs(an.rotation.x) + Math.abs(br.rotation.z - sx * 0.1)) * (1 - P.w.camina); /* caminando, los brazos los lleva el movimiento */ P.brazo[i] += (uso - P.brazo[i]) * Math.min(1, dt * 8);
-      if (P.brazo[i] < 0.99) apunta(H[l + 'Arm'], fz * sx * 0.17 + fx * 0.04, -1, -fx * sx * 0.17 + fz * 0.04, 0.55 * (1 - P.brazo[i]) * (1 - P.w.camina) * (1 - P.w.habla)); // en reposo, los brazos caen junto al cuerpo
+      const uso = suave(0.06, 0.3, Math.abs(br.rotation.x) + Math.max(0, Math.abs(an.rotation.x) - 0.16) + Math.abs(br.rotation.z - sx * 0.1)) * (1 - P.w.camina); /* caminando, los brazos los lleva el movimiento */ P.brazo[i] += (uso - P.brazo[i]) * Math.min(1, dt * 8);
+      if (P.brazo[i] < 0.99) { const k = (1 - P.brazo[i]) * (1 - P.w.camina) * (1 - P.w.habla); apunta(H[l + 'Arm'], fz * sx * 0.1 + fx * 0.03, -1, -fx * sx * 0.1 + fz * 0.03, 0.85 * k); apunta(H[l + 'ForeArm'], fz * sx * 0.04 + fx * 0.13, -1, -fx * sx * 0.04 + fz * 0.13, 0.7 * k); } // en reposo, los brazos caen junto al cuerpo, los dos iguales, con el codo apenas doblado
       if (P.brazo[i] > 0.01) ikBrazo(H[l + 'Arm'], H[l + 'ForeArm'], H[l + 'Hand'], an.localToWorld(PT.set(0, -0.2, 0.03)), V3(fz * sx * 0.45 - fx * 0.5, -0.75, -fx * sx * 0.45 - fz * 0.5), P.brazo[i]); }); // el codo, hacia abajo, atrás y afuera
     if (H.Head) { VD.set(0, 0, 1).applyQuaternion(a.head.getWorldQuaternion(QD)).normalize(); const mira = PT.copy(VD); // la cabeza mira hacia donde mira la del cuerpo de siempre
       for (const [hueso, k] of [[H.neck, 0.4], [H.Head, 1]]) if (hueso) tuerce(hueso, QR.setFromUnitVectors(VC.copy(P.frente).applyQuaternion(H.Head.getWorldQuaternion(QF)).normalize(), VD.copy(mira)), k); }
