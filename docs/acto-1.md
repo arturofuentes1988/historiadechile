@@ -24,7 +24,7 @@ Guion de trabajo (borrador 3). Un acto de **inmersión**: Leftraru es un niño q
 - **Conversar de cerca:** al hablar con alguien, la cámara se acerca y deja a los dos en primer plano, vistos en ángulo por sobre el hombro de Leftraru. Se vuelven el uno hacia el otro, se miran a la cara, y quien estaba trabajando deja lo suyo mientras habla. Al terminar, la cámara vuelve a su lugar, a la espalda de Leftraru.
 - **La subida al Treng Treng:** el cerro es más ancho y tendido, y el sendero ya no va derecho a la cima: lo rodea por el poniente y el norte, tallado en la ladera, con una pendiente pareja de unos 13 grados (antes llegaba a 40) y unos 150 pasos de largo. Llega arriba por el oriente, donde se para Curiñancu.
 - **Recolectar y preparar:** lo que alguien le enseñó a preparar se puede juntar siempre, pero de a poco (hasta tres de cada cosa). Se prepara junto al fogón, desde la bolsa. Hoy son dos cosas: el **agua de hierbas** (maqui y boldo; devuelve vida) y las **flechas** (una caña de quila y una pluma). El agua de hierbas no es un lawen: los remedios siguen siendo de la machi.
-- **El arco:** se tensa con la tecla de acción, quieto y de frente, y se suelta solo. Al blanco de paja se le tira siempre; a un pudú, solo durante el encargo de Ñamku, de cerca y sin haberlo espantado. A las crías no se les tira. Terminado el encargo no se caza más: «se caza cuando hace falta».
+- **El arco:** se apunta manteniendo apretado el botón derecho del ratón (Leftraru se para de medio lado, sostiene el arco con la mano izquierda estirada y lo tensa con la derecha; la cámara se pone donde van sus ojos, sobre el hombro derecho —el que lleva la cuerda—, como al levantar un arma en un juego de disparos: adelante se ven la mano izquierda con el arco y la flecha puesta, y la mira al centro. Mientras apunta, su cabeza no se dibuja, para que no tape la vista) y se suelta la flecha con el botón izquierdo. La flecha vuela de verdad: sale con más fuerza mientras más tenso está el arco, cae con su peso y se clava donde pega. Cada tiro gasta una flecha de la bolsa; las que quedan clavadas en el blanco o en el suelo se recuperan pasando a su lado, y las demás se hacen junto al fogón, con una caña de quila y una pluma cada una. Al blanco de paja se le tira siempre; un pudú cae solo durante la caza de la misión 4; a las crías nunca, y el arco no se suelta si hay una persona adelante. En pantallas táctiles, sin ratón, se tira con la tecla de acción y la flecha apunta sola.
 - **La aldea se llama Pewenko** («agua de los pewenes»; nombre puesto por nosotros, por confirmar). Tiene a la vista los oficios de todos los días: cueros estirados en bastidores, las armas (lanzas de coligüe, mazas, hondas y un arco), los instrumentos de las fiestas (trutruka, pifilkas y wadas), la piedra de moler y el lugar de la greda, con gente trabajando en cada uno, y algunos árboles entre las casas. Cueros, armas e instrumentos se observan y tienen ficha.
 - **La figura tallada del bosque viejo:** a pocos pasos del árbol abuelo. Al observarla, la cámara la rodea y se cuenta lo que la familia dice de ella: la promesa de tomar solo lo necesario. No es un «tótem» (eso no existe en la cultura mapuche) ni un chemamüll, que acompaña a los muertos: es invento nuestro, contado como memoria de esta familia. Por confirmar con quien revise la cultura.
 - **El refugio del bosque:** una ruka chica al final del sendero del norte, en el bosque de pewenes, con un fuego afuera. Junto a ese fuego la vida vuelve más rápido y se puede preparar lo que se sabe, igual que en el fogón.
@@ -72,17 +72,19 @@ La pregunta que mueve el capítulo es sencilla: **¿qué tiene que aprender un n
 | **Planteamiento** | 1 · Los piñones del pewen | Millaray, su madre | El bosque de pewenes | Le dan un encargo de niño y lo cumple. Aprende a pedir antes de tomar. |
 | **Planteamiento** | 2 · El traro | Curiñancu, su padre | El cerro Treng Treng | Ve su mundo entero por primera vez y entiende su nombre: mirar es su fuerza. |
 | **Nudo** | 3 · Las plantas de la machi | La machi | El monte soleado, el claro del maqui, el lugar de los antiguos | Por primera vez alguien depende de él: Ñamku está enfermo. Ya no es un mandado, es un cuidado. |
-| **Nudo** | 4 · Los invitados | Ñamku (ya sano) y Rayen | El camino de la costa | El mundo es más grande que la aldea: recibe a gente de afuera en nombre de los suyos. |
-| **Clímax** | 5 · La noche de las historias | La abuela | El fogón, de noche | Escucha la memoria de su pueblo, incluida la de los incas: ya una vez vinieron extraños a mandar. |
-| **Cierre** | 6 · We Tripantu | Toda la aldea | La poza del río, al alba | Recibe el año nuevo con todos. El mundo está entero… por última vez. |
+| **Nudo** | 4 · El arco de Ñamku | Ñamku (ya sano) | El blanco de paja y el monte de los pudúes | Aprende a hacer sus flechas y a tirar con el arco, y caza por primera vez: no para él, para la olla de todos. |
+| **Nudo** | 5 · Los invitados | Ñamku (ya sano) y Rayen | El camino de la costa | El mundo es más grande que la aldea: recibe a gente de afuera en nombre de los suyos. |
+| **Clímax** | 6 · La noche de las historias | La abuela | El fogón, de noche | Escucha la memoria de su pueblo, incluida la de los incas: ya una vez vinieron extraños a mandar. |
+| **Cierre** | 7 · We Tripantu | Toda la aldea | La poza del río, al alba | Recibe el año nuevo con todos. El mundo está entero… por última vez. |
 
-**Cómo se encadenan:** al entregar los piñones, Millaray lo manda con su padre; en la cima, Curiñancu le avisa que Ñamku enfermó y que la machi lo busca; al sanar, Ñamku le anuncia que vienen los de la costa; los invitados traen la noche larga, y la noche termina en el río. Ninguna misión aparece antes de tiempo.
+**Cómo se encadenan:** al entregar los piñones, Millaray lo manda con su padre; en la cima, Curiñancu le avisa que Ñamku enfermó y que la machi lo busca; al sanar, Ñamku le dice que le debe una y, ya de pie, le enseña el arco para que traiga carne a la fiesta; al recibir el pudú le anuncia que los de la costa ya vienen por el camino; los invitados traen la noche larga, y la noche termina en el río. Ninguna misión aparece antes de tiempo.
 
 **Lo que el jugador sabe y Leftraru no:** el relato de entrada dice que al norte llegaron hombres extraños y que la historia lo llamará Lautaro. Nadie en la aldea habla de eso. Esa distancia es la que le da peso al cierre.
 
 ### 1 — Los piñones del pewen *(jugable)*
 **Lugar:** la aldea y el bosque de pewenes. **Con:** Millaray.
 Su madre lo llama desde el telar. Antes de mandarlo al bosque le pide dos cosas que sirven de tutorial: mirar bien el telar y alcanzarle la lana. Después viene el encargo: vienen los parientes de la costa y los piñones no alcanzan. Hay que ir al bosque del norte, recoger los que quedan (uno está sobre unas rocas) y **volver a entregárselos**. Al tomar el último, una escena breve lo muestra agradeciendo al pewen y a su madre junto al fogón, revolviendo la olla que humea. Ahí lo espera hasta que le entrega los piñones; después vuelve al telar.
+**La entrega se ve entera**, en tres momentos que van entre las frases de la madre: Leftraru se para a su lado, junto a la olla, y le muestra los piñones en un canasto bajo (llepu) que sostiene con las dos manos; cuando ella dice que alcanzan, inclina el canasto y los piñones caen a la olla; y ella deja el palo en la olla y le pasa la mano por la cabeza (él cierra los ojos un momento). La cámara se pone al frente, al otro lado de la olla.
 - **Enseña:** moverse, saltar, conversar, recoger.
 - **Muestra:** el pewen como árbol que alimenta; la costumbre de no sacudirlo.
 - **Enlace:** Millaray le dice que su padre subió al Treng Treng y preguntó por él.
@@ -101,22 +103,31 @@ Curiñancu lo lleva al cerro: va adelante por el sendero, a su paso, le cuenta c
 La machi ya no puede andar por el monte: Leftraru será sus pies. Reúne hojas de canelo, corteza de quillay y hojas de maqui, vuelve con ella y le lleva el lawen a Ñamku.
 - **Enseña:** reconocer plantas y usar la tecla de acción.
 - **Muestra:** que lo que sana no es solo la planta, sino que alguien fue a buscarla pensando en el enfermo.
-- **Enlace:** Ñamku, ya con el remedio, le anuncia que vienen los de la costa.
+- **Enlace:** Ñamku, ya con el remedio, le dice que le debe una y que vuelva a verlo apenas se levante.
 > MACHI: Antes de cortar, pide. Di para quién es. La planta que se saca sin permiso no sana a nadie.
 
-### 4 — Los invitados *(por hacer)*
+### 4 — El arco de Ñamku *(jugable)*
+**Lugar:** la ruka de Ñamku, el blanco de paja al oriente y el monte. **Con:** Ñamku.
+Antes era un encargo secundario («La primera caza»); desde el 17 de noviembre de 2026 es parte de la historia. Ñamku, ya sano, quiere pagar lo que debe enseñando: vienen los de la costa y en la olla no hay más que piñones. Leftraru junta tres cañas de quila y tres plumas, Ñamku le enseña a hacer flechas y le entrega el arco de su padre con tres flechas. Prueba la puntería dándole tres veces al atado de paja, sale tras un pudú, le agradece, lo carga y se lo lleva a Ñamku, que lo reparte.
+- **Enseña:** apuntar con el botón derecho del ratón y soltar la flecha con el izquierdo; hacer flechas junto al fogón; seguir huellas sin correr.
+- **Muestra:** que se caza cuando hace falta y para todos, pidiendo antes y tomando uno solo.
+- **Enlace:** Ñamku le avisa que los de la costa ya deben venir por el camino y que alguien tendrá que salir a recibirlos.
+- **Por confirmar:** el arco y la flecha en 1545, y que un niño de once años saliera a cazar.
+> ÑAMKU: Se caza cuando hace falta, no cuando dan ganas.
+
+### 5 — Los invitados *(por hacer)*
 **Lugar:** camino de la costa. **Con:** Antü y Rayen.
 Llegan familias de la costa para celebrar juntos. Leftraru y Rayen salen a recibirlos y los guían a la aldea.
 - **Muestra:** que los pueblos de la costa y del cerro se visitaban e intercambiaban: ellos traen algas y pescado seco, la aldea ofrece los piñones que él mismo recogió.
 - **Historia:** un niño de la costa cuenta sobre el *Shumpall*, el espíritu que vive en el agua.
 
-### 5 — La noche de las historias *(por hacer)*
+### 6 — La noche de las historias *(por hacer)*
 **Lugar:** el fogón. **Con:** todos.
 La noche más larga del año. Nadie duerme: se come, se conversa y se cuentan historias hasta el alba. El jugador elige a quién escuchar.
 - **Historias:** *el regalo del pewen* (la abuela), *la memoria de los incas* (Ñamku), y las que el jugador haya ido encontrando en sus encargos.
 - **Muestra:** que la historia y el saber se pasaban hablando, de mayores a niños.
 
-### 6 — We Tripantu *(por hacer)*
+### 7 — We Tripantu *(por hacer)*
 **Lugar:** el río. **Con:** toda la aldea.
 Antes del alba todos bajan al río a bañarse para recibir el año nuevo. Amanece sobre el volcán. El traro cruza el cielo.
 - **Cierre del acto:** la cámara se aleja sobre el bosque. El mundo está entero.
@@ -146,7 +157,6 @@ Son opcionales y se pueden hacer en cualquier orden. **Aparecen en la lista cuan
 | | Plantas del suelo | Observar helecho, juncos, flores, maqui, quila y copihue. |
 | **Ñamku** | La casa y el fuego | Observar la ruka, el fogón, el rewe, el telar y las figuras de madera. |
 | | El monte soleado | Observar peumo, boldo, quillay y litre. |
-| | La primera caza | Después de la misión 3. Llevarle tres cañas de quila y tres plumas; enseña a hacer flechas y entrega su arco. Tres tiros al blanco de paja, salir tras un pudú para la olla de la fiesta, agradecer y traerlo. Por confirmar con quien revise la cultura: el arco y la flecha en esta zona en 1545, y la caza hecha por un niño de once años. |
 
 ### Ideas para más adelante
 
@@ -214,7 +224,14 @@ Todavía no existían aquí caballos, ovejas, trigo, hierro ni platería. Los an
 - **De dónde sale:** un dibujo hecho en kie.ai (opción C, pintado a mano: `docs/personaje/leftraru-c.png`), pasado a 3D con Tripo y con esqueleto y movimientos de Higgsfield. Los archivos están en `public/assets/modelos/`: el modelo con el caminar (`leftraru-camina.glb`) y, aparte, archivos chicos con solo el movimiento (quieto, correr, saltar, recoger, beber), que saca `tools/glb-animacion.mjs`.
 - **Es el cuerpo de siempre.** El cuerpo armado por código sigue debajo, invisible, llevando el movimiento y los choques. Si el modelo no carga se ve ese; para verlo a propósito, abrir el juego con `?antiguo` al final de la dirección.
 - **Pasos:** quieto, paso y trote se mezclan según la velocidad, y cada uno va al ritmo de lo que avanza para que los pies no patinen. A la velocidad normal (3,3 m/s) va trotando: el caminar que trae el modelo es de paseo (0,6 m/s). Un trote suave hecho a medida sería otro movimiento del catálogo.
+- **Quieto:** quieto quiere decir quieto. El movimiento de estar parado que trae el modelo se balancea mucho, así que se usa su postura media y casi nada de ese vaivén (un 3,5 %, y a poco más de la mitad de la velocidad): la cabeza se mueve menos de un centímetro y las manos, unos dos. Lo que se ve es una respiración leve en el pecho, el pestañeo y la cabeza cuando mira algo. La gente de la aldea, de pie, también quedó así: apenas se mece. Los demás personajes en 3D usarán la misma regla.
 - **Terreno:** bajo cada pie se mira la altura del suelo; la cadera baja hasta que el pie de más abajo pisa y la otra pierna se recoge. En cuesta el cuerpo se inclina. Parado, los pies se juntan (el movimiento de estar quieto los traía como a medio paso).
 - **Cara:** la cara es un dibujo, así que el pestañeo y los labios son piezas chicas pegadas a la cabeza: un párpado por ojo, que baja cada 2 a 6 segundos, y una boca oscura que se abre cuando Leftraru dice algo (los avisos entre «») y al saludar al empezar una conversación.
 - **Mirada:** suelto, la cabeza sigue a la cámara; conversando, queda quieta y de frente a la cara de quien le habla.
 - **Luz:** recibe el mismo sol, cielo, sombras y fogón que el resto del mundo, y da sombra.
+
+**Con el arco** se para de medio lado y lo sostiene con la mano izquierda estirada hacia donde apunta la mira; la derecha lleva la cuerda atrás. Es una postura hecha a mano: en el catálogo de movimientos hay tiros con arco hechos (*Archery_Shot*), por si se quiere cambiar.
+
+**Los demás personajes** se harán igual: primero un boceto en kie.ai (`node tools/kie-personaje.mjs millaray`), en el mismo estilo pintado, y después el 3D. **Millaray ya está en 3D en el juego** (boceto 1, `millaray-1.png`; el modelo es `public/assets/modelos/millaray.glb`, unos 30.000 triángulos, con esqueleto y su movimiento de reposo). Va encima de su cuerpo de siempre, que queda invisible y sigue decidiendo todo: las manos del modelo van a donde están las manos de ese cuerpo, la cabeza mira hacia donde mira la otra y el tronco se inclina igual. Por eso teje, revuelve la olla (con el palo en la mano), entrega, recibe y acaricia sin haber tenido que rehacer nada. Pestañea y mueve los labios cuando habla. Ahora teje de frente al telar, a un paso de la tela. Todavía no camina: no tiene ese movimiento (en el catálogo cuesta 8 créditos). Los otros personajes se pueden pasar a 3D con el mismo método: agregarlos a `GENTE3D` en `src/main.js`, con las medidas de sus ojos y su boca.
+
+Al pedir un modelo a Tripo hay que indicar siempre el límite de caras (30.000) y sin mapas extra: sin eso llega de un millón y medio de triángulos. Y antes de pedir el esqueleto hay que girarlo con `tools/glb-gira.py`, porque llega mirando de lado.

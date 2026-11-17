@@ -199,9 +199,24 @@ let dragging = false;
 function lock() { /* ya no se captura el ratón */ }
 const locked = () => false;
 document.body.classList.add('sin-raton'); // deja a la vista la ayuda de cómo girar, hasta que se arrastra por primera vez
-renderer.domElement.addEventListener('mousedown', (e) => { if (state !== 'play') return; dragging = true; document.body.classList.add('girando'); e.preventDefault(); });
+renderer.domElement.addEventListener('mousedown', (e) => { if (state !== 'play') return; dragging = true; document.body.classList.add('girando'); e.preventDefault();
+  if (e.button === 2 && puedeApuntar() && acc.apuntar(true)) { const pr = renderer.domElement.requestPointerLock && renderer.domElement.requestPointerLock(); if (pr && pr.catch) pr.catch(() => { /* sin captura del ratón se apunta igual, arrastrando */ }); } // el botón derecho tensa el arco
+  else if (e.button === 0 && acc.apunta) dispara(); }); // y el izquierdo suelta la flecha
 renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
-addEventListener('mouseup', () => { dragging = false; document.body.classList.remove('girando'); });
+addEventListener('mouseup', (e) => { if (e.button === 2) dejaDeApuntar(); if (!e.buttons) { dragging = false; document.body.classList.remove('girando'); } });
+// ---------- el arco: apuntar y soltar ----------
+// Con el botón derecho apretado Leftraru tensa el arco, la cámara se le pone al hombro y aparece la mira. El ratón queda
+// capturado mientras tanto, para poder girar sin que el puntero se salga de la ventana.
+const puedeApuntar = () => state === 'play' && !talk && !focus && !ui.open && !auto && !cine.active && !acc.sitting && player.grounded;
+const capturado = () => document.pointerLockElement === renderer.domElement;
+function dejaDeApuntar() { if (acc.apunta) acc.apuntar(false); if (capturado()) document.exitPointerLock(); }
+function dispara() { // suelta la flecha hacia donde marca la mira: lo primero que se ve al centro de la pantalla
+  const d = camera.getWorldDirection(V3()), o = camera.position, ini = 1.7; let dist = 70; // ini: lo que haya entre la cámara y Leftraru (un muro pegado a la espalda) no cuenta
+  const hit = physics.castRay(new RAPIER.Ray(V3().copy(o).addScaledVector(d, ini), d), 70 - ini, true, undefined, undefined, pCol); if (hit) dist = ini + (hit.timeOfImpact ?? hit.toi);
+  for (let k = 2; k < dist; k += 0.5) if (o.y + d.y * k < height(o.x + d.x * k, o.z + d.z * k)) { dist = k; break; } // el suelo, a pasos
+  const algo = acc.mira(o, d); if (algo !== null && algo < dist) dist = algo; // un blanco o un pudú que esté antes
+  acc.soltar(cuerpo ? cuerpo.H.LeftHand.getWorldPosition(V3()) : V3(pp().x, pp().y + 0.35, pp().z), V3().copy(o).addScaledVector(d, dist));
+}
 renderer.domElement.addEventListener('wheel', (e) => { if (state === 'play' && !focus) cam.dist = Math.min(9, Math.max(2.6, cam.dist + Math.sign(e.deltaY) * 0.6)); }, { passive: true });
 
 // ---------- fotos para el cuaderno: se toman del elemento real, en el momento de descubrirlo ----------
@@ -234,7 +249,7 @@ const herePhoto = () => { draw(); return grab(); };
 // ---------- observar y conversar (tecla E) ----------
 let near = null, scanT = 0, talk = null, misT = 0, lastAviso = null, still = 0;
 function applySkills() { explorer.reach = ui.skill('vista') ? 1.7 : 1; world.life.shyR = ui.skill('pudu') ? 3.5 : 9; }
-function say() { snd.play('hablar-sigue', 0.4, 0.96 + Math.random() * 0.08); document.body.classList.add('talking'); const t = talk; $('dlg-name').textContent = t.name; $('dlg-text').textContent = t.lines[t.i]; $('dlg-more').textContent = `${keyName(opts.keys.observar)} · ${t.i < t.lines.length - 1 ? 'seguir' : 'cerrar'}`; $('dialogo').classList.add('on'); }
+function say() { snd.play('hablar-sigue', 0.4, 0.96 + Math.random() * 0.08); if (talk.who && talk.who.c3) talk.who.c3.habla = Math.min(6, 0.6 + talk.lines[talk.i].length * 0.05); /* quien habla, si tiene cara, mueve los labios */ document.body.classList.add('talking'); const t = talk; $('dlg-name').textContent = t.name; $('dlg-text').textContent = t.lines[t.i]; $('dlg-more').textContent = `${keyName(opts.keys.observar)} · ${t.i < t.lines.length - 1 ? 'seguir' : 'cerrar'}`; $('dialogo').classList.add('on'); }
 // Muestra la línea que toca. Antes de una línea puede venir un gesto (entregar, recibir, trabajar con las manos…), y
 // después de la última se cierra la conversación. gestos: [[antes de qué línea, tipo, qué cosa], …].
 function sigue() {
@@ -253,9 +268,15 @@ const COSA = { pinon: [0x8a4a2a, 0.07, 0.6], lawen: [0x6a4632, 0.07, 0.55], reme
 const manoDe = (q, izq) => (q === boy && cuerpo && cuerpo.H.RightHand ? cuerpo.H[izq ? 'LeftHand' : 'RightHand'].getWorldPosition(V3()) : q.foreR.localToWorld(V3(0, -0.2, 0.03))); // izq: con el cuerpo nuevo, que bebe con la izquierda
 function hazGesto(tipo, cosa, a, fin) {
   if (!a || acc.sitting) return fin();
+  if (tipo === 'muestra' || tipo === 'echa' || tipo === 'caricia') { // la entrega de los piñones, junto a la olla (más abajo)
+    if (a.mode !== 'cook' || (tipo !== 'muestra' && entrega.a !== a)) return tipo === 'echa' ? hazGesto('da', cosa, a, fin) : fin(); // en otro lugar, la entrega de siempre
+    const empieza = () => { gesto = { tipo, a, t: 0, dur: tipo === 'muestra' ? 1.7 : tipo === 'echa' ? 2.9 : 2.7, cosa, fin, sono: false }; planoOlla(a); };
+    if (tipo !== 'muestra') return empieza();
+    const fx = Math.sin(a.face), fz = Math.cos(a.face), sx = a.x - fz * 0.7 + fx * 0.06, sz = a.z + fx * 0.7 + fz * 0.06; // se para a su derecha, los dos de cara a la olla
+    talk.gira = false; gesto = { tipo: 'llega' }; auto = { x: sx, z: sz, face: Math.atan2(OLLA.x - sx, OLLA.z - sz), done: () => { if (a.habla) { const B = cabeza(boy); a.habla.x = B.x; a.habla.y = B.y; a.habla.z = B.z; } entrega.a = a; entrega.esc = 0; for (const q of PIN) { q.t = 0; q.de = null; } empieza(); } }; return; }
   const parte = () => { const [col, r, ly] = COSA[cosa] || [0x4f8a3c, 0.075, 0.8]; cosaM.material.color.setHex(col); cosaM.scale.set(r, r * ly, r); gesto = { tipo, a, t: 0, dur: tipo === 'obra' ? 2.8 : tipo === 'bebe' || tipo === 'come' ? 2.1 : 1.9, cosa, fin, sono: false }; };
   const q = pp(), d = Math.hypot(a.x - q.x, a.z - q.z);
-  if ((tipo === 'da' || tipo === 'recibe') && d > 1.12) { const k = (d - 1.02) / d; gesto = { tipo: 'llega' }; auto = { x: q.x + (a.x - q.x) * k, z: q.z + (a.z - q.z) * k, face: Math.atan2(a.x - q.x, a.z - q.z), done: () => { if (talk && talk.who === a) abrePlano(a, a.mode !== 'cook'); parte(); } }; } // un paso, hasta quedar al alcance de la mano
+  if ((tipo === 'da' || tipo === 'recibe') && d > 1.12) { const k = (d - 1.02) / d; gesto = { tipo: 'llega' }; auto = { x: q.x + (a.x - q.x) * k, z: q.z + (a.z - q.z) * k, face: Math.atan2(a.x - q.x, a.z - q.z), done: () => { if (talk && talk.who === a) { abrePlano(a, a.mode !== 'cook'); if (a.habla) { const B = cabeza(boy); a.habla.x = B.x; a.habla.y = B.y; a.habla.z = B.z; } } parte(); } }; } // un paso, hasta quedar al alcance de la mano
   else parte();
 }
 function updateGesto(dt) {
@@ -268,8 +289,44 @@ function updateGesto(dt) {
     if (!g.sono && u > 0.5) { g.sono = true; snd.play('pinon', 0.45, 0.9); }
   } else if (g.tipo === 'obra') { a.obra = k; if (!g.sono && u > 0.3) { g.sono = true; snd.play('arbusto-2', 0.3, 1.2); } }
   else if (g.tipo === 'bebe') { a.bebe = k; cosaM.visible = k > 0.2; cosaM.position.copy(manoDe(a)); if (!g.sono && u > 0.45) { g.sono = true; snd.play('paso-agua-2', 0.35, 1.3); } }
+  else if (g.tipo === 'muestra') { entrega.alza = ease(Math.min(1, u / 0.62)); entrega.esc = ease(Math.min(1, u / 0.3)); if (u >= 1) { gesto = null; return g.fin(); } return; } // levanta el canasto con los piñones y se lo muestra
+  else if (g.tipo === 'echa') { const e = entrega; e.vuelca = Math.sin(Math.PI * Math.min(1, u / 0.82)); // los va dejando caer a la olla, de a uno
+    for (let i = 0; i < N_PIN; i++) if (PIN[i].t === 0 && u >= 0.07 + 0.6 * i / (N_PIN - 1)) { PIN[i].t = 0.001; if (i % 3 === 0) snd.play('pinon', 0.26, 0.85 + (i % 5) * 0.07); else if (i % 3 === 1) snd.play('paso-agua-2', 0.1, 1.5 + (i % 4) * 0.1); }
+    e.alza = 1 - ease(Math.max(0, (u - 0.8) / 0.2)); e.esc = Math.min(1, e.alza * 1.6); if (u >= 1) { e.vuelca = e.esc = 0; gesto = null; return g.fin(); } return; } // al final baja las manos y guarda el canasto
+  else if (g.tipo === 'caricia') { entrega.cari = k; if (cuerpo && u > 0.34 && u < 0.68) cuerpo.parp = -0.1; // él cierra los ojos un momento
+    if (!g.sono && u > 0.3) { g.sono = true; snd.play('arbusto-2', 0.14, 0.7); } if (u >= 1) { entrega.cari = 0; gesto = null; return g.fin(); } return; }
   else if (g.tipo === 'come') { g.boca = k; cosaM.visible = k > 0.2 && u < 0.6; cosaM.position.copy(manoDe(boy, true)); }
   if (u >= 1) { a.mano = a.obra = a.bebe = 0; cosaM.visible = false; gesto = null; g.fin(); }
+}
+// ---------- los piñones, del canasto de Leftraru a la olla ----------
+// La entrega se ve entera, en tres momentos que van entre las frases de la madre. Leftraru se para a su lado, junto a la
+// olla, y le muestra los piñones en un canasto bajo (llepu) que sostiene con las dos manos ('muestra'); cuando ella dice que
+// alcanzan, inclina el canasto y van cayendo a la olla ('echa'); y ella suelta el palo, que queda en la olla, y le pasa la
+// mano por la cabeza ('caricia'). Son dos mallas: el canasto y todos los piñones juntos (instancias).
+const N_PIN = 14, entrega = { a: null, alza: 0, esc: 0, vuelca: 0, cari: 0 }; // alza: cuánto tiene levantadas las manos; esc: tamaño con que asoma el canasto; vuelca: lo está inclinando; cari: la caricia
+const cestoM = (() => { const pf = [[0.001, 0], [0.04, 0.001], [0.08, 0.003], [0.115, 0.008], [0.145, 0.024], [0.162, 0.046], [0.172, 0.066], [0.181, 0.07]], g = new THREE.LatheGeometry(pf.map(([x, y]) => new THREE.Vector2(x * 0.66, y * 0.66)), 18), n = g.attributes.position.count, C = new Float32Array(n * 3), c = new THREE.Color();
+  for (let i = 0; i < n; i++) { const j = i % pf.length; c.setHex(j === pf.length - 1 ? 0x6e5028 : j % 2 ? 0xa98648 : 0xcbae76); C[i * 3] = c.r; C[i * 3 + 1] = c.g; C[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(C, 3)); // anillos claros y oscuros: la fibra enrollada
+  const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1, side: THREE.DoubleSide })); m.castShadow = m.receiveShadow = true; m.visible = false; m.rotation.order = 'YXZ'; scene.add(m); return m; })();
+const pinM = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 6, 4).scale(0.011, 0.011, 0.025), new THREE.MeshStandardMaterial({ roughness: 0.5 }), N_PIN); pinM.castShadow = true; pinM.frustumCulled = false; pinM.visible = false; scene.add(pinM);
+const PIN = Array.from({ length: N_PIN }, (_, i) => { const a = i * 2.4, r = 0.012 + (i % 5) * 0.012; pinM.setColorAt(i, new THREE.Color([0x8a4a2a, 0x9c5a32, 0x74401f][i % 3])); return { x: Math.cos(a) * r, y: 0.014 + (i > 8 ? 0.018 : 0) + (i % 3) * 0.005, z: Math.sin(a) * r, ry: a * 1.7, rx: (i % 4) * 0.22 - 0.3, t: -1, de: null }; }); // dónde va cada piñón dentro del canasto; t: −1 no está, 0 en el canasto, entre 0 y 1 cayendo, 1 ya en la olla
+const pinO = new THREE.Object3D(); let paloOlla = null;
+function updateEntrega(dt) {
+  const e = entrega, a = e.a; if (!a) return;
+  if (!talk || talk.who !== a) { e.a = null; e.alza = e.vuelca = e.cari = e.esc = 0; a.caricia = 0; if (a.palo) a.palo.visible = a.mode === 'cook'; if (paloOlla) paloOlla.visible = false; pinM.visible = cestoM.visible = false; return; } // se acabó la conversación
+  a.caricia = e.cari;
+  if (a.palo) { const suelto = e.cari > 0.03; // mientras lo acaricia, el palo se queda parado en la olla
+    if (suelto && !paloOlla) { paloOlla = new THREE.Mesh(a.palo.geometry, a.palo.material); paloOlla.castShadow = true; paloOlla.visible = false; scene.add(paloOlla); }
+    if (suelto && !paloOlla.visible) { a.palo.updateWorldMatrix(true, false); a.palo.matrixWorld.decompose(paloOlla.position, paloOlla.quaternion, paloOlla.scale); }
+    if (paloOlla) paloOlla.visible = suelto; a.palo.visible = !suelto && a.mode === 'cook'; }
+  const fx = Math.sin(player.facing), fz = Math.cos(player.facing), M = cuerpo ? cuerpo.H.RightHand.getWorldPosition(V3()).add(cuerpo.H.LeftHand.getWorldPosition(V3())).multiplyScalar(0.5) : manoDe(boy); // entre las dos manos
+  cestoM.visible = e.esc > 0.02; cestoM.position.set(M.x + fx * 0.05, M.y - 0.005, M.z + fz * 0.05); cestoM.rotation.set(e.vuelca * 0.95, player.facing, 0); cestoM.scale.setScalar(Math.max(0.001, e.esc)); cestoM.updateMatrixWorld(true);
+  const oy = height(OLLA.x, OLLA.z) + 0.5; let quedan = 0;
+  for (let i = 0; i < N_PIN; i++) { const q = PIN[i]; if (q.t > 0 && q.t < 1) q.t = Math.min(1, q.t + dt / 0.44);
+    if (q.t < 0 || q.t >= 1) pinO.scale.setScalar(0);
+    else { quedan++; pinO.scale.setScalar(e.esc); pinO.position.set(q.x, q.y, q.z).applyMatrix4(cestoM.matrixWorld); pinO.rotation.set(q.rx + e.vuelca * 0.9, q.ry + player.facing, 0); // dentro del canasto, se mueve con él
+      if (q.t > 0) { if (!q.de) q.de = pinO.position.clone(); const w = q.t; pinO.scale.setScalar(1); pinO.position.set(q.de.x + (OLLA.x + q.x * 2 - q.de.x) * w, q.de.y + (oy - q.de.y) * w * w + Math.sin(Math.PI * w) * 0.05, q.de.z + (OLLA.z + q.z * 2 - q.de.z) * w); pinO.rotation.x += w * 6; pinO.rotation.y += w * 4; } }
+    pinO.updateMatrix(); pinM.setMatrixAt(i, pinO.matrix); }
+  pinM.visible = quedan > 0; pinM.instanceMatrix.needsUpdate = true; if (pinM.instanceColor) pinM.instanceColor.needsUpdate = true;
 }
 function interact() {
   if (talk) { if (gesto) return; talk.i++; return sigue(); }
@@ -391,20 +448,21 @@ addEventListener('keydown', (e) => {
 addEventListener('keyup', (e) => { keys[e.code] = false; });
 // Si la ventana pierde el foco con una tecla apretada, el navegador nunca avisa que se soltó y Leftraru seguiría
 // caminando solo. Al salir de la ventana se sueltan todas, y también el arrastre de la cámara.
-const sueltaTodo = () => { for (const k in keys) keys[k] = false; dragging = false; document.body.classList.remove('girando'); };
+const sueltaTodo = () => { for (const k in keys) keys[k] = false; dragging = false; document.body.classList.remove('girando'); dejaDeApuntar(); };
 addEventListener('blur', sueltaTodo); document.addEventListener('visibilitychange', sueltaTodo);
 addEventListener('mousemove', (e) => {
   if (dragging && !e.buttons) { dragging = false; document.body.classList.remove('girando'); } // el botón se soltó fuera de la ventana
-  if (focus || (!locked() && !(dragging && state === 'play'))) return;
+  if (focus || (!locked() && !capturado() && !(dragging && state === 'play'))) return;
   document.body.classList.remove('sin-raton');
-  cam.yaw -= e.movementX * 0.0042 * opts.sens; cam.pitch = Math.min(1.2, Math.max(-0.25, cam.pitch + e.movementY * 0.0032 * opts.sens * (opts.inv ? -1 : 1)));
+  const fino = acc.apunta ? 0.55 : 1; // apuntando, el ratón gira más despacio y deja mirar hacia arriba
+  cam.yaw -= e.movementX * 0.0042 * opts.sens * fino; cam.pitch = Math.min(1.2, Math.max(acc.apunta ? -0.75 : Math.min(-0.25, cam.pitch), cam.pitch + e.movementY * 0.0032 * opts.sens * fino * (opts.inv ? -1 : 1)));
 });
 
 let doable = null, actT = 0;
 const ripples = Array.from({ length: 10 }, () => { const m = new THREE.Mesh(new THREE.RingGeometry(0.8, 1, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xeaf4f4, transparent: true, opacity: 0, depthWrite: false })); m.visible = false; m.renderOrder = 4; scene.add(m); return m; });
 let ripT = 0, ripI = 0;
 // Cuando la historia lo pide, Leftraru camina solo hasta un punto: { x, z, face, done }. Al llegar se gira hacia face y se llama done.
-let auto = null;
+let auto = null, miraOn = false, miraLista = false, miraN = -1; // la mira del arco: si está a la vista, si el arco ya está tenso y cuántas flechas muestra
 function updatePlayer(dt) {
   let ix = 0, iz = 0, andar = null;
   if (auto && state === 'play') {
@@ -419,24 +477,25 @@ function updatePlayer(dt) {
     cam.yaw += ((down('camIzq') ? 1 : 0) - (down('camDer') ? 1 : 0)) * dt * 1.8;
   }
   const wade = Math.min(1, Math.max(0, (WATER_Y - (pp().y - FEET)) / 0.8)); player.wade = wade; // con el agua a las rodillas se avanza más lento
-  const run = down('correr'), target = andar ? andar[2] : (ix || iz ? (run ? 6.2 * (ui.skill('ligero') ? 1.18 : 1) : 3.3) : 0) * (1 - wade * 0.5);
+  const run = down('correr'), apunta = acc.apunta, target = andar ? andar[2] : (ix || iz ? (apunta ? 1.4 : run ? 6.2 * (ui.skill('ligero') ? 1.18 : 1) : 3.3) : 0) * (1 - wade * 0.5);
   player.speed += (target - player.speed) * Math.min(1, dt * 10);
   const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw);
   let dx = fx * iz + rx * ix, dz = fz * iz + rz * ix; if (andar) { dx = andar[0]; dz = andar[1]; } const l = Math.hypot(dx, dz);
-  if (l > 0) { dx /= l; dz /= l; player.dirX = dx; player.dirZ = dz; let d = Math.atan2(dx, dz) - player.facing; d = Math.atan2(Math.sin(d), Math.cos(d)); player.facing += d * Math.min(1, dt * 12); }
+  if (l > 0) { dx /= l; dz /= l; player.dirX = dx; player.dirZ = dz; let d = Math.atan2(dx, dz) - player.facing; d = Math.atan2(Math.sin(d), Math.cos(d)); if (!apunta) player.facing += d * Math.min(1, dt * 12); }
+  if (apunta) { let d = cam.yaw + Math.PI - DE_LADO - player.facing; d = Math.atan2(Math.sin(d), Math.cos(d)); player.facing += d * Math.min(1, dt * 16); if (!puedeApuntar()) dejaDeApuntar(); } // con el arco tenso se para de medio lado, con el hombro izquierdo (el del arco) hacia donde apunta, aunque camine
   if (acc.sitting && (ix || iz || down('saltar'))) acc.stand(); // cualquier movimiento lo hace levantarse
   // La mirada y el giro: quieto, Leftraru se vuelve hacia donde mira la cámara, así que al girar con el ratón gira él también.
   // La cabeza llega primero y el cuerpo la sigue de cerca, con pasitos en el lugar. Conversando, mira a la cara a quien le habla.
   { const libre = state === 'play' && !talk && !focus && !acc.sitting && !auto && desmayo <= 0;
     let d = cam.yaw + Math.PI - player.facing, yaw = 0, pit = 0, giro = 0; d = Math.atan2(Math.sin(d), Math.cos(d));
-    if (libre && l === 0 && player.grounded && !acc.busy) { const paso = Math.sign(d) * Math.min(Math.abs(d), dt * Math.min(6.5, 0.5 + Math.abs(d) * 8)); player.facing += paso; d -= paso; giro = Math.min(1, Math.abs(paso) / dt / 2.5); }
+    if (libre && l === 0 && player.grounded && !acc.busy && !apunta) { const paso = Math.sign(d) * Math.min(Math.abs(d), dt * Math.min(6.5, 0.5 + Math.abs(d) * 8)); player.facing += paso; d -= paso; giro = Math.min(1, Math.abs(paso) / dt / 2.5); }
     if (libre) { yaw = Math.max(-1.15, Math.min(1.15, d)) * Math.max(0, 1 - player.speed / 3); pit = Math.max(-0.2, Math.min(0.36, (cam.pitch - 0.2) * 0.45)); }
     else if (talk && talk.who && state === 'play' && !acc.sitting) { const a = talk.who, q = pp(); let c = Math.atan2(a.x - q.x, a.z - q.z) - player.facing; c = Math.atan2(Math.sin(c), Math.cos(c));
       if (talk.gira) { const paso = c * Math.min(1, dt * 9); player.facing += paso; c -= paso; giro = Math.min(1, Math.abs(paso) / dt / 2.5); } // se vuelve hacia quien le habla
       yaw = Math.max(-0.9, Math.min(0.9, c)); pit = Math.max(-0.4, Math.min(0.3, -Math.atan2(a.g.position.y + a.h * 0.94 - (q.y - FEET + boy.h * 0.94), Math.hypot(a.x - q.x, a.z - q.z) || 1))); } // y levanta o baja la vista hasta su cara
     player.giro = (player.giro || 0) + (giro - (player.giro || 0)) * Math.min(1, dt * 10); // cuánto está girando en el lugar: da los pasitos
     player.miraY = (player.miraY || 0) + (yaw - (player.miraY || 0)) * Math.min(1, dt * 6); player.miraX = (player.miraX || 0) + (pit - (player.miraX || 0)) * Math.min(1, dt * 6); }
-  if (player.grounded && state === 'play' && !ui.open && !talk && !focus && !acc.sitting && !auto && down('saltar')) { player.vy = 6.6 * (ui.skill('salto') ? 1.22 : 1); player.grounded = false; }
+  if (player.grounded && state === 'play' && !ui.open && !talk && !focus && !acc.sitting && !auto && !apunta && down('saltar')) { player.vy = 6.6 * (ui.skill('salto') ? 1.22 : 1); player.grounded = false; }
   player.vy = Math.max(-25, player.vy - 18 * dt);
   if (player.vy > 0) ctrl.disableSnapToGround(); else ctrl.enableSnapToGround(0.3);
   const mvx = (player.dirX || 0) * player.speed * dt, mvz = (player.dirZ || 0) * player.speed * dt;
@@ -467,7 +526,7 @@ function updatePlayer(dt) {
     ui.goals = acc.goals(t); // dónde buscar lo que falta: se marca en el minimapa y en el mapa
     destinoGuia(t);
     // cuando la historia avanza un paso, se avisa qué sigue (después de los avisos de lo recién logrado)
-    const av = m ? m.aviso : 'Hasta aquí llega la historia por ahora: pronto llegarán los invitados de la costa. Mientras tanto, Ñamku y la machi tienen algo que enseñarte: búscalos en la aldea. Y quedan encargos por terminar.';
+    const av = m ? m.aviso : 'Hasta aquí llega la historia por ahora: pronto llegarán los invitados de la costa. Mientras tanto, la machi tiene algo que enseñarte: búscala junto al rewe. Y quedan encargos por terminar.';
     const crudo = Array.isArray(av) ? av : [av], key = crudo.map(teclas).join('|'), esAyuda = (t) => !!(m && m.fijo) || t[0] === '?' || /\{\w+\}/.test(t); // los pasos del tutorial y lo que nombra teclas son instrucciones de cómo jugar
     if (key !== lastAviso) { lastAviso = key; ayudas.length = 0; ayudaT = 0; ayudaGap = 0; $('ayuda').classList.remove('on'); let primero = true;
       for (const t of crudo) { if (esAyuda(t)) ayudas.push([t, 12]); else { toast(teclas(t), 10, primero ? 'mision' : null, true); primero = false; } } }
@@ -487,6 +546,7 @@ function updatePlayer(dt) {
 // De los dos costados se elige el más despejado, el que deja ver mejor la cara de quien habla y, a igualdad, el que le
 // queda más cerca a la cámara. Al terminar, la cámara vuelve sola a su lugar de siempre.
 const FOV_JUEGO = camera.fov, FOV_CHARLA = 38;
+const FOV_ARCO = 50, DE_LADO = 0.95, CAM_ARCO = [0.13, 0.55, 0.12]; let apK = 0; // CAM_ARCO: la cámara del arco, a la derecha, arriba y atrás de Leftraru; // DE_LADO: cuánto gira el cuerpo al apuntar, como se para un arquero; // apK: cuánto ha entrado la cámara del arco
 let plano = null, planoK = 0; // plano: { pos, look } del diálogo en curso; planoK: cuánto ha entrado (0 la cámara de juego, 1 el plano)
 const cabeza = (p) => p.head.getWorldPosition(V3());
 function abrePlano(a, frente) { // frente: quien habla va a quedar vuelto hacia Leftraru
@@ -506,6 +566,15 @@ function abrePlano(a, frente) { // frente: quien habla va a quedar vuelto hacia 
   if (best.free < best.L + 0.35) { if (best.free - 0.35 < best.L * 0.8) return; best.pos.copy(look).addScaledVector(best.dir, best.free - 0.35); } // un tronco o un muro a la espalda: la cámara se acerca un poco; si no cabe, no hay plano
   plano = { pos: best.pos, look };
 }
+function planoOlla(a) { // los dos lado a lado junto a la olla: la cámara se pone al frente, al otro lado de la olla, y se les ven las caras y las manos
+  const q = pp(), fx = Math.sin(a.face), fz = Math.cos(a.face), mx = (a.x + q.x) / 2, mz = (a.z + q.z) / 2, look = V3(mx + fx * 0.25, q.y - FEET + 0.88, mz + fz * 0.25); // algo bajo, para que la olla quede a la vista sobre el cuadro del diálogo
+  const pos = V3(mx + fx * 3.3 + fz * 0.95, look.y + 0.8, mz + fz * 3.3 - fx * 0.95); // un poco hacia el lado del fuego: la olla y su vapor quedan entre los dos, sin taparles la cara
+  pos.y = Math.max(pos.y, height(pos.x, pos.z) + 0.6);
+  const dir = pos.clone().sub(look), L = dir.length(); dir.divideScalar(L); const desde = look.clone().addScaledVector(dir, 0.95); // pasada la olla
+  const hit = physics.castRay(new RAPIER.Ray(desde, dir), L - 0.6, true, undefined, undefined, pCol), free = hit ? (hit.timeOfImpact ?? hit.toi) + 0.95 : L + 0.35;
+  if (free < L + 0.35) { if (free - 0.35 < L * 0.65) return; pos.copy(look).addScaledVector(dir, free - 0.35); } // algo estorba: más cerca; si no cabe, se queda el plano que había
+  plano = { pos, look };
+}
 function charla(a, gira) { // empieza una conversación con alguien del mundo: se miran a la cara y la cámara los encuadra
   plano = null; if (!a) return;
   const cuerpo = gira && a.mode !== 'cook'; abrePlano(a, cuerpo); // la que está revolviendo la olla no la suelta: solo vuelve la cabeza
@@ -524,8 +593,16 @@ function updateCamera(dt) {
   const k = ease(planoK), cerrado = Math.min(FOV_JUEGO, Math.max(FOV_CHARLA, 2 * Math.atan(0.55 / camera.aspect) * 180 / Math.PI)), fov = FOV_JUEGO + (cerrado - FOV_JUEGO) * k; // en una pantalla angosta el lente cierra menos, para que quepan los dos
   if (k > 0 && plano) { pos.lerp(plano.pos, k); look.lerp(plano.look, k); } else if (!on) plano = null;
   if (on && planoK === 1 && talk.gira && !talk.detras) { talk.detras = true; const d = player.facing - Math.PI - cam.yaw; cam.yaw += Math.atan2(Math.sin(d), Math.cos(d)); } // al terminar, la cámara vuelve a quedar a su espalda, mirando a quien le hablaba
-  if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
-  camera.position.lerp(pos, Math.min(1, dt * 9)); camera.lookAt(look);
+  // Apuntando con el arco: la cámara se pone sobre el hombro derecho, el que lleva la cuerda atrás, bien cerca (como al
+  // levantar un arma en un juego de disparos), y cierra un poco el lente. De tan cerca, el arco se ve adelante, a la izquierda. La mira del centro
+  // de la pantalla marca hacia dónde va la flecha.
+  apK = Math.max(0, Math.min(1, apK + (acc.apunta ? dt / 0.22 : -dt / 0.3))); let lente = fov;
+  if (!acc.apunta && cam.pitch < -0.25) cam.pitch += (-0.25 - cam.pitch) * Math.min(1, dt * 6); // al soltar, la cámara vuelve a su altura de siempre
+  if (apK > 0) { const ka = ease(apK), t = pp(), cp = Math.cos(cam.pitch), dx = Math.sin(cam.yaw) * cp, dy = Math.sin(cam.pitch), dz = Math.cos(cam.yaw) * cp, rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw);
+    const ap = V3(t.x + rx * CAM_ARCO[0] + dx * CAM_ARCO[2], t.y + CAM_ARCO[1] + dy * CAM_ARCO[2], t.z + rz * CAM_ARCO[0] + dz * CAM_ARCO[2]); ap.y = Math.max(ap.y, height(ap.x, ap.z) + 0.3);
+    pos.lerp(ap, ka); look.lerp(V3(ap.x - dx * 12, ap.y - dy * 12, ap.z - dz * 12), ka); lente = fov + (FOV_ARCO - fov) * ka; }
+  if (camera.fov !== lente) { camera.fov = lente; camera.updateProjectionMatrix(); }
+  camera.position.lerp(pos, Math.min(1, dt * (9 + apK * 40))); camera.lookAt(look);
 }
 
 // ---------- observar: la cámara se acerca sola al objeto, lo encuadra, toma la foto y vuelve ----------
@@ -584,7 +661,7 @@ function updateItems() {
 
 const ui = createUI({ world, onToast: (t, kind) => toast(t, 5, kind || 'hallazgo'), onClose: () => { if (state === 'play' && !menuOpen) lock(); }, onSkill: () => applySkills(), onGuide: (g) => setGuia(g, 'jugador') });
 renderer.domElement.addEventListener('webglcontextrestored', () => ui.repaint()); // si el navegador pierde y recupera el contexto gráfico, el fondo del minimapa se vuelve a pintar
-const acc = createActions({ world, ui, snd, scene, hint, murmur, player, story, pinones: () => [got, world.items.length], sanar: (n) => { vida = Math.min(100, vida + n); },
+const acc = createActions({ world, ui, snd, scene, hint, murmur, player, choca: (a, b) => { const d = V3().subVectors(b, a), L = d.length(); if (L < 1e-6) return null; d.divideScalar(L); const hit = physics.castRay(new RAPIER.Ray(a, d), L, true, undefined, undefined, pCol); return hit ? V3().copy(a).addScaledVector(d, hit.timeOfImpact ?? hit.toi) : null; }, /* choca: ¿la flecha da con algo sólido entre a y b? */ story, pinones: () => [got, world.items.length], sanar: (n) => { vida = Math.min(100, vida + n); },
   place: (x, z, facing) => { setPos(x, height(x, z) + FEET + 0.05, z); player.vy = 0; player.speed = 0; player.facing = facing; },
   speak: (name, lines, done, gestos) => { const who = world.life.actors.find((a) => a.name && a.name.toLowerCase() === name.toLowerCase()) || null, gira = !!who && !who.quieto && !acc.sitting; // quien habla, si está en el mundo; el que está mirando el valle no se da vuelta
     talk = { name, lines, i: 0, done: done || null, who, gira, gestos: gestos || null }; charla(who, gira); sigue(); if (cuerpo && who) cuerpo.habla = 0.9; },
@@ -647,7 +724,7 @@ function updateVida(dt) {
 }
 drawKeys(); applySkills();
 await assets.whenLoaded(); bar(1, 'Listo'); assets.onProgress = null; $('loading').classList.add('hide'); setTimeout(() => $('loading').remove(), 700);
-window.__g = { snd, height, ui, explorer, acc, story, toasts, murmur, setGuia, renderer, get vida() { return vida; }, set vida(v) { vida = v; }, camera, abrirPrologo, cerrarPrologo, get prologo() { return prologo; }, get acto() { return acto; }, hojas, cerrarActo, portadaMenu, avanzarPrologo, ayudas, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, get guia() { return guia; }, get guiaT() { return guiaT; }, get tour() { return tour; }, get gesto() { return gesto; }, tourIr, relato, get plano() { return plano; }, get planoK() { return planoK; }, outro, apuntes, sueltaTodo, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter() { portadaMenu(); coverT = 0; enter(); }, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
+window.__g = { CAM_ARCO, snd, height, ui, explorer, acc, story, toasts, murmur, setGuia, renderer, get vida() { return vida; }, set vida(v) { vida = v; }, camera, abrirPrologo, cerrarPrologo, get prologo() { return prologo; }, get acto() { return acto; }, hojas, cerrarActo, portadaMenu, avanzarPrologo, ayudas, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, get guia() { return guia; }, get guiaT() { return guiaT; }, get tour() { return tour; }, get gesto() { return gesto; }, tourIr, relato, get plano() { return plano; }, get planoK() { return planoK; }, outro, apuntes, sueltaTodo, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter() { portadaMenu(); coverT = 0; enter(); }, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
   tp(x, y, z) { setPos(x, y, z); player.vy = 0; },
   view(x, y, z, lx, ly, lz) { camera.position.set(x, y, z); camera.lookAt(lx, ly, lz); world.update(0, time, camera.position, pp()); draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); },
   snap() { draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); } };
@@ -655,7 +732,46 @@ window.__g = { snd, height, ui, explorer, acc, story, toasts, murmur, setGuia, r
 // El cuerpo de Leftraru: un modelo 3D hecho aparte (docs/personaje), con esqueleto y sus movimientos. Es el que se ve.
 // El cuerpo armado por código sigue ahí debajo, invisible, llevando el movimiento, los choques y el compás de cada gesto:
 // el modelo lo copia. Si el modelo no llega a cargar, o si la dirección del juego lleva ?antiguo, se ve el cuerpo de antes.
+// Los movimientos llegan empezando en 0,033 s y, los que se repiten, a veces sin el cuadro que cierra la vuelta: así, en
+// cada vuelta el cuerpo se quedaba detenido un instante. Se corren a cero y, si hace falta, se repite el primer cuadro al final.
+function lazo(clip, cierra) { let t0 = Infinity, dif = 0; for (const tr of clip.tracks) { t0 = Math.min(t0, tr.times[0]); const n = tr.getValueSize(), L = tr.values.length; if (n === 4) { let d = 0; for (let i = 0; i < 4; i++) d += tr.values[i] * tr.values[L - 4 + i]; dif = Math.max(dif, 1 - Math.abs(d)); } }
+  const mas = cierra && dif > 2e-4 ? 1 : 0; // el último cuadro no es igual al primero: falta el que cierra
+  for (const tr of clip.tracks) { const n = tr.getValueSize(), T = tr.times, L = tr.values.length, t = new Float32Array(T.length + mas), v = new Float32Array(L + mas * n);
+    for (let i = 0; i < T.length; i++) t[i] = T[i] - t0; v.set(tr.values); if (mas) { t[T.length] = t[T.length - 1] + (T.length > 1 ? T[1] - T[0] : 0.033); for (let i = 0; i < n; i++) v[L + i] = tr.values[i]; }
+    tr.times = t; tr.values = v; }
+  clip.resetDuration(); return clip;
+}
+// Estar quieto: el movimiento que traen los modelos se balancea mucho (carga el peso a un lado, al otro, se echa atrás).
+// De cada hueso se deja la postura media y apenas un resto (k) de ese vaivén, y además va más despacio. Lo que se ve
+// moverse es la respiración, un pestañeo y la cabeza cuando mira algo: quieto, pero vivo.
+function calma(clip, k) {
+  for (const tr of clip.tracks) { const n = tr.getValueSize(), v = tr.values, N = v.length / n, md = new Array(n).fill(0); if (n !== 3 && n !== 4) continue;
+    for (let i = 0; i < N; i++) { let sg = 1; if (n === 4) { let d = 0; for (let c = 0; c < 4; c++) d += v[c] * v[i * 4 + c]; if (d < 0) sg = -1; } for (let c = 0; c < n; c++) md[c] += sg * v[i * n + c]; }
+    if (n === 4) { const L = Math.hypot(...md) || 1; for (let c = 0; c < 4; c++) md[c] /= L; } else for (let c = 0; c < n; c++) md[c] /= N;
+    for (let i = 0; i < N; i++) { if (n === 4) { QA.set(md[0], md[1], md[2], md[3]).slerp(QB.set(v[i * 4], v[i * 4 + 1], v[i * 4 + 2], v[i * 4 + 3]), k); v[i * 4] = QA.x; v[i * 4 + 1] = QA.y; v[i * 4 + 2] = QA.z; v[i * 4 + 3] = QA.w; } else for (let c = 0; c < n; c++) v[i * n + c] = md[c] + (v[i * n + c] - md[c]) * k; } }
+  return clip;
+}
+// La cara del modelo es un dibujo, así que el pestañeo y el habla van con piezas chicas puestas encima, pegadas a la cabeza:
+// un párpado curvo sobre cada ojo, que baja y sube, y una boca oscura que se abre al hablar. Las medidas (en centímetros,
+// en el espacio del hueso de la cabeza) se toman una vez por modelo, apuntando a sus ojos y a su boca: de cada lugar, el centro, las dos puntas, arriba y abajo.
+function haceCara(cabeza, OJOS, BOCA, piel) {
+  const sitio = (centro, ladoA, ladoB, arr, aba) => { // un lugar de la cara: dónde está, hacia dónde mira, y su ancho y alto
+    const sd = V3(...ladoB).sub(V3(...ladoA)), an = sd.length(), up = V3(...arr).sub(V3(...aba)), al = up.length(), n = V3().crossVectors(sd.normalize(), up.normalize()).normalize(); up.crossVectors(n, sd).normalize();
+    const g = new THREE.Group(); g.position.set(...centro); g.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(sd, up, n)); cabeza.add(g);
+    return { g, an, al, panza: Math.max(0.6, V3(...centro).sub(V3(...ladoA).add(V3(...ladoB)).multiplyScalar(0.5)).dot(n)) }; }; // panza: cuánto sobresale el centro respecto de las puntas
+  const pielM = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 }), PIEL = new THREE.Color(piel), PESTANA = new THREE.Color(0x1c1410);
+  const ojos = OJOS.map((q) => {
+    const o = sitio(...q), a = o.an / 2, R = (a * a + o.panza * o.panza) / (2 * o.panza), fi = Math.asin(Math.min(0.98, (a + 0.75) / R)), psi = Math.asin(Math.min(0.9, (o.al / 2 + 0.45) / R)), topY = R * Math.sin(psi);
+    const geo = new THREE.SphereGeometry(R, 12, 6, Math.PI / 2 - fi, 2 * fi, Math.PI / 2 - psi, 2 * psi).translate(0, -topY, -R + 0.25), P = geo.attributes.position, C = new Float32Array(P.count * 3); // el borde de arriba queda en cero: al achicarlo a lo alto, el párpado sube
+    for (let k = 0; k < P.count; k++) { const c = -P.getY(k) / (2 * topY) > 0.8 ? PESTANA : PIEL; C[k * 3] = c.r; C[k * 3 + 1] = c.g; C[k * 3 + 2] = c.b; } geo.setAttribute('color', new THREE.BufferAttribute(C, 3)); // la orilla de abajo, oscura: las pestañas
+    const lid = new THREE.Mesh(geo, pielM); lid.position.y = topY; lid.scale.y = 0.001; lid.visible = false; lid.receiveShadow = true; o.g.add(lid); return lid; });
+  const bocaS = sitio(...BOCA);
+  const boca = new THREE.Mesh(new THREE.CircleGeometry(1, 18), new THREE.MeshStandardMaterial({ color: 0x3a1a16, roughness: 1 })); boca.position.z = 0.3; boca.scale.set(bocaS.an * 0.33, 0.001, 1); boca.visible = false; boca.receiveShadow = true; bocaS.g.add(boca);
+  return { ojos, boca, bocaAlto: bocaS.al * 0.5 };
+}
+const CARA_LEFTRARU = { ojos: [[[-4.78, 11.75, 11.67], [-7.81, 10.81, 9.37], [-2.4, 11.33, 10.9], [-4.75, 13.08, 11.64], [-4.87, 10.08, 11.37]], [[5.65, 12.2, 10.98], [3.2, 11.84, 10.62], [8.29, 11.53, 8.5], [5.63, 13.6, 10.88], [5.68, 10.58, 10.78]]], boca: [[0.94, 4.16, 13.7], [-2.11, 3.41, 12.7], [4.04, 3.59, 12.18], [0.94, 4.85, 13.64], [0.92, 3.18, 13.4]], piel: 0xb97b59 };
 let cuerpo = null; // { mixer, acciones, H: huesos, peso }
+const QUIETUD = 0.035; // cuánto queda del vaivén del movimiento de estar quieto (0 nada, 1 todo)
 const UNA_VEZ = ['salta', 'recoge', 'bebe']; // movimientos que no se repiten: se recorren al compás de lo que pasa en el juego
 const TRAMO = { salta: [0.25, 0.75], recoge: [0.1, 0.3], bebe: [0.22, 0.68] }; // qué parte de cada movimiento se usa (los originales traen esperas antes y después): en recoger, bajar la mano y volver; en beber, llevarse el cuenco a la boca y bajarlo
 const viejo = boy.g.children.filter((c) => c.isSkinnedMesh), ANTIGUO = new URLSearchParams(location.search).has('antiguo');
@@ -666,14 +782,6 @@ if (!ANTIGUO) import('three/examples/jsm/loaders/GLTFLoader.js').then(({ GLTFLoa
   m.scale.setScalar(s); m.position.set(-((caja.min.x + caja.max.x) / 2) * s, -caja.min.y * s, -((caja.min.z + caja.max.z) / 2) * s);
   m.traverse((o) => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; o.frustumCulled = false; } });
   boy.g.add(m);
-  // Los movimientos llegan empezando en 0,033 s y, los que se repiten, a veces sin el cuadro que cierra la vuelta: así, en
-  // cada vuelta el cuerpo se quedaba detenido un instante. Se corren a cero y, si hace falta, se repite el primer cuadro al final.
-  const lazo = (clip, cierra) => { let t0 = Infinity, dif = 0; for (const tr of clip.tracks) { t0 = Math.min(t0, tr.times[0]); const n = tr.getValueSize(), L = tr.values.length; if (n === 4) { let d = 0; for (let i = 0; i < 4; i++) d += tr.values[i] * tr.values[L - 4 + i]; dif = Math.max(dif, 1 - Math.abs(d)); } }
-    const mas = cierra && dif > 2e-4 ? 1 : 0; // el último cuadro no es igual al primero: falta el que cierra
-    for (const tr of clip.tracks) { const n = tr.getValueSize(), T = tr.times, L = tr.values.length, t = new Float32Array(T.length + mas), v = new Float32Array(L + mas * n);
-      for (let i = 0; i < T.length; i++) t[i] = T[i] - t0; v.set(tr.values); if (mas) { t[T.length] = t[T.length - 1] + (T.length > 1 ? T[1] - T[0] : 0.033); for (let i = 0; i < n; i++) v[L + i] = tr.values[i]; }
-      tr.times = t; tr.values = v; }
-    clip.resetDuration(); return clip; };
   const mixer = new THREE.AnimationMixer(m), acciones = { anda: gl.animations[0] ? mixer.clipAction(lazo(gl.animations[0], true)) : null, quieto: null, corre: null };
   if (acciones.anda) { acciones.anda.play(); acciones.anda.setEffectiveWeight(0); }
   // Quieto y correr vienen aparte, en archivos chicos que solo traen cómo se mueve cada hueso (los saca tools/glb-animacion.mjs):
@@ -681,27 +789,37 @@ if (!ANTIGUO) import('three/examples/jsm/loaders/GLTFLoader.js').then(({ GLTFLoa
   for (const k of ['quieto', 'corre', 'salta', 'recoge', 'bebe']) fetch(`assets/modelos/leftraru-${k}.json`).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!d) return;
     if (k === 'salta') d.pistas = d.pistas.filter((q) => q.que === 'giro'); // en el salto, la altura la pone el juego: del movimiento se usa solo la postura
     const clip = new THREE.AnimationClip(k, d.dura, d.pistas.map((q) => (q.que === 'giro' ? new THREE.QuaternionKeyframeTrack(`${q.hueso}.quaternion`, q.t, q.v) : new THREE.VectorKeyframeTrack(`${q.hueso}.position`, q.t, q.v))));
-    acciones[k] = mixer.clipAction(lazo(clip, !UNA_VEZ.includes(k))); acciones[k].play(); acciones[k].setEffectiveWeight(0); if (UNA_VEZ.includes(k)) acciones[k].paused = true; }).catch(() => { /* sin ese movimiento, sigue con los que tenga */ });
-  const H = {}; for (const n of ['RightArm', 'RightForeArm', 'RightHand', 'LeftArm', 'LeftForeArm', 'LeftHand', 'RightUpLeg', 'RightLeg', 'RightFoot', 'LeftUpLeg', 'LeftLeg', 'LeftFoot', 'Spine', 'neck', 'Head']) H[n] = m.getObjectByName(n); // los huesos que se mueven a mano
-  // La cara del modelo es un dibujo, así que el pestañeo y el habla van con piezas chicas puestas encima, pegadas a la cabeza:
-  // un párpado curvo sobre cada ojo, que baja y sube, y una boca oscura que se abre al hablar. Las medidas (en centímetros,
-  // en el espacio del hueso de la cabeza) se tomaron una vez, apuntando a los ojos y a la boca de este modelo.
-  const sitio = (centro, ladoA, ladoB, arr, aba) => { // un lugar de la cara: dónde está, hacia dónde mira, y su ancho y alto
-    const sd = V3(...ladoB).sub(V3(...ladoA)), an = sd.length(), up = V3(...arr).sub(V3(...aba)), al = up.length(), n = V3().crossVectors(sd.normalize(), up.normalize()).normalize(); up.crossVectors(n, sd).normalize();
-    const g = new THREE.Group(); g.position.set(...centro); g.quaternion.setFromRotationMatrix(new THREE.Matrix4().makeBasis(sd, up, n)); H.Head.add(g);
-    return { g, an, al, panza: Math.max(0.6, V3(...centro).sub(V3(...ladoA).add(V3(...ladoB)).multiplyScalar(0.5)).dot(n)) }; }; // panza: cuánto sobresale el centro respecto de las puntas
-  const pielM = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 }), PIEL = new THREE.Color(0xb97b59), PESTANA = new THREE.Color(0x1c1410);
-  const ojos = [[[-4.78, 11.75, 11.67], [-7.81, 10.81, 9.37], [-2.4, 11.33, 10.9], [-4.75, 13.08, 11.64], [-4.87, 10.08, 11.37]], [[5.65, 12.2, 10.98], [3.2, 11.84, 10.62], [8.29, 11.53, 8.5], [5.63, 13.6, 10.88], [5.68, 10.58, 10.78]]].map((q) => {
-    const o = sitio(...q), a = o.an / 2, R = (a * a + o.panza * o.panza) / (2 * o.panza), fi = Math.asin(Math.min(0.98, (a + 0.75) / R)), psi = Math.asin(Math.min(0.9, (o.al / 2 + 0.45) / R)), topY = R * Math.sin(psi);
-    const geo = new THREE.SphereGeometry(R, 12, 6, Math.PI / 2 - fi, 2 * fi, Math.PI / 2 - psi, 2 * psi).translate(0, -topY, -R + 0.25), P = geo.attributes.position, C = new Float32Array(P.count * 3); // el borde de arriba queda en cero: al achicarlo a lo alto, el párpado sube
-    for (let k = 0; k < P.count; k++) { const c = -P.getY(k) / (2 * topY) > 0.8 ? PESTANA : PIEL; C[k * 3] = c.r; C[k * 3 + 1] = c.g; C[k * 3 + 2] = c.b; } geo.setAttribute('color', new THREE.BufferAttribute(C, 3)); // la orilla de abajo, oscura: las pestañas
-    const lid = new THREE.Mesh(geo, pielM); lid.position.y = topY; lid.scale.y = 0.001; lid.visible = false; lid.receiveShadow = true; o.g.add(lid); return lid; });
-  const bocaS = sitio([0.94, 4.16, 13.7], [-2.11, 3.41, 12.7], [4.04, 3.59, 12.18], [0.94, 4.85, 13.64], [0.92, 3.18, 13.4]);
-  const boca = new THREE.Mesh(new THREE.CircleGeometry(1, 18), new THREE.MeshStandardMaterial({ color: 0x3a1a16, roughness: 1 })); boca.position.z = 0.3; boca.scale.set(bocaS.an * 0.33, 0.001, 1); boca.visible = false; boca.receiveShadow = true; bocaS.g.add(boca);
+    if (k === 'quieto') calma(clip, QUIETUD);
+    acciones[k] = mixer.clipAction(lazo(clip, !UNA_VEZ.includes(k))); acciones[k].play(); acciones[k].setEffectiveWeight(0); if (UNA_VEZ.includes(k)) acciones[k].paused = true; if (k === 'quieto') acciones[k].timeScale = 0.55; }).catch(() => { /* sin ese movimiento, sigue con los que tenga */ });
+  const H = {}; for (const n of ['RightArm', 'RightForeArm', 'RightHand', 'LeftArm', 'LeftForeArm', 'LeftHand', 'RightUpLeg', 'RightLeg', 'RightFoot', 'LeftUpLeg', 'LeftLeg', 'LeftFoot', 'Spine', 'Spine02', 'neck', 'Head']) H[n] = m.getObjectByName(n); // los huesos que se mueven a mano
+  const { ojos, boca, bocaAlto } = haceCara(H.Head, CARA_LEFTRARU.ojos, CARA_LEFTRARU.boca, CARA_LEFTRARU.piel);
   // el arco, cuando lo tensa: va en su mano izquierda, de pie y apuntando hacia donde mira
-  const arcoN = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.011, 5, 16, Math.PI * 0.8).rotateZ(-Math.PI * 0.4).rotateY(-Math.PI / 2).translate(0, 0, -0.42), new THREE.MeshStandardMaterial({ color: 0x4a3626, roughness: 1 })); arcoN.visible = false; arcoN.castShadow = true; scene.add(arcoN); boy.sinArco = true;
-  cuerpo = { mixer, acciones, H, m, y0: m.position.y, peso: { anda: 0, quieto: 0, corre: 0 }, aire: 0, sienta: 0, atento: 0, junta: 0, tapa: 0, pie: [0, 0], parp: 2, habla: 0, ojos, boca, bocaAlto: bocaS.al * 0.5, arco: arcoN }; window.__g.modelo = m; window.__g.cuerpo = cuerpo;
+  const arcoN = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.011, 5, 16, Math.PI * 0.8).rotateZ(-Math.PI * 0.4).rotateY(-Math.PI / 2).translate(0, 0, -0.42), new THREE.MeshStandardMaterial({ color: 0x4a3626, roughness: 1 })); arcoN.visible = false; arcoN.castShadow = true; arcoN.rotation.order = 'YXZ'; scene.add(arcoN); boy.sinArco = true;
+  const puesta = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.72, 5).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x9a8458, roughness: 1 })); puesta.visible = false; scene.add(puesta); // la flecha puesta en el arco, antes de soltarla
+  cuerpo = { mixer, acciones, H, m, y0: m.position.y, peso: { anda: 0, quieto: 0, corre: 0 }, aire: 0, sienta: 0, atento: 0, junta: 0, tapa: 0, pie: [0, 0], parp: 2, habla: 0, ojos, boca, bocaAlto, arco: arcoN, puesta }; window.__g.modelo = m; window.__g.cuerpo = cuerpo;
 }, undefined, () => { for (const c of viejo) c.visible = true; }));
+// ---------- la gente de la aldea en 3D ----------
+// Quien tiene modelo 3D lo lleva encima de su cuerpo de siempre, que queda invisible y sigue decidiendo todo: dónde está, qué
+// hace con las manos, hacia dónde mira. El modelo lo copia: las manos van a donde están las manos del cuerpo de siempre (y
+// con ellas lo que lleven, como el palo de revolver), la cabeza mira hacia donde mira la otra y el tronco se inclina igual.
+// Así todo lo que la persona ya sabía hacer (tejer, revolver la olla, entregar, acariciar) sirve tal cual. De pie queda quieta:
+// la postura media de su movimiento de reposo, casi sin vaivén, con los pies juntos y una respiración leve.
+// cara: las medidas de sus ojos y su boca, para el pestañeo y los labios (ver haceCara).
+const GENTE3D = { Millaray: { archivo: 'millaray', cara: { piel: 0x9c6240, boca: [[0.32, 5.6, 9.97], [-3.04, 5.53, 8.32], [3.41, 6.13, 7.86], [0.29, 6.28, 10.1], [0.37, 4.7, 9.94]],
+  ojos: [[[-4.43, 11.85, 7.51], [-6.58, 11.64, 6.26], [-2.42, 11.62, 6.95], [-4.49, 12.86, 7.44], [-4.36, 10.77, 7.58]], [[3.62, 12.47, 6.9], [1.75, 11.93, 6.68], [5.7, 12.5, 5.39], [3.55, 13.48, 6.76], [3.69, 11.39, 6.91]]] } } }, gente3d = [];
+if (!ANTIGUO) import('three/examples/jsm/loaders/GLTFLoader.js').then(({ GLTFLoader }) => { for (const a of world.life.actors) { const def = GENTE3D[a.name]; if (!def) continue;
+  new GLTFLoader().load(`assets/modelos/${def.archivo}.glb`, (gl) => {
+    const m = gl.scene; m.updateMatrixWorld(true); const caja = new THREE.Box3().setFromObject(m), e = 1 / (caja.max.y - caja.min.y); // a.g ya va a la escala de su altura: adentro, el modelo mide 1
+    m.scale.setScalar(e); m.position.set(-((caja.min.x + caja.max.x) / 2) * e, -caja.min.y * e, -((caja.min.z + caja.max.z) / 2) * e);
+    m.traverse((o) => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; o.frustumCulled = false; } });
+    for (const c of a.g.children) if (c.isSkinnedMesh) c.visible = false; // el cuerpo de siempre deja de verse
+    a.g.add(m);
+    const mixer = new THREE.AnimationMixer(m); if (gl.animations[0]) { const q = mixer.clipAction(lazo(calma(gl.animations[0], QUIETUD), true)); q.timeScale = 0.55; q.play(); }
+    const H = {}; for (const n of ['RightArm', 'RightForeArm', 'RightHand', 'LeftArm', 'LeftForeArm', 'LeftHand', 'RightUpLeg', 'RightLeg', 'RightFoot', 'LeftUpLeg', 'LeftLeg', 'LeftFoot', 'Spine02', 'neck', 'Head', 'headfront']) H[n] = m.getObjectByName(n);
+    const P = { a, m, mixer, H, y0: m.position.y, pie: [0, 0], junta: 0, brazo: [0, 0], frente: H.headfront ? H.headfront.position.clone().normalize() : V3(0, 0, 1), fase: Math.random() * 6, parp: 1 + Math.random() * 3, habla: 0 }; // frente: hacia dónde mira la cara, en el espacio del hueso de la cabeza
+    if (def.cara) Object.assign(P, haceCara(H.Head, def.cara.ojos, def.cara.boca, def.cara.piel));
+    a.c3 = P; gente3d.push(P); window.__g.gente3d = gente3d;
+  }); } });
 // El cuerpo nuevo, cuadro a cuadro. Tres capas:
 // 1. Según la velocidad se mezclan estar quieto, caminar y correr, y cada paso va al ritmo de lo que avanza.
 // 2. Los movimientos de una sola vez (saltar, agacharse a recoger, beber) se recorren al compás del juego y tapan lo anterior.
@@ -734,23 +852,26 @@ function updateCuerpo(dt) {
   for (const k in meta) { W[k] += (meta[k] - W[k]) * Math.min(1, dt * 8); if (A[k]) A[k].setEffectiveWeight(W[k] * (1 - tapa)); }
   if (A.anda) A.anda.timeScale = Math.min(2.2, Math.max(0.7, v / 0.62)); if (A.corre) A.corre.timeScale = Math.min(1.45, Math.max(0.6, v / 5.1));
   cuerpo.mixer.update(dt);
-  pisa(dt);
+  if (H.Spine02 && W.quieto > 0.05) { const b = Math.sin(time * 1.3) * 0.014 * W.quieto; H.Spine02.rotateX(b); if (H.neck) H.neck.rotateX(-b); } // quieto, respira: el pecho se mueve apenas y la cabeza se queda en su lugar
+  pisa(cuerpo, dt, { suelo: pp().y - FEET, apoyado: player.grounded && !acc.sitting && state !== 'title', f: player.facing, quieto: (W.quieto || 0) * (1 - tapa), slope: player.slope, h: boy.h });
   // 3. a mano. Adelante (fx, fz), a su derecha (rx, rz) y arriba.
-  const f = player.facing, fx = Math.sin(f), fz = Math.cos(f), rx = -fz, rz = fx;
+  const f = player.facing; let fx = Math.sin(f), fz = Math.cos(f), rx = -fz, rz = fx;
   const brazo = (lado, ad, arr, cos, ad2, arr2, cos2, k) => { const sg = lado === 'Right' ? 1 : -1; apunta(H[lado + 'Arm'], fx * ad + rx * cos * sg, arr, fz * ad + rz * cos * sg, k); apunta(H[lado + 'ForeArm'], fx * ad2 + rx * cos2 * sg, arr2, fz * ad2 + rz * cos2 * sg, k); }; // hacia dónde van el brazo y el antebrazo: cuánto adelante, arriba y al costado
   const env = h ? suave(0, 0.35, h.t / h.dur) * (1 - suave(0.7, 1, h.t / h.dur)) : 0;
   if (gesto && gesto.yo) brazo('Right', 0.9, -0.25, 0.15, 1, 0.05, 0, gesto.yo);                       // entregar o recibir: la mano adelante
   if (h && h.tipo === 'alcanzar') brazo('Right', 0.9, 0.1, 0.1, 1, 0.15, 0, env);                         // estirar la mano a la altura del pecho
   if (h && h.tipo === 'saludar') brazo('Right', 0.3, 0.9, 0.25, 0.1, 1, 0, env);                          // la mano en alto
+  if (entrega.alza > 0) { const k = entrega.alza, w = entrega.vuelca * (0.16 + Math.sin(time * 9) * 0.05); for (const l of ['Right', 'Left']) brazo(l, 0.8, -0.45, 0.24, 0.9, 0.16 - w, -0.22, k); } // el canasto entre las dos manos, adelante; al echar los piñones, las baja un poco
   if (h && h.tipo === 'verter') { brazo('Right', 0.7, -0.5, 0.2, 0.9, -0.2, 0, env); brazo('Left', 0.7, -0.5, 0.2, 0.9, -0.2, 0, env); } // las dos manos adelante y abajo
-  const ten = acc.tensa; if (ten > 0) { const k = suave(0, 0.45, ten); brazo('Left', 1, 0.02, 0.12, 1, 0.02, 0.05, k); brazo('Right', -0.45, 0, 0.75, 0.8, 0.05, -0.5, k); } // el arco: el brazo izquierdo estirado, el derecho con el codo atrás y la mano junto a la cara
+  const ten = acc.tensa, sube = acc.apunta ? -Math.sin(cam.pitch) : 0; if (acc.apunta) { const k = suave(0, 0.45, ten) * 0.75 + 0.25, tira = suave(0.2, 1, ten), fa = cam.yaw + Math.PI, de = [fx, fz, rx, rz]; fx = Math.sin(fa); fz = Math.cos(fa); rx = -fz; rz = fx; // los brazos van hacia donde apunta la mira, no hacia donde mira el cuerpo
+    brazo('Left', 1, 0.02 + sube, 0.1, 1, 0.02 + sube, 0.03, k); brazo('Right', 0.25 - 0.6 * tira, 0.05 + sube * 0.6, 0.55, 0.85, 0.05 + sube, -0.45, k); [fx, fz, rx, rz] = de; } // el arco va en la mano izquierda, estirada; la derecha lleva la cuerda atrás // el arco: el brazo izquierdo estirado, el derecho con el codo atrás y la mano junto a la cara
   cuerpo.sienta += ((acc.sitting ? 1 : 0) - cuerpo.sienta) * Math.min(1, dt * 5);                          // sentado: los muslos adelante y las canillas hacia abajo
   if (cuerpo.sienta > 0.02) for (const l of ['Right', 'Left']) { apunta(H[l + 'UpLeg'], fx, -0.12, fz, cuerpo.sienta); apunta(H[l + 'Leg'], fx * 0.15, -1, fz * 0.15, cuerpo.sienta); }
   // La mirada: la cabeza y el cuello se vuelven hacia donde mira (la cámara, o la cara de quien le habla).
   const my = player.miraY || 0, mx = player.miraX || 0;
   // Conversando pone atención: la cabeza deja el vaivén de estar parado y queda quieta, de frente a la cara del otro.
   cuerpo.atento += ((talk && talk.who && !acc.sitting && state === 'play' ? 1 : 0) - cuerpo.atento) * Math.min(1, dt * 5);
-  const cp = Math.cos(mx), a2 = f + my, at = cuerpo.atento; VD.set(Math.sin(a2) * cp, -Math.sin(mx), Math.cos(a2) * cp); // hacia dónde mira
+  const cp = Math.cos(mx), a2 = f + my, at = cuerpo.atento; VD.set(Math.sin(a2) * cp, -Math.sin(mx) - entrega.vuelca * 0.55, Math.cos(a2) * cp).normalize(); // hacia dónde mira (echando los piñones, a la olla)
   if (!acc.sitting && at < 0.98 && Math.abs(my) + Math.abs(mx) > 0.01) { QR.setFromUnitVectors(VC.set(fx, 0, fz), VD); tuerce(H.neck, QR, 0.4 * (1 - at)); tuerce(H.Head, QR, 0.6 * (1 - at)); }
   if (at > 0.02) for (const [hueso, k] of [[H.neck, 0.4], [H.Head, 1]]) { QR.setFromUnitVectors(VC.copy(CARA).applyQuaternion(H.Head.getWorldQuaternion(QD)).normalize(), VD); tuerce(hueso, QR, k * at); }
   // El pestañeo: cada tanto los párpados bajan y suben en un quinto de segundo.
@@ -760,23 +881,26 @@ function updateCuerpo(dt) {
   cuerpo.habla = Math.max(0, cuerpo.habla - dt); const abre = cuerpo.habla > 0 ? 0.2 + 0.8 * Math.abs(Math.sin(time * 14)) * (0.45 + 0.55 * Math.abs(Math.sin(time * 5.1 + 1))) : 0;
   cuerpo.boca.visible = abre > 0.03; cuerpo.boca.scale.y = Math.max(0.001, cuerpo.bocaAlto * abre);
   // El arco, en la mano izquierda mientras lo tensa.
-  const ten2 = acc.tensa; cuerpo.arco.visible = ten2 > 0 && boy.g.visible; if (ten2 > 0) { H.LeftHand.getWorldPosition(cuerpo.arco.position); cuerpo.arco.rotation.y = f; }
+  cuerpo.arco.visible = acc.apunta && boy.g.visible; if (acc.apunta) { H.LeftHand.getWorldPosition(cuerpo.arco.position); cuerpo.arco.rotation.set(cam.pitch, cam.yaw + Math.PI, 0); }
+  cuerpo.puesta.visible = cuerpo.arco.visible && !acc.vuela && acc.ctx().tengo('flecha') > 0; if (cuerpo.puesta.visible) { const cp = Math.cos(cam.pitch), ax = -Math.sin(cam.yaw) * cp, ay = -Math.sin(cam.pitch), az = -Math.cos(cam.yaw) * cp, atras = 0.2 + 0.24 * suave(0.2, 1, acc.tensa); // (ax, ay, az): hacia donde apunta
+    cuerpo.puesta.position.copy(cuerpo.arco.position).addScaledVector(VC.set(ax, ay, az), 0.36 - atras); cuerpo.puesta.position.y += 0.03; cuerpo.puesta.lookAt(VD.copy(cuerpo.puesta.position).addScaledVector(VC, 1)); }
+  H.Head.scale.setScalar(apK > 0.45 ? 0.001 : 1); // apuntando, la cámara va donde están sus ojos: la cabeza no se dibuja, para que no tape la vista
 }
 // Los pies siguen el suelo. Bajo cada pie se mira cuánto más arriba o más abajo queda el terreno respecto de donde está parado
-// Leftraru: la cadera baja lo justo para que el pie de más abajo alcance a pisar, y el otro se recoge doblando la rodilla.
+// el personaje: la cadera baja lo justo para que el pie de más abajo alcance a pisar, y el otro se recoge doblando la rodilla.
 // En una cuesta, además, el cuerpo se echa un poco hacia adelante o hacia atrás.
 // Y parado: el movimiento de estar quieto que trae el modelo deja un pie bien adelante y el otro atrás, como a medio paso.
 // Se juntan (junta), para que quede parado derecho, y la cadera sube apenas para que las rodillas no queden dobladas.
-function pisa(dt) {
-  const H = cuerpo.H, m = cuerpo.m, suelo = pp().y - FEET, apoyado = player.grounded && !acc.sitting && state !== 'title', d = [0, 0], fx = Math.sin(player.facing), fz = Math.cos(player.facing);
+function pisa(C, dt, o) { // C: el cuerpo 3D; o: la altura del suelo donde está parado, si está apoyado, hacia dónde mira (f), cuánto está quieto, la pendiente y su altura (h)
+  const H = C.H, m = C.m, suelo = o.suelo, apoyado = o.apoyado, d = [0, 0], fx = Math.sin(o.f), fz = Math.cos(o.f);
   if (apoyado) ['Left', 'Right'].forEach((l, i) => { const a = H[l + 'Foot'].getWorldPosition(PA); d[i] = Math.max(-0.4, Math.min(0.4, height(a.x, a.z) - suelo)); });
-  for (let i = 0; i < 2; i++) cuerpo.pie[i] += (d[i] - cuerpo.pie[i]) * Math.min(1, dt * 14);
-  cuerpo.junta += ((apoyado ? (cuerpo.peso.quieto || 0) * (1 - (cuerpo.tapa || 0)) * 0.72 : 0) - cuerpo.junta) * Math.min(1, dt * 8);
-  const junta = cuerpo.junta, baja = Math.min(cuerpo.pie[0], cuerpo.pie[1], 0) + junta * 0.045;
-  m.position.y = cuerpo.y0 + baja / boy.h; m.rotation.x += ((apoyado ? Math.max(-0.14, Math.min(0.2, (player.slope || 0) * 0.3)) : 0) - m.rotation.x) * Math.min(1, dt * 6);
-  if (junta < 0.02 && Math.abs(cuerpo.pie[0]) + Math.abs(cuerpo.pie[1]) < 0.012) return; // en lo plano y andando no hay nada que corregir
+  for (let i = 0; i < 2; i++) C.pie[i] += (d[i] - C.pie[i]) * Math.min(1, dt * 14);
+  C.junta += ((apoyado ? o.quieto * 0.72 : 0) - C.junta) * Math.min(1, dt * 8);
+  const junta = C.junta, baja = Math.min(C.pie[0], C.pie[1], 0) + junta * 0.045;
+  m.position.y = C.y0 + baja / o.h; m.rotation.x += ((apoyado ? Math.max(-0.14, Math.min(0.2, (o.slope || 0) * 0.3)) : 0) - m.rotation.x) * Math.min(1, dt * 6);
+  if (junta < 0.02 && Math.abs(C.pie[0]) + Math.abs(C.pie[1]) < 0.012) return; // en lo plano y andando no hay nada que corregir
   m.updateMatrixWorld(true);
-  ['Left', 'Right'].forEach((l, i) => { const sube = cuerpo.pie[i] - baja; if (junta < 0.02 && Math.abs(sube) < 0.008) return; // este pie queda donde lo dejó el movimiento
+  ['Left', 'Right'].forEach((l, i) => { const sube = C.pie[i] - baja; if (junta < 0.02 && Math.abs(sube) < 0.008) return; // este pie queda donde lo dejó el movimiento
     const pie = H[l + 'Foot'], cad = H[l + 'UpLeg'].getWorldPosition(PA), rod = H[l + 'Leg'].getWorldPosition(PB), tob = pie.getWorldPosition(PC), L1 = cad.distanceTo(rod), L2 = rod.distanceTo(tob); pie.getWorldQuaternion(QF);
     const T = PD.copy(tob); T.y += sube; if (junta > 0) { const ad = (tob.x - cad.x) * fx + (tob.z - cad.z) * fz; T.x -= fx * ad * junta; T.z -= fz * ad * junta; } // dónde debe quedar el tobillo
     const eje = PE.copy(T).sub(cad), dist = Math.min(L1 + L2 - 0.004, Math.max(0.05, eje.length())); eje.normalize();
@@ -789,11 +913,41 @@ function pisa(dt) {
     pie.quaternion.copy(pie.parent.getWorldQuaternion(QA).invert()).multiply(QF); pie.updateMatrixWorld(true); // el pie conserva la postura que traía: no se ladea con la pierna
   });
 }
+// La gente en 3D, cuadro a cuadro: después de que su cuerpo de siempre tomó la postura de este momento, el modelo la copia.
+const PT = V3();
+function ikBrazo(sup, inf, fin, T, polo, k) { // gira brazo y antebrazo para que la muñeca llegue a T; polo: hacia dónde queda el codo; k: cuánto (0 nada, 1 del todo)
+  const a = sup.getWorldPosition(PA), b = inf.getWorldPosition(PB), c = fin.getWorldPosition(PC), L1 = a.distanceTo(b), L2 = b.distanceTo(c);
+  const eje = PE.copy(T).sub(a), dist = Math.min(L1 + L2 - 0.002, Math.max(0.04, eje.length())); eje.normalize();
+  const x = (L1 * L1 - L2 * L2 + dist * dist) / (2 * dist), alto = Math.sqrt(Math.max(0, L1 * L1 - x * x));
+  const p = PF.copy(polo); p.addScaledVector(eje, -p.dot(eje)); if (p.lengthSq() < 1e-6) p.set(0, -1, 0); p.normalize();
+  const codo = PG.copy(a).addScaledVector(eje, x).addScaledVector(p, alto), meta = PD.copy(a).addScaledVector(eje, dist);
+  tuerce(sup, QR.setFromUnitVectors(VC.copy(b).sub(a).normalize(), VD.copy(codo).sub(a).normalize()), k);
+  const b2 = inf.getWorldPosition(PB), c2 = fin.getWorldPosition(PC);
+  tuerce(inf, QR.setFromUnitVectors(VC.copy(c2).sub(b2).normalize(), VD.copy(meta).sub(b2).normalize()), k);
+}
+function updateGente3D(dt) {
+  for (const P of gente3d) { const a = P.a, H = P.H; if (!a.g.visible) continue;
+    P.mixer.update(dt);
+    if (H.Spine02) { const b = Math.sin(time * 1.25 + P.fase) * 0.012; H.Spine02.rotateX(b); if (H.neck) H.neck.rotateX(-b); } // respira
+    a.g.updateMatrixWorld(true); // el cuerpo de siempre, ya con la postura de este cuadro
+    const fx = Math.sin(a.face), fz = Math.cos(a.face);
+    pisa(P, dt, { suelo: a.g.position.y, apoyado: true, f: a.face, quieto: 1, slope: 0, h: a.h });
+    const inc = a.body.rotation.x; if (Math.abs(inc) > 0.004 && H.Spine02) tuerce(H.Spine02, QR.setFromAxisAngle(VC.set(fz, 0, -fx), inc), 1); // el tronco se inclina igual
+    [['Left', a.armL, a.foreL, 1], ['Right', a.armR, a.foreR, -1]].forEach(([l, br, an, sx], i) => { // las manos van a donde están las del cuerpo de siempre; con los brazos caídos, se queda la postura de reposo
+      const uso = suave(0.06, 0.3, Math.abs(br.rotation.x) + Math.abs(an.rotation.x) + Math.abs(br.rotation.z - sx * 0.1)); P.brazo[i] += (uso - P.brazo[i]) * Math.min(1, dt * 8);
+      if (P.brazo[i] > 0.01) ikBrazo(H[l + 'Arm'], H[l + 'ForeArm'], H[l + 'Hand'], an.localToWorld(PT.set(0, -0.2, 0.03)), V3(fz * sx * 0.45 - fx * 0.5, -0.75, -fx * sx * 0.45 - fz * 0.5), P.brazo[i]); }); // el codo, hacia abajo, atrás y afuera
+    if (H.Head) { VD.set(0, 0, 1).applyQuaternion(a.head.getWorldQuaternion(QD)).normalize(); const mira = PT.copy(VD); // la cabeza mira hacia donde mira la del cuerpo de siempre
+      for (const [hueso, k] of [[H.neck, 0.4], [H.Head, 1]]) if (hueso) tuerce(hueso, QR.setFromUnitVectors(VC.copy(P.frente).applyQuaternion(H.Head.getWorldQuaternion(QF)).normalize(), VD.copy(mira)), k); }
+    if (P.ojos) { P.parp -= dt; if (P.parp < -0.2) P.parp = 2.5 + Math.random() * 4; const ci = P.parp < 0 ? Math.sin(Math.min(1, -P.parp / 0.2) * Math.PI) : 0; for (const o of P.ojos) { o.scale.y = Math.max(0.001, ci); o.visible = ci > 0.03; } // pestañea
+      P.habla = Math.max(0, P.habla - dt); const ab = P.habla > 0 ? 0.2 + 0.8 * Math.abs(Math.sin(time * 13)) * (0.45 + 0.55 * Math.abs(Math.sin(time * 4.7 + 1))) : 0; P.boca.visible = ab > 0.03; P.boca.scale.y = Math.max(0.001, P.bocaAlto * ab); } // y mueve los labios mientras habla
+  }
+}
 const clock = new THREE.Clock(); let fpsT = 0, fpsN = 0;
 applyOpts();
 function tick(dt) {
   time += dt; uTime.value = time;
-  updatePlayer(dt); updateVida(dt); if (gesto) updateGesto(dt);
+  updatePlayer(dt); updateVida(dt); if (gesto) updateGesto(dt); updateEntrega(dt);
+  if (acc.apunta !== miraOn) { miraOn = acc.apunta; $('mira').classList.toggle('on', miraOn); } if (miraOn) { const lista = acc.tensa >= 0.4, fl = acc.ctx().tengo('flecha'); if (lista !== miraLista) { miraLista = lista; $('mira').classList.toggle('lista', lista); } if (fl !== miraN) { miraN = fl; $('mira-n').textContent = fl === 1 ? '1 flecha' : `${fl} flechas`; $('mira').classList.toggle('sin', !fl); } }
   if (cuerpo) updateCuerpo(dt);
   if (cine.active) cine.update(dt);
   else if (fuera()) { const a = time * 0.04 + 2.4; camera.position.set(Math.sin(a) * 31, 12, Math.cos(a) * 31); camera.lookAt(0, 4, 0); }
@@ -809,7 +963,7 @@ function tick(dt) {
     // ondas en el agua al vadear
     ripT -= dt; if (player.wade > 0.05 && player.speed > 0.5 && ripT <= 0) { ripT = 0.22; const r = ripples[ripI++ % ripples.length]; r.position.set(p.x, WATER_Y + 0.03, p.z); r.userData.t = 0; r.visible = true; }
     for (const r of ripples) if (r.visible) { const k = (r.userData.t += dt) / 1.6; r.scale.setScalar(0.4 + k * 2.6); r.material.opacity = 0.5 * (1 - k); if (k >= 1) r.visible = false; } }
-  world.update(dt, time, camera.position, pp(), player.speed); lights.follow(fuera() ? { x: 0, y: 3, z: 0 } : cine.active ? camera.position : pp());
+  world.update(dt, time, camera.position, pp(), player.speed); updateGente3D(dt); lights.follow(fuera() ? { x: 0, y: 3, z: 0 } : cine.active ? camera.position : pp());
   if (state === 'play') { updateGuia(); ui.drawMap(pp(), player.facing, cam.yaw + Math.PI); }
   updateHojas();
   if (hintT > 0 && (hintT -= dt) <= 0) $('hint').classList.remove('on');
