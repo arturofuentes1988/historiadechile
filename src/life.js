@@ -2,10 +2,10 @@
 import * as THREE from 'three';
 import { ParticleBatch, photo, TEX } from './gfx.js';
 import { height, POI, CERRO, riverZ, WATER_Y } from './terrain.js';
-import { RUKAS, CORRAL, FOGON } from './village.js';
+import { RUKAS, CORRAL, FOGON, OFICIOS } from './village.js';
 
 const mats = new Map();
-const mat = (c) => mats.get(c) || mats.set(c, new THREE.MeshStandardMaterial({ color: c, roughness: 0.88, side: THREE.DoubleSide })).get(c);
+const mat = (c) => { let m = mats.get(c); if (!m) { m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.88, side: THREE.DoubleSide }); m.userData.liso = true; mats.set(c, m); } return m; }; // liso: un color parejo y nada más (al juntar las piezas, ese color pasa a los vértices)
 const weave = photo('tejido', { repeat: [5, 5] });
 const vmat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, side: THREE.DoubleSide, map: weave, bumpMap: weave, bumpScale: 2 }); // la ropa tiene trama de tejido
 const shadows = (g) => { g.traverse((o) => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); return g; };
@@ -19,6 +19,55 @@ function drape(profile, zs, colorAt, par) {
   for (let i = 0; i < P.count; i++) { const c = new THREE.Color(colorAt(P.getY(i))); col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.scale(1, 1, zs); g.computeVertexNormals();
   const m = new THREE.Mesh(g, vmat); par.add(m); return m;
+}
+
+// ---------- juntar las piezas de un cuerpo ----------
+// Una persona o un animal se arma con decenas de piezas sueltas colgadas de sus articulaciones, y cada pieza era una
+// orden de dibujo aparte (dos, contando su sombra): entre todos sumaban más de la mitad de las órdenes de cada cuadro.
+// Aquí, terminado de armar el cuerpo, las piezas que comparten material se juntan en una sola malla «con esqueleto»:
+// cada vértice queda amarrado a la articulación de la que colgaba su pieza. Las articulaciones siguen siendo las mismas
+// y se animan igual que antes, así que el cuerpo se ve y se mueve igual; solo cambia cuántas veces hay que mandarlo a dibujar.
+const lisoMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, side: THREE.DoubleSide }); // todas las piezas de color parejo, cada una con su color en los vértices
+const SUELTAS = new URLSearchParams(location.search).has('sueltas'); // con ?sueltas en la dirección no se junta nada: sirve para comparar si algo se ve distinto
+function fuse(root) {
+  if (SUELTAS) return [];
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), M = new THREE.Matrix4(), bones = [], lots = new Map(), old = [];
+  const walk = (o, joint) => {
+    if (!o.isMesh) { for (const c of o.children) walk(c, o); return; } // lo que no es una pieza es una articulación
+    let b = bones.indexOf(joint); if (b < 0) b = bones.push(joint) - 1;
+    const liso = !!o.material.userData.liso, shell = !!o.userData.shell, key = (liso ? 'liso' : o.material.uuid) + (shell ? '-pelo' : '');
+    const lot = lots.get(key) || lots.set(key, { mat: liso ? lisoMat : o.material, shell, pos: [], nor: [], uv: [], col: [], bone: [], idx: [] }).get(key);
+    const geo = o.geometry.clone(); if (!geo.attributes.normal) geo.computeVertexNormals();
+    geo.applyMatrix4(M.multiplyMatrices(inv, o.matrixWorld)); // la pieza, puesta donde está en el cuerpo en reposo
+    const P = geo.attributes.position, N = geo.attributes.normal, U = geo.attributes.uv, C = geo.attributes.color, I = geo.index, n0 = lot.pos.length / 3, flip = M.determinant() < 0, c = o.material.color;
+    for (let i = 0; i < P.count; i++) {
+      lot.pos.push(P.getX(i), P.getY(i), P.getZ(i)); lot.nor.push(N.getX(i), N.getY(i), N.getZ(i)); lot.uv.push(U ? U.getX(i) : 0, U ? U.getY(i) : 0);
+      if (liso) lot.col.push(c.r, c.g, c.b); else if (C) lot.col.push(C.getX(i), C.getY(i), C.getZ(i)); else lot.col.push(1, 1, 1);
+      lot.bone.push(b);
+    }
+    for (let i = 0, n = I ? I.count : P.count; i < n; i += 3) { const v0 = I ? I.getX(i) : i, v1 = I ? I.getX(i + 1) : i + 1, v2 = I ? I.getX(i + 2) : i + 2; lot.idx.push(n0 + v0, n0 + (flip ? v2 : v1), n0 + (flip ? v1 : v2)); }
+    old.push(o); for (const ch of o.children) walk(ch, joint); // el pelaje fino cuelga de su piel: va con la misma articulación
+  };
+  for (const c of root.children) walk(c, root);
+  if (!old.length) return [];
+  for (const o of old) o.removeFromParent();
+  const skeleton = new THREE.Skeleton(bones), out = []; // la postura en que quedó armado es su postura de reposo
+  for (const lot of lots.values()) {
+    const n = lot.bone.length, si = new Uint16Array(n * 4), sw = new Float32Array(n * 4), g = new THREE.BufferGeometry();
+    for (let i = 0; i < n; i++) { si[i * 4] = lot.bone[i]; sw[i * 4] = 1; }
+    g.setAttribute('position', new THREE.Float32BufferAttribute(lot.pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(lot.nor, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(lot.uv, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(lot.col, 3));
+    g.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4)); g.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4)); g.setIndex(lot.idx); g.computeBoundingBox();
+    const m = new THREE.SkinnedMesh(g, lot.mat); if (lot.shell) m.userData.shell = true; root.add(m); m.bind(skeleton);
+    out.push(m);
+  }
+  // Para decidir si está en pantalla, todas las mallas de un mismo cuerpo usan la misma esfera: la del cuerpo entero, con
+  // holgura para cuando estira el cuello, abre los brazos o pliega las alas. (Con una esfera por malla, los ojos de un animal
+  // que baja la cabeza a pastar quedaban fuera de la suya y dejaban de dibujarse cerca del borde de la pantalla.)
+  const box = new THREE.Box3(); for (const m of out) box.union(m.geometry.boundingBox);
+  const sph = box.getBoundingSphere(new THREE.Sphere()); sph.radius *= 1.6;
+  for (const m of out) { m.boundingSphere = sph.clone(); m.geometry.boundingSphere = sph.clone(); }
+  return out;
 }
 
 // Figura humana hecha por código, con proporciones reales y articulaciones (rodillas, codos, cuello).
@@ -64,7 +113,7 @@ export function buildPerson({ h = 1.38, kind = 'boy', skin = 0xa9714b, cloth = 0
     drape([[0.074, 0.58], [0.098, 0.52], [0.1, 0.4], [0.094, 0.33]], 0.82, () => 0x7a6a56, body); // chiripa
     drape([[0.038, 0.872], [0.13, 0.838], [0.172, 0.74], [0.186, 0.6], [0.192, 0.47]], 0.6, (y) => ((y > 0.5 && y < 0.53) || (y > 0.57 && y < 0.585) ? trim : cloth), body); // makuñ (poncho) con franjas
   }
-  g.scale.setScalar(h); shadows(g);
+  g.scale.setScalar(h); fuse(g); shadows(g);
   return { g, body, head, legL, legR, shinL, shinR, armL, armR, foreL, foreR, h, woman };
 }
 // Cuánto sube (+) o baja (−) el terreno hacia donde mira alguien parado en (x, z): metros de alto por metro de avance.
@@ -168,7 +217,7 @@ function buildQuad({ s = 1, kind = 'weke', body = 0xb07a4a, belly = 0xf0e8d8, le
     Ls.push(hip); Ks.push(knee);
   }
   hd.rotation.x = -0.3; neck.rotation.x = 0.3;
-  g.scale.setScalar(s); shadows(g);
+  g.scale.setScalar(s); fuse(g); shadows(g);
   const shells = []; g.traverse((o) => { if (o.userData.shell) { o.castShadow = false; shells.push(o); } });
   return { g, shells, legs: [Ls[0], Ls[1], Ls[2], Ls[3]], knees: Ks, neck, headPivot: hd, tail };
 }
@@ -180,29 +229,65 @@ function buildQuad({ s = 1, kind = 'weke', body = 0xb07a4a, belly = 0xf0e8d8, le
 //        mancha blanca en la punta del ala y cola clara con banda oscura al final;
 // choroy: verde, frente y vientre con rojo oscuro, cola larga rojiza, pico largo y ganchudo;
 // rayadito: canela, cabeza negra con ceja color ante, cola terminada en puntas.
+// Cada ave con su forma y sus colores de verdad. Las medidas de forma van en «cuerpos»: se multiplican por k, el porte del ave en metros.
+// cuerpo: la línea del cuerpo, de la cola al cuello: [alto, largo, radio a lo ancho, radio a lo alto]. cabeza: [alto, largo, radio, cuánto se alarga].
+// coat(t, sa, ca): color del cuerpo (t: 0 en la cola … 1 en el cuello; sa: 1 en el lomo … −1 en el vientre; ca: hacia qué costado).
+// cara(t, sa, ca): lo mismo en la cabeza (t: 0 en la nuca … 1 en la frente). posa: cuánto se yergue al posarse. pata: largo de la pata.
 const BIRDS = {
-  traro: { k: 0.56, span: 1.25, chord: 0.3, tailLen: 0.26, tailFan: 0.5, beak: 0xd8d2c0, cere: 0xe8802a, hook: true,
-    coat: (t, sa) => (t > 0.86 ? (sa > 0.15 ? 0x16110e : 0xe8802a) : t > 0.62 ? (sa > 0.55 ? 0x241c16 : 0xe6dcc0) : sa < -0.2 && t > 0.3 ? (Math.sin(t * 60) > 0 ? 0xd8ccac : 0x4a3c30) : 0x2c241e),
-    wing: (f, u) => (f > 0.62 && u > 0.35 && u < 0.8 ? 0xe4dcc8 : f > 0.62 && u >= 0.8 ? 0x1c1612 : 0x2c241e), tail: (u) => (u > 0.78 ? 0x1c1612 : 0xe0d8c2) },
-  choroy: { k: 0.4, span: 0.56, chord: 0.13, tailLen: 0.22, tailFan: 0.16, beak: 0x2a2622, cere: 0x4a4038, hook: true, long: true,
-    coat: (t, sa) => (t > 0.9 && sa > 0 ? 0x8a2e26 : sa < -0.5 && t > 0.2 && t < 0.5 ? 0x8a3a2c : sa > 0.3 ? 0x3d7a34 : 0x58983e),
-    wing: (f, u) => (u > 0.6 && f > 0.5 ? 0x2a5a7a : 0x3d7a34), tail: () => 0x8a3e2c },
-  small: { k: 0.15, span: 0.2, chord: 0.06, tailLen: 0.075, tailFan: 0.25, beak: 0x2a2622, cere: 0x2a2622,
-    coat: (t, sa) => (t > 0.72 ? (sa > 0.65 ? 0x1c1612 : sa > 0.25 ? 0xe2c890 : 0x1c1612) : sa < -0.2 ? 0xe8dcc0 : 0xa86a38),
-    wing: (f, u) => (u > 0.5 && f > 0.4 ? 0x2a2018 : (u > 0.3 && u < 0.5 ? 0xd8a860 : 0x6a4428)), tail: (u) => (u > 0.6 ? 0x2a2018 : 0xa86a38) },
-  // chucao: rechoncho, lomo pardo, garganta y pecho rojizos, vientre barrado de blanco y negro, cola corta y parada
-  chucao: { k: 0.2, span: 0.24, chord: 0.085, tailLen: 0.075, tailFan: 0.2, beak: 0x2a2622, cere: 0x2a2622,
-    coat: (t, sa) => (t > 0.8 ? (sa > 0.1 ? 0x3a2c22 : 0xb8502a) : sa < -0.15 ? (t > 0.5 ? 0xb8502a : Math.sin(t * 70) > 0 ? 0xe8e0d0 : 0x3a322c) : 0x4a3826),
+  // traro (carancho): grande y de patas largas y amarillas; gorro negro, cara pelada anaranjada, cuello crema, pecho barrado,
+  // cuerpo pardo oscuro, una mancha clara barrada en la punta del ala y la cola clara con la punta negra; pico grueso, ganchudo y azulado
+  traro: { k: 0.56, span: 1.25, chord: 0.3, tailLen: 0.26, tailFan: 0.42, posa: -0.95, pata: 0.26, patas: 0xd9b12e, gp: 0.02,
+    cuerpo: [[0, -0.44, 0.012, 0.012], [0.01, -0.3, 0.085, 0.075], [0.02, -0.05, 0.165, 0.155], [0.05, 0.17, 0.15, 0.15], [0.09, 0.3, 0.095, 0.095], [0.12, 0.38, 0.072, 0.075]],
+    cabeza: [0.145, 0.45, 0.09, 1.25], pico: { l: 0.2, r: 0.052, c: 0xb4c0c8, gancho: true }, cera: 0xe0691f, ojo: [0.02, 0x2a1c10], cresta: { n: 4, l: 0.1, c: 0x14100d, at: [-0.01, -0.07], dir: [0, 0.3, -1] },
+    coat: (t, sa) => (t > 0.78 ? 0xe9dfc4 : t > 0.56 ? (Math.sin(t * 110) > 0 ? 0xe2d6b8 : 0x3a2e24) : sa < -0.2 && t < 0.22 ? 0xe2d6b8 : 0x2a211b),
+    cara: (t, sa) => (sa > 0.3 ? 0x14100d : 0xe9dfc4),
+    wing: (f, u) => (f > 0.6 && u > 0.3 && u < 0.78 ? (Math.sin(u * 46) > 0 ? 0xe6dcc4 : 0x4a3c30) : 0x2a211b), tail: (u) => (u > 0.8 ? 0x17120f : Math.sin(u * 44) > 0.55 ? 0x5a4a3a : 0xe6dcc6) },
+  // choroy: loro verde de cabeza redonda; frente y contorno del ojo rojos, una mancha rojiza en el vientre, cola larga, angosta
+  // y granate, y la parte de arriba del pico muy larga y fina
+  choroy: { k: 0.4, span: 0.56, chord: 0.13, tailLen: 0.24, tailFan: 0.1, colaPunta: 0.45, colaAncho: 0.2, posa: -0.8, pata: 0.1, patas: 0x8a8478, gp: 0.022,
+    cuerpo: [[0, -0.4, 0.012, 0.012], [0, -0.28, 0.07, 0.065], [0.01, -0.05, 0.14, 0.135], [0.04, 0.16, 0.135, 0.135], [0.08, 0.28, 0.105, 0.105], [0.1, 0.34, 0.09, 0.09]],
+    cabeza: [0.12, 0.42, 0.115, 1.0], pico: { l: 0.21, r: 0.045, c: 0x4a443e, gancho: true, fino: 0.7 }, ojo: [0.02, 0x0c0a08],
+    coat: (t, sa) => (sa < -0.5 && t > 0.2 && t < 0.45 ? 0x8f3a2c : sa > 0.3 ? 0x418634 : 0x58a040),
+    cara: (t, sa) => (t > 0.66 && sa > -0.25 && sa < 0.75 ? 0x9c2b24 : sa > 0.3 ? 0x418634 : 0x58a040),
+    wing: (f, u) => (u > 0.55 && f > 0.5 ? 0x2f6f6a : 0x418634), tail: (u) => (u < 0.2 ? 0x5a7a34 : 0x7e2f26) },
+  // rayadito: chiquito y redondo; corona negra, una ceja ancha color ocre, antifaz negro, garganta y vientre blancos, lomo rojizo,
+  // alas negruzcas con dos franjas rojizas y la cola rojiza terminada en puntas finas
+  small: { k: 0.15, span: 0.2, chord: 0.06, tailLen: 0.085, tailFan: 0.2, colaAncho: 0.16, posa: -0.5, pata: 0.17, patas: 0x3a322c, gp: 0.012,
+    cuerpo: [[0, -0.36, 0.012, 0.012], [0, -0.24, 0.09, 0.085], [0.02, -0.02, 0.19, 0.18], [0.05, 0.17, 0.17, 0.17], [0.09, 0.28, 0.12, 0.12], [0.105, 0.33, 0.1, 0.1]],
+    cabeza: [0.125, 0.4, 0.125, 1.05], pico: { l: 0.13, r: 0.024, c: 0x2a2622 }, ojo: [0.022, 0x0c0a08],
+    coat: (t, sa) => (sa < -0.15 ? 0xf0ebdc : sa < 0.15 ? 0xd8b888 : 0x8a5a30),
+    cara: (t, sa) => (sa > 0.6 ? 0x17130f : sa > 0.2 ? 0xe6c27a : sa > -0.05 ? 0x1c1612 : 0xf0ebdc),
+    wing: (f, u) => (u > 0.28 && u < 0.42 ? 0xc98a48 : u > 0.58 && u < 0.7 && f > 0.35 ? 0xd8a860 : 0x2a2018), tail: (u) => (u > 0.78 ? 0x1c1612 : 0xa8632e) },
+  // chucao: rechoncho y de patas largas; lomo pardo oscuro, garganta y pecho anaranjados, vientre barrado de blanco y negro,
+  // costados grises y la cola corta y parada
+  chucao: { k: 0.2, span: 0.24, chord: 0.085, tailLen: 0.085, tailFan: 0.18, colaArriba: 1.1, posa: -0.25, pata: 0.3, patas: 0x7a5a48, gp: 0.02,
+    cuerpo: [[0.05, -0.3, 0.012, 0.012], [0.03, -0.2, 0.1, 0.1], [0.02, 0, 0.22, 0.21], [0.06, 0.18, 0.2, 0.2], [0.11, 0.3, 0.13, 0.13], [0.13, 0.35, 0.11, 0.11]],
+    cabeza: [0.15, 0.41, 0.13, 1.0], pico: { l: 0.1, r: 0.034, c: 0x1c1816 }, ojo: [0.024, 0x0c0a08],
+    coat: (t, sa) => (sa > -0.1 ? (sa < 0.2 ? 0x6a625a : 0x4a3826) : t > 0.62 ? 0xc4541f : Math.sin(t * 80) > 0 ? 0xeae4d6 : 0x2c2622),
+    cara: (t, sa) => (sa > 0.3 ? 0x4a3826 : sa > 0.1 ? (t > 0.45 ? 0xb8602e : 0x4a3826) : 0xc4541f),
     wing: () => 0x3e2e20, tail: () => 0x33261c },
-  // carpintero negro: todo negro, con la cabeza roja y una mancha blanca en las alas; pico largo y recto, color hueso
-  carpintero: { k: 0.42, span: 0.62, chord: 0.17, tailLen: 0.17, tailFan: 0.1, beak: 0xd8d2c4, cere: 0x15120f, long: true,
-    coat: (t) => (t > 0.74 ? 0xb81e1a : 0x15120f), wing: (f, u) => (f < 0.45 && u < 0.45 ? 0xf0ece0 : 0x15120f), tail: () => 0x15120f },
-  // picaflor: diminuto, verde, de vientre claro y corona rojiza; pico fino y largo
-  picaflor: { k: 0.1, span: 0.14, chord: 0.04, tailLen: 0.04, tailFan: 0.25, beak: 0x1a1614, cere: 0x1a1614, long: true,
-    coat: (t, sa) => (t > 0.86 && sa > 0.2 ? 0xd8642a : sa < -0.2 ? 0xd8d4c4 : 0x3f8a4a), wing: () => 0x3a3a40, tail: () => 0x2a5a36 },
-  // chuncho: búho pequeño y cabezón, pardo con rayas claras en el pecho y la cara más clara
-  chuncho: { k: 0.3, span: 0.38, chord: 0.13, tailLen: 0.09, tailFan: 0.2, beak: 0xd8c890, cere: 0xd8c890, hook: true,
-    coat: (t, sa) => (t > 0.7 ? (sa < 0.1 ? 0xd8ccb0 : 0x6a4a30) : sa < -0.15 ? (Math.sin(t * 50) > 0.2 ? 0xe8e0cc : 0x6a4a30) : 0x6a4a30),
+  // carpintero negro (el macho): todo negro, con la cabeza y el copete rojos, una mancha blanca en el ala, el ojo amarillo
+  // y el pico largo, recto y oscuro, como un cincel
+  carpintero: { k: 0.42, span: 0.62, chord: 0.17, tailLen: 0.18, tailFan: 0.09, posa: -1.15, pata: 0.1, patas: 0x4a4a4e, gp: 0.02,
+    cuerpo: [[0, -0.46, 0.012, 0.012], [0, -0.32, 0.08, 0.075], [0.01, -0.06, 0.145, 0.14], [0.03, 0.18, 0.13, 0.13], [0.07, 0.33, 0.09, 0.09], [0.09, 0.4, 0.075, 0.075]],
+    cabeza: [0.115, 0.48, 0.1, 1.15], pico: { l: 0.26, r: 0.04, c: 0x3a3a40, fino: 0.7 }, ojo: [0.016, 0x0c0a08, 0xe8d870], cresta: { n: 5, l: 0.15, c: 0xc2201a, at: [-0.02, -0.02], dir: [0, 0.9, -0.35] },
+    coat: () => 0x14110f, cara: () => 0xc2201a,
+    wing: (f, u) => (f < 0.5 && u < 0.55 ? 0xf2eee2 : 0x14110f), tail: () => 0x14110f },
+  // picaflor chico (el macho): diminuto; lomo verde bronceado, corona rojo fuego, vientre claro salpicado de verde
+  // y un pico negro, recto y fino como aguja
+  picaflor: { k: 0.1, span: 0.14, chord: 0.04, tailLen: 0.045, tailFan: 0.22, posa: -0.6, pata: 0.07, patas: 0x2a2622, gp: 0.01,
+    cuerpo: [[0, -0.38, 0.012, 0.012], [0, -0.26, 0.07, 0.065], [0.01, -0.04, 0.15, 0.14], [0.04, 0.16, 0.135, 0.135], [0.08, 0.27, 0.095, 0.095], [0.095, 0.32, 0.085, 0.085]],
+    cabeza: [0.115, 0.38, 0.105, 1.0], pico: { l: 0.34, r: 0.016, c: 0x1a1614, fino: 1 }, ojo: [0.02, 0x0c0a08],
+    coat: (t, sa, ca) => (sa > -0.1 ? 0x4a8f4a : Math.sin(t * 60) * Math.sin(ca * 9) > 0.3 ? 0x5a8a50 : 0xddd6c2),
+    cara: (t, sa) => (sa > 0.3 && t > 0.3 ? 0xe0521f : sa > -0.1 ? 0x4a8f4a : 0xddd6c2),
+    wing: () => 0x3c3a40, tail: () => 0x3a6a3e },
+  // chuncho: búho chico y cabezón, sin «orejas»; pardo salpicado de blanco, cejas blancas, ojos amarillos que miran de frente,
+  // pecho blanco con rayas pardas, cola barrada y patas emplumadas
+  chuncho: { k: 0.3, span: 0.38, chord: 0.13, tailLen: 0.1, tailFan: 0.18, posa: -1.2, pata: 0.11, patas: 0xd8ccb0, gp: 0.03, frente: true,
+    cuerpo: [[0, -0.32, 0.012, 0.012], [0, -0.22, 0.1, 0.095], [0.02, 0, 0.2, 0.19], [0.06, 0.18, 0.19, 0.19], [0.1, 0.28, 0.16, 0.16], [0.12, 0.32, 0.14, 0.14]],
+    cabeza: [0.15, 0.4, 0.185, 0.85], pico: { l: 0.075, r: 0.034, c: 0xcfc878, gancho: true, bajo: 0.3 }, ojo: [0.03, 0x0c0a08, 0xf2c81e],
+    coat: (t, sa, ca) => (sa < -0.1 ? (Math.sin(ca * 16) > 0.2 ? 0x6e4a2e : 0xece6d4) : Math.sin(t * 46) * Math.sin(ca * 11) > 0.6 ? 0xe8dcc0 : 0x6e4a2e),
+    cara: (t, sa, ca) => (t > 0.6 ? (sa > 0.28 ? 0xece4d0 : sa < -0.45 ? 0xece6d4 : 0xa89474) : Math.sin(t * 40) * Math.sin(ca * 12) > 0.5 ? 0xe8dcc0 : 0x6e4a2e),
     wing: (f, u) => (Math.sin(u * 20 + f * 9) > 0.6 ? 0xd8c8a0 : 0x5a3e28), tail: (u) => (Math.sin(u * 16) > 0 ? 0x5a3e28 : 0x8a6a48) },
 };
 // Monito del monte: un marsupial que cabe en una mano. Cuerpo redondo, ojos grandes con antifaz oscuro, orejas redondas
@@ -215,7 +300,7 @@ function buildMonito() {
   for (const sx of [-1, 1]) { ball(0.0105, dark, hd, sx * 0.016, 0.008, 0.02, 1, 1, 0.5); ball(0.0068, dark, hd, sx * 0.0165, 0.0085, 0.0235).material = eyeMat; ball(0.012, 0xc8a090, hd, sx * 0.022, 0.024, -0.004, 1, 1, 0.3).rotation.y = sx * 0.5; }
   g.add(skin([[0.032, -0.05, 0.012, 0.012], [0.012, -0.085, 0.013, 0.013], [-0.022, -0.1, 0.012, 0.012], [-0.055, -0.085, 0.01, 0.01], [-0.066, -0.055, 0.008, 0.008], [-0.05, -0.036, 0.005, 0.005]], () => 0x7a6a58, { rings: 16, radial: 8, fur: 0.003 }));
   for (const [x, z] of [[0.02, 0.035], [-0.02, 0.035], [0.022, -0.03], [-0.022, -0.03]]) ball(0.008, 0xd8b0a0, g, x, 0.008, z, 1, 0.6, 1.4);
-  g.scale.setScalar(2); shadows(g); g.traverse((o) => { if (o.userData.shell) o.castShadow = false; });
+  g.scale.setScalar(2); fuse(g); shadows(g); g.traverse((o) => { if (o.userData.shell) o.castShadow = false; });
   return { g, hd };
 }
 const featherMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: furTex, roughness: 0.9, side: THREE.DoubleSide });
@@ -231,16 +316,28 @@ function feathers(list) {
   return new THREE.Mesh(g, featherMat);
 }
 function buildBird(type) {
-  const B = BIRDS[type], g = new THREE.Group(), k = B.k, V = (x, y, z) => new THREE.Vector3(x, y, z);
-  // cuerpo, cuello y cabeza en una sola piel: cola → vientre → pecho → cuello → cabeza
-  g.add(skin([[0, -0.5 * k, 0.01, 0.01], [0.01 * k, -0.34 * k, 0.09 * k, 0.08 * k], [0.02 * k, -0.05 * k, 0.17 * k, 0.16 * k], [0.04 * k, 0.2 * k, 0.15 * k, 0.15 * k], [0.08 * k, 0.36 * k, 0.085 * k, 0.09 * k], [0.11 * k, 0.47 * k, 0.095 * k, 0.1 * k], [0.1 * k, 0.56 * k, 0.06 * k, 0.065 * k], [0.095 * k, 0.6 * k, 0.012, 0.012]], B.coat, { rings: 18, radial: 12, rough: 0.03 }));
-  // pico: ganchudo en las rapaces y los loros
-  const bk = mesh(new THREE.ConeGeometry(0.045 * k, (B.long ? 0.2 : 0.15) * k, 6), B.beak, g, 0, 0.09 * k, (B.long ? 0.67 : 0.65) * k); bk.rotation.x = Math.PI / 2 + (B.hook ? 0.35 : 0.1);
-  if (B.hook) { const tip = mesh(new THREE.ConeGeometry(0.022 * k, 0.07 * k, 5), B.beak, g, 0, 0.045 * k, (B.long ? 0.75 : 0.71) * k); tip.rotation.x = Math.PI * 0.95; }
-  ball(0.05 * k, B.cere, g, 0, 0.1 * k, 0.585 * k, 1, 0.8, 0.9);
-  for (const sx of [-1, 1]) { const e = ball(0.02 * k, 0x0c0a08, g, sx * 0.075 * k, 0.135 * k, 0.5 * k); e.material = eyeMat; }
-  // cola en abanico
-  const T = 7; g.add(feathers(Array.from({ length: T }, (_, i) => { const a = (i / (T - 1) - 0.5) * B.tailFan * 2; return { base: V(0, 0.01 * k, -0.4 * k), dir: V(Math.sin(a), 0, -Math.cos(a)), len: B.tailLen, wid: B.tailLen * 0.3, colorAt: B.tail }; })));
+  const B = BIRDS[type], g = new THREE.Group(), k = B.k, V = (x, y, z) => new THREE.Vector3(x, y, z), Y = V(0, 1, 0);
+  // cuerpo: de la cola al cuello, en una sola piel
+  g.add(skin(B.cuerpo.map(([y, z, rx, ry]) => [y * k, z * k, Math.max(0.004, rx * k), Math.max(0.004, ry * k)]), B.coat, { rings: 16, radial: 12, rough: 0.03 }));
+  // cabeza: va en su propia articulación, para que posada y erguida el ave la lleve derecha y mire alrededor
+  const [hy, hz, hr, hl] = B.cabeza, head = new THREE.Group(), r = hr * k, L = r * hl; head.position.set(0, hy * k, hz * k); g.add(head);
+  head.add(skin([[-r * 0.1, -L * 0.95, 0.004, 0.004], [0, -L * 0.6, r * 0.78, r * 0.8], [0, 0, r, r], [-r * 0.05, L * 0.62, r * 0.78, r * 0.8], [-r * 0.1, L * 0.98, 0.004, 0.004]], B.cara, { rings: 10, radial: 12 }));
+  // pico: un cono, más o menos fino; ganchudo en las rapaces y los loros. La cera es la piel pelada de su base.
+  const P = B.pico, bl = P.l * k, br = P.r * k, by = -r * (P.bajo ?? 0.18), bz = L * 0.8;
+  const bk = mesh(new THREE.ConeGeometry(br, bl, 6), P.c, head, 0, by, bz + bl * 0.42); bk.rotation.x = Math.PI / 2 + (P.gancho ? 0.3 : 0.06); bk.scale.x = P.fino ?? 0.8;
+  if (P.gancho) { const tip = mesh(new THREE.ConeGeometry(br * 0.5, bl * 0.42, 5), P.c, head, 0, by - bl * 0.2, bz + bl * 0.78); tip.rotation.x = Math.PI * 0.95; }
+  if (B.cera) ball(br * 1.25, B.cera, head, 0, by + br * 0.25, bz + bl * 0.04, 1.15, 1, 1);
+  // ojos: a los lados, o mirando de frente en el búho; algunos tienen el iris de color
+  const [er, ec, iris] = B.ojo, ex = r * (B.frente ? 0.42 : 0.8), ez = L * (B.frente ? 0.8 : 0.35), ey = r * 0.18, e = er * k;
+  for (const sx of [-1, 1]) {
+    if (iris) ball(e * 1.55, iris, head, sx * ex, ey, ez, B.frente ? 1 : 0.5, 1, B.frente ? 0.5 : 1);
+    ball(e, ec, head, sx * (ex + (B.frente || !iris ? 0 : e * 0.45)), ey, ez + (B.frente ? e * 0.5 : 0));
+  }
+  // copete
+  if (B.cresta) { const C = B.cresta; head.add(feathers(Array.from({ length: C.n }, (_, i) => { const u = i / (C.n - 1) - 0.5; return { base: V(u * r * 0.5, r * 0.8 + C.at[0] * k, C.at[1] * k), dir: V(u * 0.5, C.dir[1], C.dir[2]).normalize(), len: C.l * k * (1.1 - Math.abs(u) * 0.6), wid: C.l * k * 0.36, colorAt: () => C.c }; }))); }
+  // cola: un abanico de plumas; larga y en punta en el loro, parada en el chucao
+  const T = 7, tb = B.cuerpo[0];
+  g.add(feathers(Array.from({ length: T }, (_, i) => { const a = (i / (T - 1) - 0.5) * B.tailFan * 2, c = Math.abs(i / (T - 1) - 0.5) * 2; return { base: V(0, (tb[0] + 0.02) * k, (tb[1] + 0.12) * k), dir: V(Math.sin(a), B.colaArriba ?? 0, -Math.cos(a)).normalize(), len: B.tailLen * (1 - c * (B.colaPunta ?? 0.12)), wid: B.tailLen * (B.colaAncho ?? 0.3), colorAt: B.tail }; })));
   // ala: brazo con cobertoras y secundarias, y mano con las remeras largas abiertas en dedos
   const wing = (sx) => {
     const inner = new THREE.Group(); inner.position.set(sx * 0.12 * k, 0.06 * k, 0.1 * k); g.add(inner);
@@ -254,8 +351,15 @@ function buildBird(type) {
     return [inner, outer];
   };
   const [wl, wlo] = wing(1), [wr, wro] = wing(-1);
-  shadows(g);
-  return { g, wl, wr, wlo, wro };
+  // patas: canilla y cuatro dedos (tres adelante y uno atrás). Van en su propia articulación: posada quedan derechas
+  // aunque el cuerpo se incline, y en vuelo se recogen hacia atrás.
+  const legs = new THREE.Group(); legs.position.set(0, -0.1 * k, 0.02 * k); g.add(legs);
+  const pl = B.pata * k, pg = B.gp * k, td = Math.max(0.06, B.pata * 0.42) * k;
+  for (const sx of [-1, 1]) { const x0 = sx * 0.055 * k;
+    mesh(new THREE.CylinderGeometry(pg, pg * 0.8, pl, 5), B.patas, legs, x0, -pl / 2, 0);
+    for (const [a, l] of [[0, 1], [0.6, 0.9], [-0.6, 0.9], [Math.PI, 0.65]]) { const d = mesh(new THREE.CylinderGeometry(pg * 0.7, pg * 0.3, td * l, 4), B.patas, legs, x0 + Math.sin(a) * td * l * 0.5, -pl + pg * 0.3, Math.cos(a) * td * l * 0.5); d.quaternion.setFromUnitVectors(Y, V(Math.sin(a), -0.12, Math.cos(a)).normalize()); } }
+  fuse(g); shadows(g);
+  return { g, wl, wr, wlo, wro, head, legs };
 }
 
 // Símbolos que flotan sobre la gente: estrella dorada de ocho puntas = misión principal,
@@ -293,6 +397,14 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
   person({ ...man, cloth: 0x4a2a22, trim: 0x17151b }, 8, -8, { mode: 'walk', pts: [[8, -8], [9, -13], [-17, -1], [-6, 14], [5, 4]], pace: 1.3 });
   person({ ...woman, cloth: 0x2a3326, trim: 0xd99a1c }, -2, 14, { mode: 'walk', pts: [[-2, 14], [-3, 40], [-2, 14], [12, 10], [4, 3]], pace: 1.2 });
   person({ ...man, h: 1.7, cloth: 0x2a2630, trim: 0x8a4a2c }, -20, 6, { mode: 'work', face: -2.6 });
+  // gente en sus oficios (los lugares los arma village.js): la que muele, la que trabaja la greda, el que revisa las lanzas
+  // y el que prueba una pifilka. El hombre de arriba raspa el cuero que tiene estirado delante.
+  { const [mx, mz] = OFICIOS.moler, [gx, gz] = OFICIOS.greda, [ax, az] = OFICIOS.armas, [ux, uz] = OFICIOS.musica;
+    person({ ...woman, cloth: 0x2a2630, trim: 0xd99a1c, band: 0xd99a1c }, mx - 0.62, mz, { mode: 'oficio', oficio: 'moler', face: Math.PI / 2 });
+    person({ ...woman, h: 1.5, cloth: 0x33262a, trim: 0xe9dcb8 }, gx, gz + 0.62, { mode: 'oficio', oficio: 'moler', face: Math.PI });
+    person({ ...man, h: 1.62, cloth: 0x3a2a22, trim: 0xb3262e }, ax, az + 1.2, { mode: 'work', face: Math.PI });
+    const mu = person({ ...man, h: 1.6, cloth: 0x26323a, trim: 0xe9dcb8 }, ux + 1.0, uz - 0.2, { mode: 'oficio', oficio: 'tocar', face: Math.atan2(-ux - 1, 0.2 - uz) });
+    const pif = new THREE.Mesh(new THREE.CylinderGeometry(0.011, 0.013, 0.2, 6), mat(0x5a4632)); pif.position.set(0, -0.2, 0.02); pif.rotation.x = 0.5; pif.castShadow = true; mu.foreR.add(pif); } // la pifilka, en la mano
 
   // ---------- animales ----------
   const quad = (opts, x, z, beh) => { const q = buildQuad(opts); q.x = x; q.z = z; q.face = R(0, 6); q.phase = R(0, 6); q.wait = R(0, 4); q.tx = x; q.tz = z; q.speed = 0; Object.assign(q, beh); q.kind = opts.kind || 'weke'; scene.add(q.g); quads.push(q); const k = opts.s || 1; if (q.kind === 'weke') solid(q, 0.4 * k, 0.25 * k, 0.75 * k); else solid(q, 0.17, 0.03, 0.22); };
@@ -386,7 +498,7 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
     for (const p of actors) {
       if (p.mode === 'walk') {
         const [tx, tz] = p.pts[p.i], d = Math.hypot(tx - p.x, tz - p.z);
-        const near = Math.hypot(pp.x - p.x, pp.z - p.z); if (near < 1.7) { p.wait = Math.max(p.wait, 0.6); turn(p, pp.x, pp.z, dt, 3); } // si te cruzas, se detiene y te mira
+        const near = Math.hypot(pp.x - p.x, pp.z - p.z); if (near < 1.7 || p.habla) { p.wait = Math.max(p.wait, 0.6); turn(p, pp.x, pp.z, dt, 3); } // si te cruzas, se detiene y te mira; y no se va mientras conversan
         if (p.wait > 0) { p.wait -= dt; p.speed += (0 - p.speed) * Math.min(1, dt * 8); }
         else if (d < 0.5) { p.i = (p.i + 1) % p.pts.length; p.wait = R(1.5, 5); }
         else { turn(p, tx, tz, dt); p.speed += (p.pace - p.speed) * Math.min(1, dt * 5); p.x += Math.sin(p.face) * p.speed * dt; p.z += Math.cos(p.face) * p.speed * dt; }
@@ -397,13 +509,34 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
         p.body.rotation.x = 0.13; p.head.rotation.x = 0.4; p.head.rotation.y = -0.12;
         p.armR.rotation.x = -0.62 + c * 0.07; p.armR.rotation.z = -0.1 + s * 0.09; p.foreR.rotation.x = -0.5 + s * 0.05;
         p.armL.rotation.x = -0.2; p.foreL.rotation.x = -1.2; }
+      else if (p.mode === 'oficio') { p.phase += dt * 2.4; animatePerson(p, 0, 0); const sw = Math.sin(p.phase);
+        if (p.oficio === 'moler') { p.shinL.rotation.x = p.shinR.rotation.x = 1.55; p.body.position.y = -0.24; p.body.rotation.x = 0.42 + sw * 0.07; p.armL.rotation.x = p.armR.rotation.x = -0.75 + sw * 0.22; p.foreL.rotation.x = p.foreR.rotation.x = -0.25; p.head.rotation.x = 0.25; } // de rodillas, empujando la piedra de moler o alisando la greda
+        else { p.armL.rotation.x = -1.05; p.armR.rotation.x = -1.2; p.foreL.rotation.x = -1.5; p.foreR.rotation.x = -1.35; p.body.rotation.z = sw * 0.025; p.head.rotation.x = -0.04 + Math.sin(p.phase * 0.5) * 0.04; } } // tocando: las manos frente a la boca
       else if (p.mode === 'lead') { p.phase += dt * (1.5 + p.speed * 3.4 / Math.sqrt(p.h)); animatePerson(p, p.phase, Math.min(1, p.speed / 2.4) * 0.75 + (p.speed > 0.1 ? 0.2 : 0), false, slopeOf(p, dt)); p.head.rotation.y += ((p.mira || 0) - p.head.rotation.y) * Math.min(1, dt * 4); } // va guiando: su paso lo decide acciones.js
       else { p.phase += dt; animatePerson(p, 0, 0); p.armL.rotation.x = Math.sin(p.phase * 0.6) * 0.05; p.body.rotation.z = Math.sin(p.phase * 0.35) * 0.015; p.head.rotation.y = Math.sin(p.phase * 0.23) * 0.3; if (p.quieto) p.head.rotation.y *= 0.2; else if (Math.hypot(pp.x - p.x, pp.z - p.z) < 6) { turn(p, pp.x, pp.z, dt, 2.5); p.head.rotation.y *= 0.3; } }
+      // Conversando con Leftraru (p.habla: dónde está su cara, y si además se vuelve entera hacia él): lo mira a los ojos y
+      // deja lo que tenía entre manos. Al terminar, la cabeza vuelve a lo suyo y quien trabajaba se vuelve otra vez a su trabajo.
+      const hk = p.hablaK = Math.max(0, Math.min(1, (p.hablaK || 0) + (p.habla ? dt : -dt) * 4)); if (p.habla) p.hablaP = p.habla;
+      if (hk > 0) { const h = p.hablaP, suelta = p.mode === 'work' || p.mode === 'walk'; if (p.habla && h.cuerpo) turn(p, h.x, h.z, dt, 8); // suelta: en ese modo nadie más le mueve la cabeza
+        let ry = Math.atan2(h.x - p.x, h.z - p.z) - p.face; ry = Math.max(-1, Math.min(1, Math.atan2(Math.sin(ry), Math.cos(ry))));
+        const rx = Math.max(-0.3, Math.min(0.5, Math.atan2(height(p.x, p.z) + p.h * 0.94 - h.y, Math.hypot(h.x - p.x, h.z - p.z) || 1))), bx = p.mode === 'work' ? 0.2 : p.mode === 'cook' ? 0.4 : 0, by = suelta ? 0 : p.head.rotation.y;
+        p.head.rotation.x = bx + (rx - bx) * hk; p.head.rotation.y = by + (ry - by) * hk;
+        if (p.mode === 'work') for (const o of [p.armL, p.armR, p.foreL, p.foreR]) o.rotation.x *= 1 - hk * 0.8;
+      } else { if (p.hablaP) { p.hablaP = null; if (p.mode === 'work' || p.mode === 'walk') p.head.rotation.y = 0; if (p.mode !== 'work' && p.mode !== 'cook') p.head.rotation.x = 0; }
+        if (p.mode === 'work' && p.face0 !== undefined) { let d = p.face0 - p.face; d = Math.atan2(Math.sin(d), Math.cos(d)); p.face += d * Math.min(1, dt * 4); if (Math.abs(d) < 0.01) p.face0 = undefined; } }
+      // Gestos de una conversación (los lleva main.js). mano: estira el brazo para entregar o recibir; obra: trabaja con las
+      // dos manos, mirándolas; bebe: se lleva algo a la boca.
+      if (p.mano > 0) { p.armR.rotation.x += (-1.2 - p.armR.rotation.x) * p.mano; p.foreR.rotation.x += (-0.3 - p.foreR.rotation.x) * p.mano; }
+      if (p.obra > 0) { const w = Math.sin(t * 7), k2 = p.obra; p.armL.rotation.x += (-0.8 + w * 0.12 - p.armL.rotation.x) * k2; p.armR.rotation.x += (-0.8 - w * 0.12 - p.armR.rotation.x) * k2; p.foreL.rotation.x += (-0.95 - w * 0.25 - p.foreL.rotation.x) * k2; p.foreR.rotation.x += (-0.95 + w * 0.25 - p.foreR.rotation.x) * k2; p.head.rotation.x += (0.32 - p.head.rotation.x) * k2; }
+      if (p.bebe > 0) { p.armR.rotation.x += (-0.85 - p.armR.rotation.x) * p.bebe; p.foreR.rotation.x += (-2.0 - p.foreR.rotation.x) * p.bebe; p.head.rotation.x += (-0.22 - p.head.rotation.x) * p.bebe; }
       const gy = height(p.x, p.z); p.g.position.set(p.x, gy + Math.sin(p.phase * 0.8) * 0.008, p.z); p.g.rotation.y = p.face;
       if (p.mark) { p.mark.position.set(p.x, gy + p.h + 0.36 + Math.sin(t * 2.2 + p.x) * 0.045, p.z); p.mark.material.rotation = Math.sin(t * 0.9) * 0.12; }
     }
     for (const q of quads) {
-      const dp = Math.hypot(pp.x - q.x, pp.z - q.z), flee = q.shy && dp < api.shyR * (speed > 4 ? 1 : 0.4); // corriendo los espantas de lejos; caminando puedes acercarte
+      if (q.fuera) continue; // ya no está en el monte
+      if (q.caido) { q.speed = 0; q.g.rotation.z += (1.5 - q.g.rotation.z) * Math.min(1, dt * 5); q.g.position.set(q.x, height(q.x, q.z) + 0.1, q.z); continue; } // cazado: queda tendido de costado
+      if (q.susto > 0) q.susto -= dt; // una flecha que pasó cerca: huye aunque nadie corra
+      const dp = Math.hypot(pp.x - q.x, pp.z - q.z), flee = q.shy && (dp < api.shyR * (speed > 4 ? 1 : 0.4) || q.susto > 0); // corriendo los espantas de lejos; caminando puedes acercarte
       if (flee) { q.tx = q.x + ((q.x - pp.x) / dp) * 14; q.tz = q.z + ((q.z - pp.z) / dp) * 14; q.wait = 0; }
       const d = Math.hypot(q.tx - q.x, q.tz - q.z), want = flee ? 5.2 : q.pace;
       if (q.wait > 0) { q.wait -= dt; q.speed += (0 - q.speed) * Math.min(1, dt * 6); q.neck.rotation.x += ((q.graze ? 1.7 : 0.3) - q.neck.rotation.x) * Math.min(1, dt * 3); q.headPivot.rotation.x = -q.neck.rotation.x * 0.6; q.tail.rotation.x = Math.sin(q.phase * 3 + q.x) * 0.25; }
@@ -433,13 +566,15 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
       const g = b.grp, p = b.perch, [fx, fy, fz, amp, fq] = b.f(g.ft, b); let k = 0; // k: 0 en vuelo … 1 posada
       if (p && g.st !== 'fly') { const u = sm(0, 1, (g.tm - b.lag) / g.T); k = g.st === 'perch' ? 1 : g.st === 'land' ? u : 1 - u; }
       const scare = g.shy && k === 0 && Math.hypot(pp.x - fx, pp.z - fz) < 9 && speed > 1; b.up += ((scare ? 7 : 0) - b.up) * Math.min(1, dt * (scare ? 2.5 : 0.25)); // los pajaritos suben cuando pasas debajo
-      const sit = p ? p.r + BIRDS[b.type].k * 0.15 : 0, x = p ? fx + (p.x - fx) * k : fx, y = p ? fy + b.up * (1 - k) + (p.y + sit - fy) * k + Math.sin(Math.PI * k) * 1.2 : fy + b.up, z = p ? fz + (p.z - fz) * k : fz; // llega a la rama un poco desde arriba
+      const sit = p ? p.r + (BIRDS[b.type].pata + 0.07) * BIRDS[b.type].k : 0, x = p ? fx + (p.x - fx) * k : fx, y = p ? fy + b.up * (1 - k) + (p.y + sit - fy) * k + Math.sin(Math.PI * k) * 1.2 : fy + b.up, z = p ? fz + (p.z - fz) * k : fz; // llega a la rama un poco desde arriba
       // rumbo y cabeceo según hacia dónde se mueve de verdad; al posarse queda atravesada en la rama, más erguida, y mira alrededor
       const o = b.g.position, mx = x - o.x, my = y - o.y, mz = z - o.z, hs = Math.hypot(mx, mz), F = sm(0.82, 1, k); let yaw = b.yaw, pitch = b.pitch;
       if (b.seen && dt > 0 && hs > dt * 0.3) { yaw = Math.atan2(mx, mz); pitch = Math.max(-0.7, Math.min(0.7, -Math.atan2(my, hs) * 0.7)); }
-      if (p && F > 0) { let d = p.yaw + Math.sin(t * 0.37 + b.o) * 0.35 * F - yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); yaw += d * F; pitch += (-0.42 - pitch) * F; }
+      if (p && F > 0) { let d = p.yaw + Math.sin(t * 0.37 + b.o) * 0.35 * F - yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); yaw += d * F; pitch += (BIRDS[b.type].posa - pitch) * F; }
       let dy = yaw - b.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); b.yaw += dy * Math.min(1, dt * 7); b.pitch += (pitch - b.pitch) * Math.min(1, dt * 6); if (!b.seen) { b.yaw = yaw; b.seen = true; }
       o.set(x, y, z); b.g.rotation.y = b.yaw; b.g.rotation.x = b.pitch;
+      b.head.rotation.x = -b.pitch * 0.9 * F; b.head.rotation.y = Math.sin(t * 0.43 + b.o * 3) * 0.6 * F; // posada, la cabeza va derecha y mira alrededor
+      b.legs.rotation.x = -b.pitch * F + 1.2 * (1 - F); // las patas, derechas sobre la rama; en vuelo, recogidas
       // alas: baten más fuerte al frenar y al despegar, y se pliegan contra el cuerpo al quedar posada
       const brake = Math.sin(Math.PI * k) * (1 - F); b.ph += dt * fq * (1 + brake * 1.3);
       const fl = Math.sin(b.ph) * (amp + brake * 0.55) * (1 - F);

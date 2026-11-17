@@ -7,6 +7,7 @@ La clave no está en el repositorio: se guarda como secreto del entorno.
 - **Texturas continuas** (suelos, cortezas, roca, paja, tejido): se piden repetibles y con luz pareja; se guardan en WebP a 2048 px.
 - **Recortes** (hojas de cada especie, rama de pewen, helecho, pasto, juncos, flores, quila, copihue): se piden sobre fondo azul puro, el azul se vuelve transparente y se guardan en WebP con transparencia a 1024 px.
 - **Sin usar:** la textura de pelaje se generó pero no se usa; sobre el cuerpo de los animales se veía a franjas.
+- **Copias livianas:** cada textura continua tiene además una copia a 1024 px en `public/assets/tex-1024/`, con el mismo nombre. El juego las usa cuando está encendida la opción «Texturas livianas» (la lista de nombres está en `src/gfx.js`, en `LIVIANAS`). Al agregar una textura continua nueva hay que generar su copia y sumarla a esa lista: `ffmpeg -i tex/nombre.webp -vf "scale=1024:1024:flags=lanczos" -c:v libwebp -quality 90 -compression_level 6 tex-1024/nombre.webp`.
 
 Cómo se pide una imagen:
 

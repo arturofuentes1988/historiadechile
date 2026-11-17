@@ -1,7 +1,7 @@
 // Exploración: qué hay cerca de Leftraru que se pueda observar o con quién se puede hablar.
 import { POI, CERRO, riverZ, height } from './terrain.js';
-import { RUKAS, FOGON } from './village.js';
-import { TALK } from './notes.js';
+import { RUKAS, FOGON, OFICIOS, TALLADO, REFUGIO } from './village.js';
+import { TALK, NOTES } from './notes.js';
 
 export const PERSON = { 'Curiñancu': 'curinancu', 'Millaray': 'millaray', 'la abuela': 'abuela', 'Ayelén': 'ayelen', 'Rayen': 'rayen', 'la machi': 'machi', 'Ñamku': 'namku' };
 const TREE = { pewen: ['pewen', 'el pewen'], coigue: ['coigue', 'el coigüe'], roble: ['roble', 'el roble'], canelo: ['canelo', 'el canelo'], giant: ['gigante', 'el árbol abuelo'], peumo: ['peumo', 'el peumo'], boldo: ['boldo', 'el boldo'], quillay: ['quillay', 'el quillay'], litre: ['litre', 'el litre'] };
@@ -11,6 +11,7 @@ const BIRD = { traro: ['traro', 'el traro', 36, 2.5], choroy: ['choroy', 'el cho
 // Los animales de cuatro patas: nota del cuaderno, nombre, desde cuán lejos se observan, y cómo se encuadran (distancia, altura de cámara, ángulo, alto del cuerpo).
 const QUAD = { weke: ['weke', 'el weke', 5, 2.7, 0.2, 42, 0.95], pudu: ['pudu', 'el pudú', 5.5, 1.25, 0.12, 34, 0.3], zorro: ['zorro', 'el zorro', 8, 1.8, 0.15, 36, 0.36] };
 
+const UNA_VEZ = new Set(NOTES.filter((n) => n.cat === 'flora' || n.cat === 'fauna').map((n) => n.id)); // fichas de árboles, plantas, animales y aves
 export function createExplorer({ world, ui }) {
   let reach = 1; // la «vista de traro» lo aumenta
   const H = (x, z) => height(x, z), d2 = (p, x, z) => Math.hypot(p.x - x, p.z - z);
@@ -25,11 +26,16 @@ export function createExplorer({ world, ui }) {
     for (const b of world.life.birds) { if (!b.perched) continue; const [id, label, r, dist] = BIRD[b.type], bp = b.g.position, d = d2(p, bp.x, bp.z); if (d < r * reach) add(id, 'Observar', label, d / 8, null, { dist, up: dist * 0.1, fov: 36, side: b.perch.cam }, { live: () => b.g.position, rec: b.perch.tree.rec, bird: b.grp }); }
     let rk = null; for (const r of RUKAS) { const d = d2(p, r.x, r.z); if (d < 6 && (!rk || d < rk.d)) rk = { ...r, d }; }
     if (rk) add('ruka', 'Observar', 'la ruka', rk.d, { x: rk.x, y: H(rk.x, rk.z) + 1.7, z: rk.z }, { dist: 9.5, up: 1.2, fov: 48 });
-    const fix = (id, label, x, z, r, y, shot) => { const d = d2(p, x, z); if (d < r * k) add(id, 'Observar', label, d, { x, y: H(x, z) + y, z }, shot); };
+    const fix = (id, label, x, z, r, y, shot, antes = 0) => { const d = d2(p, x, z); if (d < r * k) add(id, 'Observar', label, d - antes, { x, y: H(x, z) + y, z }, shot); }; // antes: cuánto se adelanta a las plantas que tenga alrededor
     fix('kutral', 'el fogón', FOGON.x, FOGON.z, 4.2, 0.5, { dist: 4.6, up: 1.3, fov: 45 });
     fix('rewe', 'el rewe', 20, 19, 4, 1.7, { dist: 5.5, up: 0.6, fov: 45 });
     fix('witral', 'el telar', -10.6, -4.2, 3.2, 1.1, { dist: 3.6, up: 0.3, fov: 42 });
     fix('chemamull', 'las figuras de madera', POI.antiguos.x, POI.antiguos.z, 8, 1.6, { dist: 8.5, up: 0.8, fov: 46 });
+    fix('tallado', 'la figura tallada', TALLADO.x, TALLADO.z, 5, 1.9, { dist: 5.4, up: 0.6, fov: 44 }, 5);
+    fix('refugio', 'el refugio del bosque', REFUGIO.x, REFUGIO.z, 7.5, 1.1, { dist: 7.5, up: 1.1, fov: 46 }, 7);
+    fix('armas', 'las armas', OFICIOS.armas[0], OFICIOS.armas[1], 3.6, 1.2, { dist: 4.8, up: 0.5, fov: 44 }, 3);
+    fix('instrumentos', 'los instrumentos', OFICIOS.musica[0], OFICIOS.musica[1], 3.4, 0.4, { dist: 3.4, up: 1.0, fov: 44 }, 3);
+    fix('cueros', 'los cueros', OFICIOS.cueros[0], OFICIOS.cueros[1], 3.4, 1.0, { dist: 4.4, up: 0.4, fov: 44 }, 3);
     if (d2(p, CERRO[0], CERRO[1]) < 11) { add('pillan', 'Mirar', 'el volcán', 1, null, { view: 'pillan' }); add('lafken', 'Mirar', 'el mar', 1.5, null, { view: 'lafken' }); }
     const rz = riverZ(p.x); if (Math.abs(p.z - rz) < 6) add('rio', 'Observar', 'el río', Math.abs(p.z - rz), { x: p.x + 4, y: -1.3, z: rz }, { dist: 11, up: 3.2, fov: 55 });
     // el árbol entero, en plano general
@@ -43,7 +49,7 @@ export function createExplorer({ world, ui }) {
     const fresh = c.filter((x) => !x.known).sort((a, b) => a.d - b.d)[0];
     if (fresh) return fresh;
     const who = c.filter((x) => x.person).sort((a, b) => a.d - b.d)[0]; if (who) return who;
-    const again = still ? c.filter((x) => x.shot && !x.shot.view).sort((a, b) => a.d - b.d)[0] : null;
+    const again = still ? c.filter((x) => x.shot && !x.shot.view && !UNA_VEZ.has(x.id)).sort((a, b) => a.d - b.d)[0] : null; // las plantas y los animales se observan una sola vez: con la ficha ya en el cuaderno, no se vuelven a ofrecer
     return again ? { ...again, verb: 'Volver a observar' } : null;
   }
   // para el «rastreador»: cosas fijas aún sin descubrir, cerca
@@ -52,6 +58,7 @@ export function createExplorer({ world, ui }) {
     for (const a of world.life.actors) if (PERSON[a.name]) add(PERSON[a.name], a.x, a.z);
     for (const q of world.life.quads) add(q.kind, q.x, q.z); for (const c of world.life.critters) add(c.id, c.x, c.z);
     add('ruka', RUKAS[0].x, RUKAS[0].z); add('kutral', FOGON.x, FOGON.z); add('rewe', 20, 19); add('witral', -10.6, -4.2); add('chemamull', POI.antiguos.x, POI.antiguos.z); add('gigante', POI.viejo.x, POI.viejo.z); add('pillan', CERRO[0], CERRO[1]);
+    add('tallado', TALLADO.x, TALLADO.z); add('refugio', REFUGIO.x, REFUGIO.z); add('armas', OFICIOS.armas[0], OFICIOS.armas[1]); add('instrumentos', OFICIOS.musica[0], OFICIOS.musica[1]); add('cueros', OFICIOS.cueros[0], OFICIOS.cueros[1]);
     for (const key in POI) add('l-' + key, POI[key].x, POI[key].z);
     return out;
   }

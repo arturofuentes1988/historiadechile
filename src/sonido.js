@@ -65,6 +65,8 @@ export function createSound() {
     buf.hablar = make(0.95, (d, sr) => { drum(d, sr, 0, 150, 0.45); flute(d, sr, 0.03, 0.2, 523, 0.5); flute(d, sr, 0.22, 0.38, 659, 0.55); lp(d, sr, 4200); air(d, sr, 0.25); });
     buf['hablar-sigue'] = make(0.24, (d, sr) => { tock(d, sr, 0, 880, 0.6, 70); tock(d, sr, 0.055, 1175, 0.35, 90); lp(d, sr, 5000); });
     buf['hablar-fin'] = make(0.5, (d, sr) => { flute(d, sr, 0, 0.3, 587, 0.4); lp(d, sr, 3800); air(d, sr, 0.3); });                                       // una nota que baja el telón
+    // la tinta del aviso del comienzo: una pluma que rasga el papel, en dos o tres trazos cortos
+    buf.tinta = make(0.6, (d, sr) => { noise(d); hp(d, sr, 1700); lp(d, sr, 4800); for (let i = 0; i < d.length; i++) { const t = i / sr; d[i] *= Math.sin(Math.PI * Math.min(1, t / 0.56)) ** 1.3 * (0.3 + 0.7 * Math.abs(Math.sin(t * 17))) ** 1.5; } tock(d, sr, 0, 230, 0.1, 34, 0.2); });
     for (const n of ['rio', 'viento', 'pajaros', 'fuego']) { const s = ctx.createBufferSource(), g = ctx.createGain(); s.buffer = buf[n]; s.loop = true; g.gain.value = 0; s.connect(g).connect(master); s.start(); loops[n] = g; }
   }
   // Solo suena mientras la ventana del juego es la que se está usando. Una copia abierta en segundo plano (otra pestaña,

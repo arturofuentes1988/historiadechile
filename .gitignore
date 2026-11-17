@@ -1,2 +1,5 @@
 node_modules
 dist
+# claves de servicios externos: nunca se suben
+.env.local
+.env*.local

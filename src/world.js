@@ -138,6 +138,12 @@ export function buildWorld(scene, RAPIER, physics) {
 
   for (let i = 0, n = 5000 * Q; i < n; i++) { const x = R(B.x0 + 2, B.x1 - 2), z = R(B.z0 + 2, B.z1 - 2), h = height(x, z); if (h > WATER_Y - 0.5) flora.rock(x, h - 0.02, z, R(0.05, 0.16), { squash: 0.6, color: rng() < 0.5 ? 0xb8b0a0 : 0x9a9284 }); } // piedritas
 
+  // El claro del maqui tiene de verdad maqui: un grupo de matas alrededor del centro, que es donde apunta el mapa.
+  // (El reparto al azar no pone nada a menos de 4 pasos de un sendero, y el sendero termina justo ahí: quedaba vacío.)
+  // Van en media luna, dejando libre el lado por donde llega el sendero.
+  [[70, 4.2, 1.3], [110, 5.8, 1.15], [150, 4.2, 1.45], [190, 5.8, 1.2], [230, 4.2, 1.35], [270, 5.8, 1.1], [300, 4.4, 1.25]].forEach(([deg, r, sz], i) => {
+    const a = deg * Math.PI / 180, x = POI.maqui.x + Math.cos(a) * r, z = POI.maqui.z + Math.sin(a) * r; flora.bushAt(x, height(x, z), z, sz, i * 1.7, i); });
+
   // ---------- aldea, cielo y vida ----------
   const emit = buildVillage({ scene, rng, bag, flora, physics, RAPIER, fixed });
   scene.add(bag.build());
@@ -163,9 +169,9 @@ export function buildWorld(scene, RAPIER, physics) {
   });
 
   return {
-    items, trees, life, strokes: Math.round(tris),
+    items, trees, life, strokes: Math.round(tris), refugio: emit.refugio, // refugio: dónde arde el fuego del refugio del bosque
     nearTree(x, z, r) { const ci = Math.floor(x / 8), cj = Math.floor(z / 8); let best = null; for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const l = grid.get(ci + i + ',' + (cj + j)); if (l) for (const t of l) { const d = Math.hypot(t.x - x, t.z - z); if (d < r && (!best || d < best.d)) best = { ...t, d }; } } return best; },
-    nearPlant: flora.nearScatter, findPlant: flora.findScatter, nearBush: flora.nearBush, blockers: flora.blockers, clearView: flora.clearView, restoreView: flora.restoreView, volcano: new THREE.Vector3(VOL.x, 380, VOL.z),
+    nearPlant: flora.nearScatter, findPlant: flora.findScatter, nearBush: flora.nearBush, bushesIn: flora.bushesIn, blockers: flora.blockers, clearView: flora.clearView, restoreView: flora.restoreView, volcano: new THREE.Vector3(VOL.x, 380, VOL.z),
     update(dt, t, camPos, playerPos, speed) { flora.update(camPos); life.update(dt, t, playerPos, speed); for (const sp of plume) { sp.position.x = sp.userData.x + Math.sin(t * 0.13 + sp.userData.i * 2) * 9; sp.position.y = sp.userData.y + Math.sin(t * 0.21 + sp.userData.i) * 5; } if (emit.glow) { emit.glow.intensity = 12 + Math.sin(t * 11) * 2.5 + Math.sin(t * 23.7) * 1.5; emit.ember.emissiveIntensity = 1.8 + Math.sin(t * 3.1) * 0.5 + Math.sin(t * 7.3) * 0.25; } },
   };
 }

@@ -83,11 +83,12 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
   function hoja(g, x, y, k = 1) { g.save(); g.translate(x, y); g.rotate(-0.6); g.fillStyle = '#9fd66a'; g.strokeStyle = '#14110f'; g.lineWidth = 2.5 * k; g.beginPath(); g.moveTo(0, -11 * k); g.quadraticCurveTo(9 * k, -2 * k, 0, 11 * k); g.quadraticCurveTo(-9 * k, -2 * k, 0, -11 * k); g.fill(); g.stroke(); g.beginPath(); g.moveTo(0, -7 * k); g.lineTo(0, 8 * k); g.lineWidth = 1.2 * k; g.stroke(); g.restore(); }
   const FIJOS = { kutral: [FOGON.x, FOGON.z], rewe: [20, 19], witral: [-10.6, -4.2], ruka: [RUKAS[0].x, RUKAS[0].z], chemamull: [POI.antiguos.x, POI.antiguos.z], gigante: [POI.viejo.x, POI.viejo.z], weke: [CORRAL.x, CORRAL.z], palin: [POI.cancha.x, POI.cancha.z] };
   let rot = null, rotT = 0; // cuánto está girado el minimapa
-  function drawMap(pos, facing) {
+  function drawMap(pos, facing, vista = facing) { // vista: hacia dónde mira la cámara
     last = { x: pos.x, z: pos.z, f: facing };
     const [px, py] = P(pos.x, pos.z), R = S / 2 - 3, now = performance.now();
-    // El mapa gira para que lo que Leftraru tiene delante quede siempre arriba. Gira suave, para que una media vuelta no maree.
-    { const want = facing + Math.PI; if (rot === null) rot = want; let d = want - rot; d = Math.atan2(Math.sin(d), Math.cos(d)); rot += d * (1 - Math.exp(-Math.min(200, now - rotT) / 170)); rotT = now; }
+    // El mapa gira con la cámara: lo que el jugador tiene delante en la pantalla queda siempre arriba, también cuando
+    // gira la vista con el ratón sin caminar. Lo sigue casi al instante, con un mínimo de suavizado.
+    { const want = vista + Math.PI; if (rot === null) rot = want; let d = want - rot; d = Math.atan2(Math.sin(d), Math.cos(d)); rot += d * (1 - Math.exp(-Math.min(200, now - rotT) / 55)); rotT = now; }
     const cr = Math.cos(rot), sr = Math.sin(rot);
     const off = (x, z) => { const [a, c] = P(x, z), dx = (a - px) * ZOOM, dy = (c - py) * ZOOM; return [dx * cr - dy * sr, dx * sr + dy * cr]; }; // de un punto del mundo a su lugar en el minimapa, medido desde el centro
     const edge = (dx, dy, m) => { const d = Math.hypot(dx, dy), far = d > R - m; return far ? [dx * (R - m) / d, dy * (R - m) / d, true] : [dx, dy, false]; }; // lo que queda fuera se dibuja en el borde, en su dirección
@@ -105,8 +106,8 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
     for (const mk of api.marks) { const [dx, dy] = off(mk.x, mk.z); if (Math.hypot(dx, dy) < R - 14) { ctx.fillStyle = '#14110f'; ctx.beginPath(); ctx.arc(S / 2 + dx, S / 2 + dy, 9, 0, 7); ctx.fill(); ctx.fillStyle = '#e9dfc6'; ctx.font = 'bold 14px Georgia'; ctx.textAlign = 'center'; ctx.fillText('?', S / 2 + dx, S / 2 + dy + 5); } }
     // el banderín del destino va encima de todo lo demás; si queda fuera del minimapa, se ve en el borde, hacia donde está
     if (api.guide) { const [ex, ey, far] = edge(...off(api.guide.x, api.guide.z), 14); meta(ctx, S / 2 + ex, S / 2 + ey, far ? 0.95 : 1.15); }
-    // Leftraru: siempre al centro y con la flecha hacia arriba
-    ctx.translate(S / 2, S / 2); ctx.fillStyle = '#fff'; ctx.strokeStyle = '#14110f'; ctx.lineWidth = 3;
+    // Leftraru: siempre al centro. La flecha apunta hacia donde mira él: arriba si va hacia donde mira la cámara
+    ctx.translate(S / 2, S / 2); ctx.rotate(rot - Math.PI - facing); ctx.fillStyle = '#fff'; ctx.strokeStyle = '#14110f'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(12, 13); ctx.lineTo(0, 6); ctx.lineTo(-12, 13); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.restore();
     // aro: una línea de cobre con cuatro marcas en los puntos cardinales, que giran con el mapa; la clara, con la N, es el norte
@@ -201,10 +202,12 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
         SKILLS.map((x) => { const q = info(x); return `<button class="node${q.have ? ' have' : q.can ? ' can' : ''}${x.id === k.id ? ' on' : ''}" data-node="${x.id}" style="left:${POS[x.id][0]}%;top:${POS[x.id][1]}%"><i></i><span>${x.name}<small>${q.have ? 'aprendido' : '1 punto de saber'}</small></span></button>`; }).join('') + '</div>' +
         `<aside><small>${k.rama}</small><h3>${k.name}</h3><p>${k.text}</p><p class="muted">Lo enseña ${d.teacher.title}. Cuesta 1 punto de saber.</p>${d.can ? `<button class="btn main" data-skill="${k.id}">Aprender</button>` : `<em>${d.why}</em>`}</aside></div>`;
     } else if (open === 'bolsa') {
-      const ids = Object.keys(bag);
+      const ids = Object.keys(bag), cosa = (id) => BY[id] || api.cosas[id] || { title: id }, rec = api.recetas ? api.recetas() : [];
       $('panel-title').textContent = 'Bolsa';
-      body.innerHTML = '<p class="muted">Lo que Leftraru lleva consigo.</p><div class="grid">' + ids.map((id) => `<div class="slot">${thumb(BY[id])}<b>${BY[id].title}</b><i>× ${bag[id]}</i></div>`).join('') +
-        Array.from({ length: Math.max(0, 8 - ids.length) }, () => '<div class="slot empty"></div>').join('') + '</div>';
+      body.innerHTML = '<p class="muted">Lo que Leftraru lleva consigo.</p><div class="grid">' + ids.map((id) => { const c = cosa(id); return `<div class="slot">${BY[id] ? thumb(BY[id]) : `<span class="q cosa">${c.ico || '?'}</span>`}<b>${c.title}</b><i>× ${bag[id]}</i>${c.usar ? `<button class="btn mini" data-usar="${id}">${c.usar}</button>` : ''}</div>`; }).join('') +
+        Array.from({ length: Math.max(0, 8 - ids.length) }, () => '<div class="slot empty"></div>').join('') + '</div>' +
+        // lo que alguien le enseñó a preparar: qué pide cada cosa y un botón para hacerla (junto al fogón)
+        (rec.length ? '<h3 class="sec">Lo que sabes preparar</h3>' + rec.map((r) => `<div class="receta"><div><b>${r.title}</b><p>${r.text}</p><small>${r.lleva}</small></div><button class="btn" data-prep="${r.id}"${r.puede ? '' : ' disabled'}>${r.puede ? 'Preparar' : r.porque}</button></div>`).join('') : '');
     } else {
       $('panel-title').textContent = 'Cuaderno de Leftraru';
       const lv = level(), list = NOTES.filter((n) => n.cat === cat), cur = BY[sel] && BY[sel].cat === cat ? BY[sel] : null, have = found[sel] !== undefined;
@@ -222,6 +225,9 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
     open = which; document.exitPointerLock?.(); panel.classList.add('on'); if (which === 'notas') $('btn-notas').classList.remove('new'); if (which === 'misiones') $('btn-misiones').classList.remove('new'); render();
   }
   body.addEventListener('click', (e) => {
+    const pr = e.target.closest('[data-prep]'), us = e.target.closest('[data-usar]');
+    if (pr) { if (!pr.disabled && api.preparar) api.preparar(pr.dataset.prep); return render(); }
+    if (us) { if (api.usar) api.usar(us.dataset.usar); return render(); }
     const bm = e.target.closest('#bigmap'), gu = e.target.closest('[data-guia]');
     if (bm) { const r = bm.getBoundingClientRect(); return pickOnMap(B.x0 + ((e.clientX - r.left) / r.width) * (B.x1 - B.x0), B.z0 + ((e.clientY - r.top) / r.height) * (B.z1 - B.z0)); }
     if (e.target.closest('#guia-off')) return onGuide(null);
@@ -238,7 +244,7 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
   $('btn-saberes').addEventListener('click', () => show('saberes'));
   $('panel-close').addEventListener('click', () => show(null));
   cv.addEventListener('click', () => show('mapa'));
-  $('mis-lista').addEventListener('click', (e) => { const r = e.target.closest('[data-guia]'); if (r) toggleGuide(r.dataset.guia); }); // un clic en una misión de la lista de arriba pone (o quita) su guía
+  $('mis-lista').addEventListener('click', (e) => { const r = e.target.closest('[data-guia]'); if (r) toggleGuide(r.dataset.guia); }); // un clic en una misión de la lista de la izquierda pone (o quita) su guía
   let actId = null; // la misión de la historia que está abierta
   refreshScore();
 
@@ -280,11 +286,18 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
       for (const m of MISSIONS) if (m.main && m.check) { if (done[m.id]) h += row(m, 'hecha'); else if (m === act) h += row(m, 'actual') + `<div class="paso">${act.paso ? act.paso(mctx) : ''}</div>`; }
       if (!act) h += '<div class="paso">Continuará…</div>';
       const enc = MISSIONS.filter((m) => !m.main && seen[m.id] && (!done[m.id] || now - (recien[m.id] || 0) < 15000)); // un encargo recién cumplido se ve tachado un momento
-      if (enc.length) h += '<h5>Encargos</h5>' + enc.slice(0, 5).map((m) => row(m, done[m.id] ? 'hecha' : '')).join('') + (enc.length > 5 ? `<div class="paso">y ${enc.length - 5} más</div>` : '');
+      // Arriba van el encargo recién cumplido (tachado un momento), el que lleva la línea de guía y los que alguien te pidió
+      // y están en curso, del más reciente al más antiguo. Bajo cada uno de esos va, en una línea, lo que toca hacer ahora.
+      let nuevoOrden = false; for (const m of enc) if (!done[m.id] && m.activa && m.activa(mctx) && !seen[m.id + '+']) { seen[m.id + '+'] = Date.now(); nuevoOrden = true; } // cuándo se aceptó
+      if (nuevoOrden) save();
+      const peso = (m) => (done[m.id] ? 8e15 : api.guideKey === 'm:' + m.id ? 7e15 : m.activa && m.activa(mctx) ? seen[m.id + '+'] || 1 : 0);
+      const orden = enc.map((m, k) => [m, peso(m), k]).sort((a, b) => b[1] - a[1] || a[2] - b[2]).map((q) => q[0]);
+      if (enc.length) h += '<h5>Encargos</h5>' + orden.slice(0, 5).map((m, k) => row(m, done[m.id] ? 'hecha' : '') + (!done[m.id] && peso(m) > 0 && m.paso && k < 3 ? `<div class="paso">${m.paso(mctx)}</div>` : '')).join('') + (enc.length > 5 ? `<div class="paso">y ${enc.length - 5} más</div>` : '');
       if (h !== lista) { lista = h; $('mis-lista').innerHTML = h; }
       return act ? { id: act.id, title: act.title, prog: act.check(mctx), aviso: typeof act.aviso === 'function' ? act.aviso(mctx) : act.aviso, fijo: !!(act.fijo && act.fijo(mctx)) } : null;
     },
     marks: [], people: [], goals: [],
+    cosas: {}, recetas: null, preparar: null, usar: null, // las llena acciones.js: cómo se ven las cosas sin ficha, y lo que se sabe preparar
     guide: null, guideKey: '', // la línea de guía ({ pts, x, z, label, len }) y a qué apunta ('m:id' si es una misión)
     repaint: paintBase, done: (id) => !!done[id],
     state: { get found() { return found; }, bag, get skills() { return skills; }, get done() { return done; } },

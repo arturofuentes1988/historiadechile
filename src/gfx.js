@@ -264,12 +264,24 @@ manager.onStart = manager.onProgress = (url, l, t) => { assets.loaded = l; asset
 manager.onError = () => {};
 // Se llama cuando el mundo ya está armado (ya se pidieron todas): espera a que lleguen. Si alguna no llega, el juego igual parte.
 assets.whenLoaded = () => new Promise((res) => { const t0 = performance.now(), chk = () => (assets.loaded >= assets.total || performance.now() - t0 > 90000 ? res() : setTimeout(chk, 120)); chk(); });
-const loader = new THREE.TextureLoader(manager), cache = new Map();
+const loader = new THREE.TextureLoader(manager), cache = new Map(), imagenes = new Map();
+// Texturas livianas: las 18 imágenes grandes (suelos, cortezas, roca, paja, telas) existen también a la mitad de tamaño en
+// assets/tex-1024. Ocupan la cuarta parte de la memoria de video y un tercio de la descarga, pero de muy cerca se ven menos
+// nítidas, así que son una opción (Menú → Opciones) pensada para equipos modestos. Parte encendida solo si el equipo dice
+// tener poca memoria. Con ?tex=1024 o ?tex=2048 en la dirección se fuerza una u otra, para comparar.
+export const texLivianasPorDefecto = (navigator.deviceMemory || 8) <= 4;
+const LIVIANAS = new Set(['corteza-canelo', 'corteza-coigue', 'corteza-peumo', 'corteza-pewen', 'corteza-quillay', 'corteza-roble', 'cuero', 'estera', 'madera', 'manta', 'nubes', 'paja', 'roca', 'suelo-bosque', 'suelo-pasto', 'suelo-piedras', 'suelo-tierra', 'tejido']);
+export const TEX_LIVIANAS = (() => { const q = new URLSearchParams(location.search).get('tex'); if (q === '1024') return true; if (q === '2048') return false; let o = {}; try { o = JSON.parse(localStorage.getItem('leftraru.opciones') || '{}'); } catch { /* opciones ilegibles: se usa lo de fábrica */ } return o.texLivianas ?? texLivianasPorDefecto; })();
 // repeat: cuántas veces se repite (texturas continuas); cut: recorte con fondo transparente (hojas y plantas)
 export function photo(name, { repeat, cut = false } = {}) {
   const key = name + (repeat ? repeat.join('x') : '');
   if (cache.has(key)) return cache.get(key);
-  const t = loader.load(`assets/tex/${name}.webp`); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  // Cada imagen se carga y se sube a la tarjeta una sola vez: si ya se pidió con otra repetición, la textura nueva comparte la
+  // imagen de la primera (antes la paja de las rukas, que se usa con dos repeticiones, estaba dos veces en memoria).
+  let t; const ya = imagenes.get(name);
+  if (ya) { t = ya.t.clone(); t.repeat.set(1, 1); t.generateMipmaps = true; t.minFilter = THREE.LinearMipmapLinearFilter; ya.otras.push(t); if (ya.lista) t.needsUpdate = true; }
+  else { const img = { t: null, otras: [], lista: false }; imagenes.set(name, img); t = img.t = loader.load(`assets/${TEX_LIVIANAS && LIVIANAS.has(name) ? 'tex-1024' : 'tex'}/${name}.webp`, () => { img.lista = true; for (const o of img.otras) o.needsUpdate = true; }); }
+  t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
   if (cut) { t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; } else { t.wrapS = t.wrapT = THREE.RepeatWrapping; if (repeat) t.repeat.set(...repeat); }
   cache.set(key, t); return t;
 }
