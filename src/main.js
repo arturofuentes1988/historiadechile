@@ -12,6 +12,7 @@ import { riverZ, WATER_Y, zone, normalAt } from './terrain.js';
 import { createSound } from './sonido.js';
 import { createActions } from './acciones.js';
 import { route } from './guia.js';
+import { createMeter } from './medidor.js';
 
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 const $ = (id) => document.getElementById(id);
@@ -109,7 +110,9 @@ function intro() {
 
 // ---------- opciones (se guardan en este navegador) ----------
 const snd = createSound();
-const opts = Object.assign({ calidad: 'auto', detalle: '1', sens: 1, inv: false, mini: true, musica: 0.6, efectos: 0.7 }, JSON.parse(localStorage.getItem('leftraru.opciones') || '{}')); snd.volume = opts.efectos;
+const opts = Object.assign({ calidad: 'auto', detalle: '1', sens: 1, inv: false, mini: true, medidor: false, musica: 0.6, efectos: 0.7 }, JSON.parse(localStorage.getItem('leftraru.opciones') || '{}')); snd.volume = opts.efectos;
+// medidor de rendimiento: se enciende en Opciones, o con ?medir en la dirección (para probar en otro equipo sin entrar al menú)
+const medidor = createMeter(renderer, { calidad: () => opts.calidad }), MEDIR = new URLSearchParams(location.search).has('medir');
 // teclas: cada acción tiene una tecla que se puede cambiar en Menú → Controles
 const ACTIONS = [['adelante', 'Adelante', 'KeyW'], ['atras', 'Atrás', 'KeyS'], ['izquierda', 'Izquierda', 'KeyA'], ['derecha', 'Derecha', 'KeyD'], ['correr', 'Correr', 'ShiftLeft'], ['saltar', 'Saltar', 'Space'],
   ['observar', 'Observar o hablar', 'KeyE'], ['accion', 'Recoger, usar, hacer', 'KeyR'], ['camIzq', 'Girar a la izquierda', 'KeyZ'], ['camDer', 'Girar a la derecha', 'KeyC'], ['cuaderno', 'Cuaderno', 'KeyN'], ['misiones', 'Misiones', 'KeyJ'], ['saberes', 'Saberes', 'KeyK'],
@@ -131,7 +134,7 @@ const detalleInicial = opts.detalle;
 let menuOpen = false, pr = Math.min(devicePixelRatio, 1.5);
 function applyOpts() {
   pr = opts.calidad === 'auto' ? Math.min(devicePixelRatio, 1.5) : Math.min(parseFloat(opts.calidad), Math.max(1, devicePixelRatio));
-  renderer.setPixelRatio(pr); post.resize(); document.body.classList.toggle('nomini', !opts.mini);
+  renderer.setPixelRatio(pr); post.resize(); document.body.classList.toggle('nomini', !opts.mini); medidor.show(opts.medidor || MEDIR);
   $('o-reload').hidden = opts.detalle === detalleInicial;
   localStorage.setItem('leftraru.opciones', JSON.stringify(opts));
 }
@@ -148,6 +151,7 @@ $('o-detalle').onchange = (e) => { opts.detalle = e.target.value; applyOpts(); }
 $('o-sens').oninput = (e) => { opts.sens = parseFloat(e.target.value); applyOpts(); };
 $('o-inv').onchange = (e) => { opts.inv = e.target.checked; applyOpts(); };
 $('o-mini').onchange = (e) => { opts.mini = e.target.checked; applyOpts(); };
+$('o-medidor').checked = opts.medidor; $('o-medidor').onchange = (e) => { opts.medidor = e.target.checked; applyOpts(); };
 $('o-recargar').onclick = () => location.reload();
 $('m-portada').onclick = () => { try { if (document.fullscreenElement) document.exitFullscreen(); } catch { /* nada */ } location.reload(); }; // salir del juego: vuelve a la portada
 $('m-continuar').onclick = () => setMenu(false);
@@ -597,7 +601,7 @@ addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b)
   snd.play(['btn-notas', 'btn-misiones', 'btn-saberes', 'btn-bolsa', 'btn-mapa'].includes(id) ? 'ui-cuaderno' : 'ui-clic', 0.6); }, true);
 let fallos = 0; // cuadros seguidos con error
 function frame() {
-  requestAnimationFrame(frame); updateMusic(1 / 60); updateSound(1 / 60);
+  requestAnimationFrame(frame); medidor.begin(); updateMusic(1 / 60); updateSound(1 / 60);
   const dt = Math.min(0.05, clock.getDelta());
   if (window.__g.paused) return;
   if (!menuOpen || state === 'title') { // el juego se detiene con el menú abierto
@@ -607,7 +611,7 @@ function frame() {
       if (fallos === 90) { $('aviso-error').classList.add('on'); console.error('Leftraru: el error se repite', e); }
     }
   }
-  draw();
+  draw(); medidor.end();
   // si el equipo va lento, baja la resolución de a poco
   fpsT += dt; fpsN++; if (fpsT > 3) { if (opts.calidad === 'auto' && !menuOpen && fpsN / fpsT < 27 && pr > 0.6) { pr = Math.max(0.6, pr - 0.25); renderer.setPixelRatio(pr); post.resize(); } fpsT = fpsN = 0; }
 }
