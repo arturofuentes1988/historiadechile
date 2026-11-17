@@ -200,10 +200,10 @@ function lock() { /* ya no se captura el ratón */ }
 const locked = () => false;
 document.body.classList.add('sin-raton'); // deja a la vista la ayuda de cómo girar, hasta que se arrastra por primera vez
 renderer.domElement.addEventListener('mousedown', (e) => { if (state !== 'play') return; dragging = true; document.body.classList.add('girando'); e.preventDefault();
-  if (e.button === 2) { botonDer = true; if (puedeApuntar() && acc.apuntar(true)) captura(); } // el botón derecho apunta
+  if (e.button === 2) { botonDer = true; if (puedeApuntar() && acc.apuntar(true)) captura(); else if (acc.tieneArco && !acc.equipado) hint(`Tienes el arco guardado. Sácalo con ${keyName(opts.keys.arma)} o desde la bolsa.`, 4); } // el botón derecho apunta
   else if (e.button === 0 && acc.equipado && puedeApuntar()) { if (!acc.apunta && acc.apuntar(true)) captura(); salirAp = 0; acc.tensar(true); } }); // el izquierdo, mientras se mantiene, tensa el arco
 renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
-addEventListener('mouseup', (e) => { if (e.button === 0 && acc.apunta) { dispara(); if (!botonDer) salirAp = 0.5; } if (e.button === 2) { botonDer = false; if (acc.tira) salirAp = 0.01; else dejaDeApuntar(); } if (!e.buttons) { dragging = false; document.body.classList.remove('girando'); } });
+addEventListener('mouseup', (e) => { if (e.button === 0) { if (acc.apunta) { dispara(); if (!botonDer) salirAp = 0.5; } acc.tensar(false); } if (e.button === 2) { botonDer = false; if (acc.tira) salirAp = 0.01; else dejaDeApuntar(); } if (!e.buttons) { dragging = false; document.body.classList.remove('girando'); } });
 // ---------- el arco: apuntar y soltar ----------
 // Con el botón derecho apretado Leftraru tensa el arco, la cámara se le pone al hombro y aparece la mira. El ratón queda
 // capturado mientras tanto, para poder girar sin que el puntero se salga de la ventana.
@@ -607,7 +607,7 @@ function updateCamera(dt) {
   // Apuntando con el arco: la cámara se pone sobre el hombro derecho, el que lleva la cuerda atrás, bien cerca (como al
   // levantar un arma en un juego de disparos), y cierra un poco el lente. De tan cerca, el arco se ve adelante, a la izquierda. La mira del centro
   // de la pantalla marca hacia dónde va la flecha.
-  apK = Math.max(0, Math.min(1, apK + (acc.apunta ? dt / 0.22 : -dt / 0.3))); let lente = fov;
+  apK = Math.max(0, Math.min(1, apK + (acc.apunta ? dt / 0.2 : -dt / 0.24))); let lente = fov;
   if (!acc.apunta && cam.pitch < -0.25) cam.pitch += (-0.25 - cam.pitch) * Math.min(1, dt * 6); // al soltar, la cámara vuelve a su altura de siempre
   if (apK > 0) { const ka = ease(apK), t = pp(), cp = Math.cos(cam.pitch), dx = Math.sin(cam.yaw) * cp, dy = Math.sin(cam.pitch), dz = Math.cos(cam.yaw) * cp, rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw);
     const ap = V3(t.x + rx * CAM_ARCO[0] + dx * CAM_ARCO[2], t.y + CAM_ARCO[1] + dy * CAM_ARCO[2], t.z + rz * CAM_ARCO[0] + dz * CAM_ARCO[2]); ap.y = Math.max(ap.y, height(ap.x, ap.z) + 0.3);
@@ -810,7 +810,7 @@ if (!ANTIGUO) import('three/examples/jsm/loaders/GLTFLoader.js').then(({ GLTFLoa
   const arcoN = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.011, 5, 18, Math.PI * 0.5).rotateZ(-Math.PI * 0.25).rotateY(-Math.PI / 2).translate(0, 0, -0.6), new THREE.MeshStandardMaterial({ color: 0x4a3626, roughness: 1 })); arcoN.visible = false; arcoN.castShadow = true; arcoN.rotation.order = 'YXZ'; scene.add(arcoN); boy.sinArco = true;
   const puesta = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.72, 5).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xb49a62, roughness: 1 })); puesta.visible = false; scene.add(puesta); // la flecha puesta en el arco, antes de soltarla
   const cuerda = new THREE.Group(), hilo = new THREE.CylinderGeometry(0.0022, 0.0022, 1, 4).rotateX(Math.PI / 2).translate(0, 0, 0.5), hiloM = new THREE.MeshStandardMaterial({ color: 0xd8cfb8, roughness: 1 }); cuerda.add(new THREE.Mesh(hilo, hiloM), new THREE.Mesh(hilo, hiloM)); cuerda.visible = false; scene.add(cuerda); // la cuerda: de una punta del arco a la otra, pasando por donde la lleva la mano
-  cuerpo = { mixer, acciones, H, m, y0: m.position.y, peso: { anda: 0, quieto: 0, corre: 0 }, aire: 0, sienta: 0, atento: 0, junta: 0, tapa: 0, pie: [0, 0], parp: 2, habla: 0, ojos, boca, bocaAlto, arco: arcoN, puesta, cuerda }; window.__g.modelo = m; window.__g.cuerpo = cuerpo;
+  cuerpo = { mixer, acciones, H, m, y0: m.position.y, peso: { anda: 0, quieto: 0, corre: 0 }, aire: 0, sienta: 0, atento: 0, junta: 0, tapa: 0, pie: [0, 0], parp: 2, habla: 0, ojos, boca, bocaAlto, arco: arcoN, puesta, cuerda, palma: { Left: palmaDe(m, H.LeftHand), Right: palmaDe(m, H.RightHand) } }; window.__g.modelo = m; window.__g.cuerpo = cuerpo;
 }, undefined, () => { for (const c of viejo) c.visible = true; }));
 // ---------- la gente de la aldea en 3D ----------
 // Quien tiene modelo 3D lo lleva encima de su cuerpo de siempre, que queda invisible y sigue decidiendo todo: dónde está, qué
@@ -941,25 +941,49 @@ function cuerdaPor(C, p) { // la cuerda pasa por p (o va derecha de punta a punt
   C.arco.updateMatrixWorld(true); const a = C.arco.localToWorld(PA.set(0, TIP, -PANZA)), b = C.arco.localToWorld(PB.set(0, -TIP, -PANZA)), m = p || PC.copy(a).lerp(b, 0.5);
   [a, b].forEach((q, i) => { const t = C.cuerda.children[i]; t.position.copy(q); t.lookAt(m); t.scale.z = q.distanceTo(m); });
 }
+// Las manos de los modelos no tienen dedos que se muevan: son planas, abiertas. Para que parezca que agarran, se las gira:
+// los dedos hacia un lado y la palma hacia otro. palmaDe averigua, una vez, hacia dónde mira la palma en cada mano.
+function palmaDe(m, hueso) { // las manos vienen medio cerradas: la palma mira hacia donde se curvan los dedos (la punta de la mano, respecto de su base)
+  let sk = null; m.traverse((o) => { if (o.isSkinnedMesh && !sk) sk = o; }); const bi = sk && hueso ? sk.skeleton.bones.indexOf(hueso) : -1; if (bi < 0) return V3(0, 0, 1);
+  const P = sk.geometry.attributes.position, I = sk.geometry.attributes.skinIndex, W = sk.geometry.attributes.skinWeight, inv = sk.skeleton.boneInverses[bi], v = V3(), pts = []; let largo = 0;
+  for (let i = 0; i < P.count; i++) { let w = 0; for (let c = 0; c < 4; c++) if (I.getComponent(i, c) === bi) w += W.getComponent(i, c); if (w < 0.6) continue; v.fromBufferAttribute(P, i).applyMatrix4(sk.bindMatrix).applyMatrix4(inv); pts.push(v.x, v.y, v.z); largo = Math.max(largo, v.y); }
+  const punta = [0, 0, 0], base = [0, 0, 0]; for (let i = 0; i < pts.length; i += 3) { const q = pts[i + 1] > largo * 0.7 ? punta : pts[i + 1] < largo * 0.38 ? base : null; if (q) { q[0] += pts[i]; q[1] += pts[i + 2]; q[2]++; } }
+  if (!punta[2] || !base[2]) return V3(0, 0, 1); const nl = V3(punta[0] / punta[2] - base[0] / base[2], 0, punta[1] / punta[2] - base[1] / base[2]); return nl.lengthSq() > 1e-6 ? nl.normalize() : V3(0, 0, 1);
+}
+const MB = new THREE.Matrix4(), MC = new THREE.Matrix4(), VX = V3(), VY = V3(), VZ = V3(), EU = new THREE.Euler(0, 0, 0, 'YXZ'), QG = new THREE.Quaternion(), PBW = V3(), VAD = V3(), VDE = V3(), VAR = V3();
+function orientaMano(hueso, nl, dedos, palma, k) { // gira la mano para que los dedos vayan hacia «dedos» y la palma mire hacia «palma» (direcciones del mundo); k: cuánto
+  if (!hueso || k <= 0) return; const F = VY.copy(dedos).normalize(), Pm = VZ.copy(palma).addScaledVector(F, -palma.dot(F)).normalize(), X = VX.crossVectors(F, Pm);
+  MB.makeBasis(X, F, Pm); MC.makeBasis(PE.set(0, 1, 0).cross(nl).normalize(), PF.set(0, 1, 0), nl).transpose(); MB.multiply(MC); // de la mano al mundo
+  QR.setFromRotationMatrix(MB); hueso.parent.updateWorldMatrix(true, false); QB.copy(hueso.parent.getWorldQuaternion(QA)).invert().multiply(QR); hueso.quaternion.slerp(QB, Math.min(1, k)); hueso.updateMatrixWorld(true);
+}
 function armaArco(dt, f, h) {
-  const C = cuerpo, H = C.H, eq = acc.equipado && boy.g.visible && state !== 'title', ap = eq && acc.apunta && apK > 0.2;
-  C.arco.visible = C.cuerda.visible = eq; C.puesta.visible = false; H.Head.scale.setScalar(apK > 0.2 ? 0.001 : 1); // apuntando, la cámara va donde están sus ojos: la cabeza no se dibuja
+  const C = cuerpo, H = C.H, eq = acc.equipado && boy.g.visible && state !== 'title', ka = eq ? suave(0.12, 1, apK) : 0; // ka: cuánto están las manos en la postura de apuntar (entra y sale de a poco)
+  C.arco.visible = C.cuerda.visible = eq; C.puesta.visible = false; H.Head.scale.setScalar(apK > 0.05 ? 0.001 : 1); // apuntando, la cámara va donde están sus ojos: la cabeza no se dibuja
   if (!eq) return;
-  if (!ap) { // en la mano, al costado: el brazo izquierdo no se balancea, lleva el arco
-    if (!(h && h.tipo === 'labrar') && !acc.sitting && !rueda) { const fx = Math.sin(f), fz = Math.cos(f); apunta(H.LeftArm, fx * 0.2 + fz * 0.16, -0.95, fz * 0.2 - fx * 0.16, 0.9); apunta(H.LeftForeArm, fx * 0.62 + fz * 0.04, -0.78, fz * 0.62 - fx * 0.04, 0.9); }
-    H.LeftHand.getWorldPosition(C.arco.position); C.arco.rotation.set(1.0, f, 0); C.arco.scale.set(1, 1, 1); cuerdaPor(C, null); return; }
+  const fx = Math.sin(f), fz = Math.cos(f);
+  if (ka < 1 && !(h && h.tipo === 'labrar') && !acc.sitting && !rueda) { apunta(H.LeftArm, fx * 0.2 + fz * 0.16, -0.95, fz * 0.2 - fx * 0.16, 0.9 * (1 - ka)); apunta(H.LeftForeArm, fx * 0.62 + fz * 0.04, -0.78, fz * 0.62 - fx * 0.04, 0.9 * (1 - ka)); } // en la mano, al costado: el brazo izquierdo no se balancea, lleva el arco
+  C.m.updateMatrixWorld(true);
+  if (ka <= 0) { H.LeftHand.getWorldPosition(C.arco.position).addScaledVector(VA.set(0, 1, 0).applyQuaternion(H.LeftHand.getWorldQuaternion(QD)), 0.07); C.arco.rotation.set(1.0, f, 0); C.arco.scale.set(1, 1, 1); cuerdaPor(C, null); return; } // el arco va en la palma, no en la muñeca
   // apuntando: todo se mide desde los ojos (donde está la cámara) y hacia donde apunta la mira
   const cp = Math.cos(cam.pitch), ax = -Math.sin(cam.yaw) * cp, ay = -Math.sin(cam.pitch), az = -Math.cos(cam.yaw) * cp, rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw), ux = -rz * ay, uy = rz * ax - rx * az, uz = rx * ay; // adelante, a la derecha y arriba
   const t = pp(), ex = t.x + rx * CAM_ARCO[0] - ax * CAM_ARCO[2], ey = t.y + CAM_ARCO[1] - ay * CAM_ARCO[2], ez = t.z + rz * CAM_ARCO[0] - az * CAM_ARCO[2]; // los ojos
   const en = (ad, de, ar, o) => o.set(ex + ax * ad + rx * de + ux * ar, ey + ay * ad + uy * ar, ez + az * ad + rz * de + uz * ar); // un punto a tanto adelante, a la derecha y arriba de los ojos
-  const c = suave(0, 1, acc.tensa), rec = acc.recarga, hay = acc.ctx().tengo('flecha') > 0, puestaYa = hay && !acc.vuela && rec < 0.45;
-  C.m.updateMatrixWorld(true);
-  ikBrazo(H.LeftArm, H.LeftForeArm, H.LeftHand, en(0.4, -0.11, -0.235 + retro * 0.03, PW), VA.set(-rx * 0.5, -0.8, -rz * 0.5), 1); // la mano del arco, adelante y a la izquierda
-  en(0.46, -0.105, -0.215 + retro * 0.03, C.arco.position); C.arco.rotation.set(cam.pitch, cam.yaw + Math.PI, 0.1); C.arco.scale.set(1, 1 - 0.06 * c, 1 + 0.5 * c); // al tensarlo, las puntas se vienen hacia atrás
-  const D = PANZA + (0.42 - PANZA) * c; en(0.46 - D, -0.085, -0.165 + retro * 0.03, PN); // dónde va la cuerda con la flecha
+  const c = suave(0, 1, acc.tensa), rec = acc.recarga, hay = acc.ctx().tengo('flecha') > 0, puestaYa = ka > 0.7 && hay && !acc.vuela && rec < 0.45, sube = retro * 0.03;
+  VAD.set(ax, ay, az); VDE.set(rx, 0, rz); VAR.set(ux, uy, uz);
+  // la mano izquierda agarra el arco: la muñeca queda a la izquierda de la empuñadura y los dedos la cruzan por delante, así que
+  // desde los ojos se ve el dorso de la mano tapando la empuñadura
+  en(0.435, -0.165, -0.18 + sube, PW); ikBrazo(H.LeftArm, H.LeftForeArm, H.LeftHand, PW, VA.set(-rx * 0.5, -0.8, -rz * 0.5), ka);
+  orientaMano(H.LeftHand, C.palma.Left, VA.copy(VDE).addScaledVector(VAR, 0.3).addScaledVector(VAD, 0.15), VAD, ka);
+  en(0.47, -0.09, -0.17 + sube, PBW); EU.set(cam.pitch, cam.yaw + Math.PI, 0.1); QG.setFromEuler(EU);
+  if (ka < 1) { H.LeftHand.getWorldPosition(C.arco.position).addScaledVector(VA.set(0, 1, 0).applyQuaternion(H.LeftHand.getWorldQuaternion(QD)), 0.07).lerp(PBW, ka); EU.set(1.0, f, 0); C.arco.quaternion.setFromEuler(EU).slerp(QG, ka); } // mientras sube o baja el arco, va de la postura de llevarlo a la de apuntar
+  else { C.arco.position.copy(PBW); C.arco.quaternion.copy(QG); }
+  C.arco.scale.set(1, 1 - 0.06 * c, 1 + 0.5 * c); // al tensarlo, las puntas se vienen hacia atrás
+  const D = PANZA + (0.42 - PANZA) * c; en(0.47 - D, -0.075, -0.125 + sube, PN); // dónde va la cuerda con la flecha
   const baja = suave(0.35, 1, rec); // después de soltar, la mano derecha baja a buscar otra flecha y vuelve a la cuerda
-  en(0.46 - D - 0.05 - baja * 0.1, -0.06 + baja * 0.3, -0.19 - baja * 0.35, PW); ikBrazo(H.RightArm, H.RightForeArm, H.RightHand, PW, VA.set(rx * 0.55 - ax * 0.3, -0.6, rz * 0.55 - az * 0.3), 1);
-  cuerdaPor(C, puestaYa || acc.tira ? PN : null);
+  // la mano derecha toma la cuerda: la muñeca a la derecha, los dedos hacia la cuerda
+  en(0.47 - D - 0.01 - baja * 0.1, 0.0 + baja * 0.3, -0.118 - baja * 0.35, PW); ikBrazo(H.RightArm, H.RightForeArm, H.RightHand, PW, VA.set(rx * 0.55 - ax * 0.3, -0.6, rz * 0.55 - az * 0.3), ka);
+  orientaMano(H.RightHand, C.palma.Right, VA.copy(VDE).negate().addScaledVector(VAD, 0.25).addScaledVector(VAR, 0.1), VAD, ka);
+  cuerdaPor(C, puestaYa || (acc.tira && ka > 0.7) ? PN : null);
   if (puestaYa) { C.puesta.visible = true; C.puesta.position.set(PN.x + ax * 0.36, PN.y + ay * 0.36, PN.z + az * 0.36); C.puesta.lookAt(PN.x + ax * 2, PN.y + ay * 2, PN.z + az * 2); }
 }
 // La gente en 3D, cuadro a cuadro: después de que su cuerpo de siempre tomó la postura de este momento, el modelo la copia.
