@@ -286,7 +286,13 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
       for (const m of MISSIONS) if (m.main && m.check) { if (done[m.id]) h += row(m, 'hecha'); else if (m === act) h += row(m, 'actual') + `<div class="paso">${act.paso ? act.paso(mctx) : ''}</div>`; }
       if (!act) h += '<div class="paso">Continuará…</div>';
       const enc = MISSIONS.filter((m) => !m.main && seen[m.id] && (!done[m.id] || now - (recien[m.id] || 0) < 15000)); // un encargo recién cumplido se ve tachado un momento
-      if (enc.length) h += '<h5>Encargos</h5>' + enc.slice(0, 5).map((m) => row(m, done[m.id] ? 'hecha' : '')).join('') + (enc.length > 5 ? `<div class="paso">y ${enc.length - 5} más</div>` : '');
+      // Arriba van el encargo recién cumplido (tachado un momento), el que lleva la línea de guía y los que alguien te pidió
+      // y están en curso, del más reciente al más antiguo. Bajo cada uno de esos va, en una línea, lo que toca hacer ahora.
+      let nuevoOrden = false; for (const m of enc) if (!done[m.id] && m.activa && m.activa(mctx) && !seen[m.id + '+']) { seen[m.id + '+'] = Date.now(); nuevoOrden = true; } // cuándo se aceptó
+      if (nuevoOrden) save();
+      const peso = (m) => (done[m.id] ? 8e15 : api.guideKey === 'm:' + m.id ? 7e15 : m.activa && m.activa(mctx) ? seen[m.id + '+'] || 1 : 0);
+      const orden = enc.map((m, k) => [m, peso(m), k]).sort((a, b) => b[1] - a[1] || a[2] - b[2]).map((q) => q[0]);
+      if (enc.length) h += '<h5>Encargos</h5>' + orden.slice(0, 5).map((m, k) => row(m, done[m.id] ? 'hecha' : '') + (!done[m.id] && peso(m) > 0 && m.paso && k < 3 ? `<div class="paso">${m.paso(mctx)}</div>` : '')).join('') + (enc.length > 5 ? `<div class="paso">y ${enc.length - 5} más</div>` : '');
       if (h !== lista) { lista = h; $('mis-lista').innerHTML = h; }
       return act ? { id: act.id, title: act.title, prog: act.check(mctx), aviso: typeof act.aviso === 'function' ? act.aviso(mctx) : act.aviso, fijo: !!(act.fijo && act.fijo(mctx)) } : null;
     },

@@ -137,6 +137,17 @@
   #btns:has(#btn-saberes:hover) #btn-nombre { right: 104px; } #btns:has(#btn-saberes:hover) #btn-nombre::after { content: 'Saberes'; }
   #btns:has(#btn-bolsa:hover) #btn-nombre { right: 52px; } #btns:has(#btn-bolsa:hover) #btn-nombre::after { content: 'Bolsa'; }
   #btns:has(#btn-mapa:hover) #btn-nombre::after { content: 'Mapa'; }
+  /* presentación de los botones (una sola vez): un velo suave, el botón señalado bien a la vista, una flecha y un recuadro */
+  #tour { position: fixed; inset: 0; z-index: 8; display: none; background: #0a08068c; cursor: pointer; } body.tour #tour { display: block; }
+  body.tour #btns { z-index: 9; pointer-events: none; } body.tour #btns .tool { opacity: .3; }
+  body.tour #btns .tool.tour-on { opacity: 1; background: #c98a4a; color: var(--ink); } body.tour #btns .tool.tour-on svg, body.tour #btns .tool.tour-on kbd { color: var(--ink); }
+  #tour-caja { position: fixed; width: min(340px, 86vw); box-sizing: border-box; background: var(--panel); box-shadow: inset 0 3px 0 var(--copper); padding: 15px 20px 14px; color: var(--cream); cursor: default; }
+  #tour-n { color: var(--dim); letter-spacing: .12em; font-size: 12px; text-transform: uppercase; } #tour-t { display: block; font-size: 23px; font-weight: normal; margin: 3px 0 6px; }
+  #tour-t kbd { font: inherit; font-size: 13px; border: 1px solid #f1e4c466; border-radius: 4px; padding: 1px 7px; margin-left: 8px; color: var(--dim); vertical-align: middle; }
+  #tour-x { margin: 0 0 13px; font-size: 16px; line-height: 1.45; } #tour-pie { display: flex; justify-content: space-between; align-items: center; } #tour-pie .btn { padding: 8px 18px; font-size: 15px; }
+  #tour-saltar { background: none; border: 0; color: var(--dim); font: inherit; font-size: 14px; cursor: pointer; text-decoration: underline; padding: 6px 0; }
+  #tour-flecha { position: fixed; width: 0; height: 0; margin-left: -12px; border-left: 12px solid transparent; border-right: 12px solid transparent; border-top: 20px solid #e9b03a; filter: drop-shadow(0 2px 3px #000a); animation: tour-baja .7s ease-in-out infinite alternate; }
+  @keyframes tour-baja { from { transform: translateY(-8px); } to { transform: translateY(2px); } }
   #btn-full .b, #btn-full.on .a { display: none; } #btn-full.on .b { display: block; }
   .tool.new::after { content: ''; position: absolute; top: 5px; right: 6px; width: 7px; height: 7px; background: #e9b03a; transform: rotate(45deg); }
   #prompt2 { bottom: 150px !important; }
@@ -253,7 +264,7 @@
 <div id="title"><h1>LEFTRARU</h1><div class="rule"></div>
   <p id="c-toca" class="toca">Haz clic para comenzar</p>
   <div id="cover-1" class="cover shadow" hidden><button id="c-aventura" class="btn main">Aventura<small>Comienza o continúa la historia</small></button><button id="c-opciones" class="btn">Opciones<small>Imagen, sonido y controles</small></button></div></div>
-<div id="acto"><small>Acto 1</small><h2>El mundo de Leftraru</h2><div class="rule"></div><p>Nahuelbuta, invierno de 1545</p></div>
+<div id="acto"><small>Acto 1</small><h2>El mundo de Leftraru</h2><div class="rule"></div><p>Pewenko · Nahuelbuta, invierno de 1545</p></div>
 
 <div id="hudbox">
   <div id="estado"><div id="barras">
@@ -270,7 +281,7 @@
 <div id="apuntes"></div>
 <div id="sub"><b id="sub-name"></b><span id="sub-text"></span></div>
 <div id="prologo"><div class="aviso"><div class="papel"><div class="marco">
-  <small>Nahuelbuta · invierno de 1545</small><h2>La tierra y su gente</h2><div class="filete"></div>
+  <small>Pewenko, Nahuelbuta · invierno de 1545</small><h2>La tierra y su gente</h2><div class="filete"></div>
   <p>Año 1545. Al sur del mundo, entre la cordillera y el mar, está la tierra de los mapuche, la gente de la tierra.</p>
   <p>No tienen reyes ni ciudades. Cada lof, un puñado de familias y sus rukas, vive de lo que dan el bosque y el río, y pide permiso antes de tomar.</p>
   <p>Hace dos generaciones detuvieron a los ejércitos del inca. Ahora, por el mismo camino del norte, avanzan hombres de barba y metal, montados en animales que nadie conoce. Aquí, en Nahuelbuta, todavía son solo un rumor.</p>
@@ -298,6 +309,7 @@
   <button id="btn-menu" class="tool ico" title="Menú: pausa, opciones y controles" aria-label="Menú"><svg viewBox='0 0 24 24' fill='currentColor'><path d='M3 5h18v3H3zM6 10.5h12v3H6zM3 16h18v3H3z'/></svg></button>
 </div>
 
+<div id="tour"><div id="tour-caja"><small id="tour-n"></small><b id="tour-t"></b><p id="tour-x"></p><div id="tour-pie"><button id="tour-saltar">Saltar</button><button id="tour-sig" class="btn">Siguiente</button></div></div><div id="tour-flecha"></div></div>
 <div id="panel"><div id="sheet"><div class="head"><h2 id="panel-title">Cuaderno</h2><button id="panel-close" class="btn">Cerrar · Esc</button></div><div class="greca"></div><div id="panel-body"></div></div></div>
 
 <div id="menu"><div id="menu-sheet">

@@ -38,7 +38,7 @@ export const SUBIDA = (() => {
   return pts;
 })();
 export const POI = {
-  aldea: { x: 0, z: 0, name: 'La aldea' },
+  aldea: { x: 0, z: 0, name: 'Pewenko' }, // «agua de los pewenes»: el nombre de la aldea
   pewen: { x: 0, z: -90, name: 'Bosque de pewenes' },
   cerro: { x: CERRO[0], z: CERRO[1], name: 'Cerro Treng Treng' },
   menoko: { x: -104, z: 66, name: 'Menoko' },

@@ -11,6 +11,10 @@ export const RUKAS = [
 export const CORRAL = { x: -25, z: 14, r: 6.5 };
 export const FOGON = { x: 0, z: 0 };
 export const OLLA = { x: FOGON.x + 1.5, z: FOGON.z + 0.9 }; // la olla del caldo, junto al fogón
+// Dónde va cada oficio de la aldea (life.js pone ahí a la gente que lo hace)
+export const OFICIOS = { cueros: [-20.49, 5.19], armas: [-4, -14], musica: [12.5, 23.5], moler: [8.5, -18.5], greda: [-9.5, 21] };
+export const TALLADO = { x: POI.viejo.x + 5.5, z: POI.viejo.z + 3.5 }; // la figura tallada del bosque viejo, a pocos pasos del árbol abuelo
+export const REFUGIO = { x: POI.pewen.x, z: POI.pewen.z };             // la ruka chica del bosque de pewenes, donde termina el sendero del norte
 
 export function buildVillage({ scene, rng, bag, flora, physics, RAPIER, fixed }) {
   const R = (a, b) => a + (b - a) * rng(), PI = Math.PI, UP = new THREE.Vector3(0, 1, 0);
@@ -99,7 +103,7 @@ export function buildVillage({ scene, rng, bag, flora, physics, RAPIER, fixed })
     for (let i = 0; i < 5; i++) { const a = 0.6 + i * 1.2; physics.createCollider(RAPIER.ColliderDesc.capsule(0.62, 0.21).setTranslation(x + Math.cos(a) * 2.9, y + 0.2, z + Math.sin(a) * 2.9).setRotation(new THREE.Quaternion().setFromEuler(new THREE.Euler(PI / 2, 0, a - PI / 2, 'ZYX'))), fixed); }
     physics.createCollider(RAPIER.ColliderDesc.cylinder(0.35, 0.3).setTranslation(x + 1.5, y + 0.35, z + 0.9), fixed);
     // llamas, brasas que brillan y una olla de greda sobre tres piedras
-    const fm = flameMaterial(); for (let i = 0; i < 3; i++) { const f = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.45), fm); f.position.set(x, y + 0.8, z); f.rotation.y = (i / 3) * PI; f.renderOrder = 3; scene.add(f); }
+    const fm = emit.flama = flameMaterial(); for (let i = 0; i < 3; i++) { const f = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.45), fm); f.position.set(x, y + 0.8, z); f.rotation.y = (i / 3) * PI; f.renderOrder = 3; scene.add(f); }
     const ember = new THREE.MeshStandardMaterial({ color: 0x1a0e08, emissive: 0xff4a12, emissiveIntensity: 2.2, roughness: 1 }); emit.ember = ember;
     for (let i = 0; i < 5; i++) { const e = add(new THREE.CylinderGeometry(0.06, 0.06, R(0.5, 0.9), 6), ember, x + R(-0.25, 0.25), y + 0.1, z + R(-0.25, 0.25)); e.rotation.set(PI / 2, 0, R(0, 3)); e.castShadow = false; }
     for (let i = 0; i < 3; i++) { const a = i * 2.1 + 0.4; flora.rock(x + 1.5 + Math.cos(a) * 0.22, y - 0.02, z + 0.9 + Math.sin(a) * 0.22, 0.16, { squash: 0.9, color: 0x6e6a62 }); }
@@ -159,6 +163,91 @@ export function buildVillage({ scene, rng, bag, flora, physics, RAPIER, fixed })
 
   // ---------- el árbol gigante del bosque viejo ----------
   { const { x, z } = POI.viejo; flora.tree('giant', x, height(x, z), z, 40); }
+
+  // ====================================================================================================
+  // Lo que sigue va al final a propósito, y con su propio azar fijo (D): así no cambia de lugar nada de lo anterior.
+  // Casi todo entra en las mallas comunes de la aldea (bag), que se dibujan de una sola vez: los oficios no suman
+  // órdenes de dibujo, salvo una para todos los cueros.
+  // ====================================================================================================
+  const D = (i) => { const v = Math.sin(i * 12.9898 + 4.1) * 43758.5453; return v - Math.floor(v); };
+  const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
+  const palo = (a, b, r, color = WOOD, kind) => { const d = V3(b[0] - a[0], b[1] - a[1], b[2] - a[2]), L = d.length(); bag.add(cyl, new THREE.Matrix4().compose(V3((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2), new THREE.Quaternion().setFromUnitVectors(UP, d.normalize()), V3(r, L, r)), color, kind); };
+  const caja = (x, y, z, hx, hy, hz, yaw = 0) => physics.createCollider(RAPIER.ColliderDesc.cuboid(hx, hy, hz).setTranslation(x, y + hy, z).setRotation(new THREE.Quaternion().setFromAxisAngle(UP, yaw)), fixed);
+  const estera = (x, z, w, d, yaw) => bag.add(new THREE.BoxGeometry(w, 0.03, d), M(x, height(x, z) + 0.025, z, yaw), 0xb89c5e, 'estera');
+
+  // ---------- cueros: estirados en bastidores de varas para rasparlos y secarlos ----------
+  const cueroGeo = (() => { const N = 16, pos = [0, 0, 0], idx = []; for (let i = 0; i < N; i++) { const a = (i / N) * 6.283, r = 0.36 + 0.14 * Math.abs(Math.sin(a * 2)) ** 3 + 0.03 * Math.sin(a * 5); pos.push(Math.cos(a) * r * 1.05, Math.sin(a) * r * 1.3, 0); idx.push(0, 1 + i, 1 + (i + 1) % N); }
+    const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setIndex(idx); return g; })(); // la silueta del cuero, con sus cuatro patas
+  function bastidor(x, z, yaw, sc, color) {
+    const y = height(x, z), c = Math.cos(yaw), sn = Math.sin(yaw), lean = 0.2, W = 0.7 * sc, H = 0.95 * sc, cl = Math.cos(lean), sl = Math.sin(lean);
+    const F = (u, v, w = 0) => { const zz = w - v * sl; return [x + u * c + zz * sn, y + 0.12 + v * cl, z - u * sn + zz * c]; }; // u: a lo ancho; v: hacia arriba por el bastidor; w: hacia el frente
+    palo(F(-W, -0.12), F(-W, 2 * H + 0.2), 0.03); palo(F(W, -0.12), F(W, 2 * H + 0.2), 0.03); palo(F(-W - 0.12, 2 * H), F(W + 0.12, 2 * H), 0.026, WOOD2); palo(F(-W - 0.12, 0.12), F(W + 0.12, 0.12), 0.026, WOOD2);
+    for (const sd of [-1, 1]) { const g0 = F(sd * W, 0, -0.95); g0[1] = y; palo(F(sd * W, 1.7 * H), g0, 0.026, WOOD2); } // los puntales de atrás
+    const ctr = F(0, H + 0.06);
+    bag.add(cueroGeo, new THREE.Matrix4().compose(V3(ctr[0], ctr[1], ctr[2]), new THREE.Quaternion().setFromEuler(new THREE.Euler(-lean, yaw, 0, 'YXZ')), V3(sc * 1.3, sc * 1.3, 1)), color, 'cuero');
+    for (const [du, dv] of [[-1, 0.15], [1, 0.15], [-1, 1.85], [1, 1.85]]) palo(F(du * W, dv * H), F(du * W * 0.6, H + (dv - 1) * H * 0.6), 0.006, 0xd8c8a0, 'otros'); // las amarras
+    caja(x, y, z, W + 0.1, H, 0.25, yaw);
+  }
+  { const [x, z] = OFICIOS.cueros; bastidor(x, z, 0.541, 1, 0xb08a5c); bastidor(x - 2.9, z - 1.5, 0.95, 0.85, 0xc9ab7c);
+    const gx = x + 1.6, gz = z - 2.1; bag.add(cueroGeo, new THREE.Matrix4().compose(V3(gx, height(gx, gz) + 0.04, gz), new THREE.Quaternion().setFromEuler(new THREE.Euler(-PI / 2, 0.7, 0, 'YXZ')), V3(1.25, 1.25, 1)), 0x8f6a44, 'cuero'); } // uno tendido en el suelo, ya sobado
+
+  // ---------- las armas: lanzas de coligüe apoyadas en una vara, mazas de madera dura, hondas y un arco ----------
+  { const [x, z] = OFICIOS.armas, y = height(x, z);
+    for (const sd of [-1, 1]) { palo([x + sd * 1.2, y - 0.1, z], [x + sd * 1.2, y + 1.55, z], 0.045); palo([x + sd * 1.2, y + 1.5, z], [x + sd * 1.32, y + 1.78, z + 0.1], 0.03); palo([x + sd * 1.2, y + 1.5, z], [x + sd * 1.08, y + 1.78, z - 0.1], 0.03); } // dos horcones
+    palo([x - 1.4, y + 1.57, z], [x + 1.4, y + 1.57, z], 0.035, WOOD2);
+    for (let i = 0; i < 6; i++) { const u = -1 + i * 0.4 + D(i) * 0.1, L = 3.3 + D(i + 9) * 0.9, off = 0.75 + D(i + 3) * 0.2, b = [x + u, y, z - off], dir = V3(D(i + 5) * 0.06 - 0.03, 1.57, off).normalize(), en = (l) => [b[0] + dir.x * l, b[1] + dir.y * l, b[2] + dir.z * l];
+      palo(b, en(L - 0.45), 0.017, 0xa89a58); palo(en(L - 0.45), en(L), 0.012, 0x3a2e24); } // la caña, y su punta endurecida al fuego
+    for (let i = 0; i < 3; i++) { const u = -0.95 + i * 0.36, t = [x + u + 0.03, y + 1.12, z + 0.07]; palo([x + u, y, z + 0.5], t, 0.024, WOOD2); bag.add(sph, M(t[0], t[1], t[2], 0, 0.07, 0.1, 0.07), WOOD2); } // mazas
+    for (let i = 0; i < 2; i++) { const u = 0.35 + i * 0.3; palo([x + u, y + 1.57, z], [x + u - 0.03, y + 0.95, z + 0.03], 0.006, 0xc8b88a, 'otros'); palo([x + u + 0.05, y + 1.57, z], [x + u + 0.03, y + 0.95, z + 0.03], 0.006, 0xc8b88a, 'otros'); bag.add(sph, M(x + u, y + 0.93, z + 0.03, 0, 0.05, 0.025, 0.035), 0x8a6a48, 'cuero'); } // hondas
+    bag.add(new THREE.TorusGeometry(0.5, 0.013, 5, 14, PI * 0.8).rotateZ(PI * 0.1), M(x + 1.2, y + 0.75, z + 0.16, PI / 2), 0x4a3626); // un arco colgado del horcón
+    caja(x, y, z, 1.45, 0.9, 0.16);
+  }
+
+  // ---------- los instrumentos de las fiestas, sobre una estera: trutruka, pifilkas y wadas ----------
+  { const [x, z] = OFICIOS.musica, y = height(x, z);
+    estera(x, z, 2.0, 1.3, 0.4);
+    palo([x - 1.3, y - 0.1, z - 0.2], [x - 1.3, y + 0.95, z - 0.2], 0.04); palo([x + 0.9, y + 0.12, z + 0.5], [x - 1.45, y + 1.02, z - 0.28], 0.022, 0x9a8a50); palo([x - 1.45, y + 1.02, z - 0.28], [x - 1.62, y + 1.1, z - 0.33], 0.04, 0x8a7a48); // la trutruka, una caña larga apoyada en una horqueta
+    for (let i = 0; i < 3; i++) palo([x - 0.3 + i * 0.22, y + 0.08, z - 0.25], [x - 0.24 + i * 0.22, y + 0.08, z + 0.08], 0.028 - i * 0.003, i % 2 ? WOOD : WOOD2); // pifilkas
+    for (let i = 0; i < 2; i++) { const wx = x + 0.45 + i * 0.3, wz = z + 0.2 - i * 0.25; bag.add(sph, M(wx, y + 0.13, wz, 0, 0.1, 0.11, 0.1), 0xc8a45a, 'otros'); palo([wx, y + 0.2, wz], [wx + 0.16, y + 0.3, wz + 0.1], 0.014); } // wadas: calabazas con semillas
+  }
+
+  // ---------- la piedra de moler y el lugar de la greda ----------
+  { const [x, z] = OFICIOS.moler, y = height(x, z); estera(x - 0.45, z, 1.5, 1.2, 0.1);
+    flora.rock(x, y - 0.05, z, 0.42, { squash: 0.32, color: 0xa8a49a }); flora.rock(x - 0.06, y + 0.12, z, 0.14, { squash: 0.6, color: 0x8e8a80 });
+    bag.add(new THREE.CylinderGeometry(0.26, 0.2, 0.3, 10, 1, true), M(x + 0.45, y + 0.15, z + 0.6), 0xb09a5a, 'estera'); }
+  { const [x, z] = OFICIOS.greda, y = height(x, z); estera(x, z + 0.3, 1.6, 1.3, 0.2);
+    vasija('olla', x, y - 0.01, z, 0.2, 0.4, greda.lisa); vasija('cantaro', x + 0.78, y - 0.01, z - 0.35, 0.22, 1.2, greda.lisa);
+    for (let i = 0; i < 4; i++) bag.add(sph, M(x - 0.75 + D(i + 20) * 0.5, y + 0.08, z - 0.25 + D(i + 30) * 0.5, 0, 0.11, 0.07, 0.1), 0x9a6a48, 'otros'); } // pellas de greda
+
+  // ---------- algunos árboles y matas entre las casas ----------
+  for (const [kind, x, z, H] of [['roble', -24, -20, 14], ['coigue', -14, -29, 16], ['pewenYoung', 4, -24, 6], ['boldo', 22, -12, 7], ['canelo', 27, 9, 8], ['canelo', 7.5, 27.5, 9], ['peumo', -14, 26, 10], ['quillay', -31, 5, 11], ['boldo', 9.5, -3.5, 5.5]]) flora.tree(kind, x, height(x, z) - 0.1, z, H);
+  [[-27, -9, 1.2], [18, -24, 1.1], [3, 28, 1.3]].forEach(([x, z, sc], i) => flora.bushAt(x, height(x, z), z, sc, i * 2.1, i + 3));
+
+  // ---------- la figura tallada del bosque viejo ----------
+  // Un poste más alto que un hombre, con cabeza, brazos recogidos sobre el vientre y tres franjas pintadas. Mira hacia la aldea.
+  { const { x, z } = TALLADO, y = height(x, z) - 0.1, yaw = Math.atan2(-x, -z), fx = Math.sin(yaw), fz = Math.cos(yaw), rx = Math.cos(yaw), rz = -Math.sin(yaw);
+    bag.add(cyl, M(x, y + 1.3, z, yaw, 0.3, 2.6, 0.26), 0x8a6a48); bag.add(cyl, M(x, y + 2.25, z, yaw, 0.37, 0.3, 0.3), 0x9a7a54); // el cuerpo y los hombros
+    bag.add(cyl, M(x, y + 2.85, z, yaw, 0.26, 0.6, 0.24), 0x9a7a54); bag.add(cyl, M(x, y + 3.2, z, yaw, 0.35, 0.12, 0.32), 0x6a5038);  // la cabeza y lo que lleva encima
+    for (const sd of [-1, 1]) { palo([x + rx * sd * 0.36, y + 2.2, z + rz * sd * 0.36], [x + rx * sd * 0.3 + fx * 0.2, y + 1.55, z + rz * sd * 0.3 + fz * 0.2], 0.07, 0x9a7a54); palo([x + rx * sd * 0.3 + fx * 0.2, y + 1.55, z + rz * sd * 0.3 + fz * 0.2], [x + rx * sd * 0.06 + fx * 0.3, y + 1.45, z + rz * sd * 0.06 + fz * 0.3], 0.06, 0x9a7a54); // los brazos, con las manos sobre el vientre
+      bag.add(sph, M(x + rx * sd * 0.1 + fx * 0.235, y + 2.95, z + rz * sd * 0.1 + fz * 0.235, yaw, 0.045, 0.03, 0.03), 0x1c1612); } // los ojos
+    bag.add(sph, M(x + fx * 0.24, y + 2.72, z + fz * 0.24, yaw, 0.09, 0.02, 0.03), 0x1c1612); // la boca
+    [[0.55, 0x8a3a2c], [0.85, 0xd8ccb0], [1.15, 0x2a2420]].forEach(([hh, col]) => bag.add(new THREE.TorusGeometry(0.3, 0.035, 5, 18).rotateX(PI / 2), M(x, y + hh, z, yaw, 1, 1, 0.87), col, 'otros')); // franjas de color
+    for (let i = 0; i < 7; i++) { const a = (i / 7) * 6.28 + 0.3; flora.rock(x + Math.cos(a) * 0.95, y + 0.04, z + Math.sin(a) * 0.95, 0.2 + D(i + 60) * 0.1, { squash: 0.7, color: 0x9a968c }); }
+    physics.createCollider(RAPIER.ColliderDesc.cylinder(1.6, 0.34).setTranslation(x, y + 1.6, z), fixed);
+  }
+
+  // ---------- el refugio del bosque de pewenes: una ruka chica al final del sendero, con un fuego afuera ----------
+  { const { x, z } = REFUGIO; ruka({ x, z, s: 0.6 });
+    const fx = x + 1.6, fz = z + 4.1, y = height(fx, fz); // el fuego, a un costado de la entrada (que mira hacia la aldea)
+    for (let i = 0; i < 7; i++) { const a = (i / 7) * 6.28; flora.rock(fx + Math.cos(a) * 0.55, y - 0.04, fz + Math.sin(a) * 0.55, 0.17, { squash: 0.8, color: 0x9a968c }); }
+    const brasas = mergeGeometries([0, 1, 2, 3].map((i) => new THREE.CylinderGeometry(0.045, 0.045, 0.5, 6).rotateZ(PI / 2).rotateY(i * 0.9).translate((D(i + 40) - 0.5) * 0.25, 0.08, (D(i + 50) - 0.5) * 0.25)));
+    add(brasas, emit.ember, fx, y, fz).castShadow = false;
+    const llama = new THREE.Mesh(mergeGeometries([new THREE.PlaneGeometry(0.62, 0.85), new THREE.PlaneGeometry(0.62, 0.85).rotateY(PI / 2)]), emit.flama); llama.position.set(fx, y + 0.45, fz); llama.renderOrder = 3; scene.add(llama);
+    emit.smoke.push([fx, y + 0.6, fz, 0.55]);
+    for (let i = 0; i < 6; i++) palo([x - 2.9 + (i % 3) * 0.2, y + 0.1 + Math.floor(i / 3) * 0.17, z + 1.2], [x - 2.9 + (i % 3) * 0.2, y + 0.1 + Math.floor(i / 3) * 0.17, z + 2.3], 0.085, i % 2 ? WOOD : WOOD2); // leña seca para el que venga después
+    physics.createCollider(RAPIER.ColliderDesc.cylinder(0.25, 0.6).setTranslation(fx, y + 0.25, fz), fixed);
+    emit.refugio = { x: fx, z: fz };
+  }
 
   return emit;
 }

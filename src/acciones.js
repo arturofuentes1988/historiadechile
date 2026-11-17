@@ -120,9 +120,9 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
           : { lines: ['Primero el telar, hijo. Acércate y obsérvalo con calma.'] };
         return f.lana ? { main: true, lines: ENCARGO, done: () => set('m1', 1) } : { lines: ['La lana roja, hijo. Está ahí mismo, junto al telar.'] };
       }
-      if (f.m1 === 1 && got >= total) return { main: true, lines: ['¿Los trajiste todos? A ver… Sí. Con estos alcanza para la noche más larga.', 'Cuando yo era niña, mi madre me mandaba por los mismos piñones al mismo bosque. El pewen no se ha olvidado de nosotros ni un solo invierno.', 'Ahora anda con tu padre. Te está esperando para subir al Treng Treng: dice que hay algo que solo se ve desde arriba.'], done: () => { set('m1', 2); ui.takeItem('pinon', total); } };
+      if (f.m1 === 1 && got >= total) return { main: true, lines: ['¿Los trajiste todos? A ver… Sí. Con estos alcanza para la noche más larga.', 'Cuando yo era niña, mi madre me mandaba por los mismos piñones al mismo bosque. El pewen no se ha olvidado de nosotros ni un solo invierno.', 'Ahora anda con tu padre. Te está esperando para subir al Treng Treng: dice que hay algo que solo se ve desde arriba.'], gestos: [[0, 'da', 'pinon']], done: () => { set('m1', 2); ui.takeItem('pinon', total); } };
       if (!f.mi) return { lines: ['Hijo, me quedé sin amarillo para la manta. Se saca de la raíz del michay, ese arbusto de espinas y flores anaranjadas.', 'Tráeme dos raíces. Escarba con cuidado y deja la mata en pie: tiene que seguir dando.'], done: () => set('mi', 1) };
-      if (f.mi === 1 && listo(['michay'])) return { lines: ['Estas sirven. Mira: se hierven con la lana y sale un amarillo como de sol de invierno.', 'Cada color viene de un lugar. Cuando te pongas esta manta vas a llevar encima el monte entero, aunque estés lejos.'], done: () => { take('michay', 2); set('mi', 2); } };
+      if (f.mi === 1 && listo(['michay'])) return { lines: ['Estas sirven. Mira: se hierven con la lana y sale un amarillo como de sol de invierno.', 'Cada color viene de un lugar. Cuando te pongas esta manta vas a llevar encima el monte entero, aunque estés lejos.'], gestos: [[0, 'da', 'michay']], done: () => { take('michay', 2); set('mi', 2); } };
       if (f.m1 === 1) return { lines: [`Todavía faltan piñones: llevas ${got} de ${total}. Están en el bosque del norte, siguiendo el sendero.`] };
       if (f.mi === 1) return { lines: [`Aún falta: ${falta()}. Crece en las laderas donde pega el sol.`] };
     }
@@ -136,37 +136,37 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
       if (ui.has('nalca')) {
         if (!f.na) return { lines: ['Para el We Tripantu vamos a cocer la comida bajo tierra, y hay que taparla con hojas grandes.', 'Tráeme dos tallos de nalca con su hoja. Crece junto al agua, en el menoko y a la orilla del río.'], done: () => set('na', 1) };
         if (f.na === 1 && !listo(['nalca'])) return { lines: [`Falta: ${falta()}. Busca cerca del agua.`] };
-        if (f.na === 1) return { lines: ['Buenas hojas. Con estas no entra ni una piedra a la comida.', 'El tallo pélalo y cómetelo: es ácido y quita la sed. Te lo ganaste.'], done: () => { take('nalca', 2); set('na', 2); } };
+        if (f.na === 1) return { lines: ['Buenas hojas. Con estas no entra ni una piedra a la comida.', 'El tallo pélalo y cómetelo: es ácido y quita la sed. Te lo ganaste.'], gestos: [[0, 'da', 'nalca']], done: () => { take('nalca', 2); set('na', 2); } };
       }
     }
     if (id === 'machi' && f.m2 === 2) {
       if (!f.m3) return { main: true, lines: ['Leftraru, qué bueno que viniste. El viejo Ñamku amaneció con fiebre y la tos no lo deja dormir.', 'Voy a prepararle un lawen, pero mis piernas ya no están para andar por el monte. Tú serás mis pies.', 'Tráeme hojas de canelo, de dos árboles distintos: crece cerca del agua y en el lugar de los antiguos. Un trozo de corteza de quillay, del monte donde pega el sol. Y hojas de maqui, del claro del surponiente.', 'Antes de cortar, pide. Di para quién es. La planta que se saca sin permiso no sana a nadie.'], done: () => set('m3', 1) };
       if (f.m3 === 1 && !listo(['canelo', 'quillay', 'maqui'])) return { lines: [`Todavía falta: ${falta()}.`, 'No te apures. Mira bien cada planta antes de cortarla: hay que conocerla para pedirle.'] };
-      if (f.m3 === 1) return { main: true, lines: ['Déjame ver… Sí. Las cortaste con cuidado, se nota.', 'El canelo abre el camino, el quillay suelta el pecho y el maqui baja la fiebre. Pero lo que sana es que alguien fue a buscarlas pensando en el enfermo.', 'Ya está. Llévaselo a Ñamku mientras está tibio. Y dile que se lo tome todo, que yo sé que es porfiado.'], done: () => { take('canelo', 2); take('quillay', 1); take('maqui', 2); inv.lawen = 1; set('m3', 2); } };
+      if (f.m3 === 1) return { main: true, lines: ['Déjame ver… Sí. Las cortaste con cuidado, se nota.', 'El canelo abre el camino, el quillay suelta el pecho y el maqui baja la fiebre. Pero lo que sana es que alguien fue a buscarlas pensando en el enfermo.', 'Ya está. Llévaselo a Ñamku mientras está tibio. Y dile que se lo tome todo, que yo sé que es porfiado.'], gestos: [[0, 'da', 'canelo'], [2, 'obra'], [3, 'recibe', 'lawen']], done: () => { take('canelo', 2); take('quillay', 1); take('maqui', 2); inv.lawen = 1; set('m3', 2); } };
       if (f.m3 === 2) return { lines: ['El lawen se enfría, niño. Ñamku está en su ruka, al oriente.'] };
       // Después de la historia: le enseña el agua de hierbas (f.rm: 1 juntando las hojas, 2 aprendida). No es su lawen: es lo de casa.
       if (f.m3 === 3) {
         if (!f.rm) return { lines: ['Ñamku ya anda de pie, y fue por tus pies. Ahora te toca aprender algo con las manos.', 'Lo que yo le di era lawen, y eso es cosa mía: se pide, se canta, y no se enseña de un día para otro. Pero hay un agua de hierbas que en toda casa se sabe preparar, para el cansancio, el frío y los golpes.', 'Tráeme dos manojos de hojas de maqui y dos de boldo, el árbol de hoja dura y olorosa que crece donde pega el sol. Pide antes de cortar, como ya sabes.'], done: () => set('rm', 1) };
         if (f.rm === 1 && !listo(['maqui', 'boldo'])) return { lines: [`Todavía falta: ${falta()}.`, 'El boldo se conoce por el olor: restriega una hoja entre los dedos.'] };
-        if (f.rm === 1) return { lines: ['Bien cortadas. Ahora mira, que esto se aprende mirando.', 'El agua tiene que hervir primero. Las hojas se echan cuando ya la sacaste del fuego, y se tapa. Si las hierves, amarga y no sirve.', 'Una hoja de maqui por una de boldo. Ni más, que cae pesado; ni menos, que es agua sola.', 'Toma: esta la hicimos juntos. Las que vengan las preparas tú, junto al fogón. Y no cortes más de lo que vayas a usar.'], done: () => { take('maqui', 2); take('boldo', 2); give('remedio', 1); set('rm', 2); hint('Aprendiste a preparar agua de hierbas. Se hace junto al fogón, desde la bolsa.', 8); } };
+        if (f.rm === 1) return { lines: ['Bien cortadas. Ahora mira, que esto se aprende mirando.', 'El agua tiene que hervir primero. Las hojas se echan cuando ya la sacaste del fuego, y se tapa. Si las hierves, amarga y no sirve.', 'Una hoja de maqui por una de boldo. Ni más, que cae pesado; ni menos, que es agua sola.', 'Toma: esta la hicimos juntos. Las que vengan las preparas tú, junto al fogón. Y no cortes más de lo que vayas a usar.'], gestos: [[0, 'da', 'maqui'], [3, 'obra'], [4, 'recibe', 'remedio']], done: () => { take('maqui', 2); take('boldo', 2); give('remedio', 1); set('rm', 2); hint('Aprendiste a preparar agua de hierbas. Se hace junto al fogón, desde la bolsa.', 8); } };
       }
     }
-    if (id === 'namku' && f.m3 === 2) return { main: true, lines: ['¿Eso es para mí? Huele al monte entero… La machi te mandó a ti, ¿no? Así se aprende.', 'Amargo. Bien amargo. Así tiene que ser.', 'Cuando yo tenía tu edad, mi abuelo se enfermó y fui yo a buscar las plantas. Me perdí dos días. Volví con las hojas equivocadas, y él se mejoró igual, de puro reírse.', 'Gracias, Leftraru. Uno no se sana solo: lo sana su gente.', 'Y prepárate, que ya vienen los de la costa para el We Tripantu. Alguien tendrá que salir a recibirlos.'], done: () => { inv.lawen = 0; set('m3', 3); } };
+    if (id === 'namku' && f.m3 === 2) return { main: true, lines: ['¿Eso es para mí? Huele al monte entero… La machi te mandó a ti, ¿no? Así se aprende.', 'Amargo. Bien amargo. Así tiene que ser.', 'Cuando yo tenía tu edad, mi abuelo se enfermó y fui yo a buscar las plantas. Me perdí dos días. Volví con las hojas equivocadas, y él se mejoró igual, de puro reírse.', 'Gracias, Leftraru. Uno no se sana solo: lo sana su gente.', 'Y prepárate, que ya vienen los de la costa para el We Tripantu. Alguien tendrá que salir a recibirlos.'], gestos: [[0, 'da', 'lawen'], [1, 'bebe', 'lawen']], done: () => { inv.lawen = 0; set('m3', 3); } };
     // Después de la historia: le enseña a hacer flechas y lo manda a su primera caza.
     // f.cz: 1 juntando cañas y plumas, 2 con el arco, probando la puntería (f.blanco: aciertos), 3 de caza, 4 trae el pudú, 5 hecha.
     if (id === 'namku' && f.m3 === 3) {
       if (!f.cz) return { lines: ['Leftraru. Mira estas manos: ya no tiemblan. Te debo una, y yo pago enseñando.', 'Vienen los de la costa y en la olla no hay más que piñones. Hace falta carne, y mis piernas todavía no están para el monte. Vas a ir tú.', 'Pero primero se hacen las flechas. Tráeme tres cañas de quila, derechas, y tres plumas: las encuentras al pie de los árboles donde se posan los pájaros.'], done: () => set('cz', 1) };
       if (f.cz === 1 && !listo(['quila', 'pluma'])) return { lines: [`Falta: ${falta()}.`, 'La caña, derecha. Las plumas, enteras.'] };
-      if (f.cz === 1) return { lines: ['A ver… Sirven. Siéntate y mira.', 'La caña se endereza al calor del fuego y la punta se endurece en la brasa: queda dura como hueso. La pluma se parte por el medio y se amarra atrás, para que la flecha vuele derecho y no dé tumbos.', 'Este arco fue de mi padre. Ahora lo llevas tú, y también estas tres flechas. Las que falten las haces tú junto al fogón: una caña y una pluma por cada una.', 'Antes de salir al monte, pruébalo. Dejé un atado de paja amarrado a un poste, aquí al oriente. Dale tres veces y vuelve.'], done: () => { take('quila', 3); take('pluma', 3); give('arco', 1); give('flecha', 3); set('blanco', 0); set('cz', 2); hint('Aprendiste a hacer flechas. Se hacen junto al fogón, desde la bolsa.', 8); } };
+      if (f.cz === 1) return { lines: ['A ver… Sirven. Siéntate y mira.', 'La caña se endereza al calor del fuego y la punta se endurece en la brasa: queda dura como hueso. La pluma se parte por el medio y se amarra atrás, para que la flecha vuele derecho y no dé tumbos.', 'Este arco fue de mi padre. Ahora lo llevas tú, y también estas tres flechas. Las que falten las haces tú junto al fogón: una caña y una pluma por cada una.', 'Antes de salir al monte, pruébalo. Dejé un atado de paja amarrado a un poste, aquí al oriente. Dale tres veces y vuelve.'], gestos: [[0, 'da', 'quila'], [1, 'obra'], [4, 'recibe', 'arco']], done: () => { take('quila', 3); take('pluma', 3); give('arco', 1); give('flecha', 3); set('blanco', 0); set('cz', 2); hint('Aprendiste a hacer flechas. Se hacen junto al fogón, desde la bolsa.', 8); } };
       if (f.cz === 2 && (f.blanco || 0) < 3) return { lines: [`Llevas ${f.blanco || 0} de 3 en el blanco. Párate a unos pasos, quédate quieto y suelta.`] };
       if (f.cz === 2) return { lines: ['Tres de tres. Tienes el ojo de tu nombre.', 'Ahora escucha, que esto es lo que importa. Al pudú no se le corre: se le sigue. Busca sus huellas y camina despacio. Si corres, no lo ves más.', 'Antes de soltar la flecha, pide. Al dueño del monte se le dice para quién es la carne. Y se toma uno solo: el monte da, pero lleva la cuenta.', 'Anda. Y si vuelves con las manos vacías, también se aprende.'], done: () => set('cz', 3) };
       if (f.cz === 3) return { lines: ['Las huellas, despacio, y de cerca. Uno solo.'] };
-      if (f.cz === 4) return { lines: ['Lo trajiste… Déjame verlo. Un tiro limpio: no sufrió.', 'Hoy comen los de la costa por tu mano. La primera caza no se la come el cazador: se reparte. Así nadie olvida que se caza para todos.', 'El arco es tuyo. Pero óyeme bien: mientras haya carne en la casa, se queda colgado. Se caza cuando hace falta, no cuando dan ganas.'], done: () => { take('presa', 1); set('cz', 5); } };
+      if (f.cz === 4) return { lines: ['Lo trajiste… Déjame verlo. Un tiro limpio: no sufrió.', 'Hoy comen los de la costa por tu mano. La primera caza no se la come el cazador: se reparte. Así nadie olvida que se caza para todos.', 'El arco es tuyo. Pero óyeme bien: mientras haya carne en la casa, se queda colgado. Se caza cuando hace falta, no cuando dan ganas.'], gestos: [[0, 'da', 'presa']], done: () => { take('presa', 1); set('cz', 5); } };
     }
     if (id === 'abuela') {
       if (!f.ab) return { lines: ['Leftraru, ¿me harías un favor? Tengo antojo de murtilla y ya no llego hasta donde crece.', 'Es una mata bajita de frutos rojos. Se da en los claros y en las laderas con sol. Tráeme tres puñados.'], done: () => set('ab', 1) };
       if (f.ab === 1 && !listo(['murtilla'])) return { lines: [`Todavía me falta: ${falta()}. Busca donde llega el sol.`] };
-      if (f.ab === 1) return { lines: ['¡Qué perfume! Así olía la ruka de mi madre al final del verano.', 'Ella las secaba al sol y las guardaba para el invierno. En las noches largas nos daba un puñado a cada uno, y había que hacerlo durar hasta que terminara el cuento.', 'Toma, come tú también. Y cuando seas viejo, acuérdate de a qué sabía.'], done: () => { take('murtilla', 3); set('ab', 2); } };
+      if (f.ab === 1) return { lines: ['¡Qué perfume! Así olía la ruka de mi madre al final del verano.', 'Ella las secaba al sol y las guardaba para el invierno. En las noches largas nos daba un puñado a cada uno, y había que hacerlo durar hasta que terminara el cuento.', 'Toma, come tú también. Y cuando seas viejo, acuérdate de a qué sabía.'], gestos: [[0, 'da', 'murtilla'], [2, 'recibe', 'murtilla'], [3, 'come', 'murtilla']], done: () => { take('murtilla', 3); set('ab', 2); } };
     }
     if (id === 'rayen') {
       if (palin) return { lines: ['¡Menos conversa y más juego!'] };
@@ -240,10 +240,10 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
     { id: 'remedio', sabe: () => f.rm === 2, title: 'Agua de hierbas', pide: { maqui: 1, boldo: 1 }, tope: 3, text: 'Devuelve las fuerzas después del frío, del cansancio o de un golpe. Te la enseñó la machi: no es un lawen, es lo que se sabe en toda casa.' },
     { id: 'flecha', sabe: () => f.cz >= 2, title: 'Flecha', pide: { quila: 1, pluma: 1 }, tope: 6, text: 'Una caña de quila enderezada al calor, con la punta endurecida en la brasa y media pluma amarrada atrás. Te la enseñó Ñamku.' },
   ];
-  const alFuego = () => d2(here, FOGON.x, FOGON.z) < 6.5;
+  const alFuego = () => d2(here, FOGON.x, FOGON.z) < 6.5 || (!!world.refugio && d2(here, world.refugio.x, world.refugio.z) < 5.5); // el fogón de la aldea o el fuego del refugio del bosque
   function recetas() {
     return RECETAS.filter((r) => r.sabe()).map((r) => { const sin = Object.keys(r.pide).filter((k) => have(k) < r.pide[k]), lleno = have(r.id) >= r.tope;
-      return { id: r.id, title: r.title, text: r.text, lleva: Object.keys(r.pide).map((k) => `${ITEMS[k].uno}: ${have(k)} de ${r.pide[k]}`).join(' · '), puede: !sin.length && !lleno && alFuego(), porque: lleno ? 'Ya llevas suficiente' : sin.length ? `Falta ${sin.map((k) => ITEMS[k].uno).join(' y ')}` : 'Acércate al fogón' }; });
+      return { id: r.id, title: r.title, text: r.text, lleva: Object.keys(r.pide).map((k) => `${ITEMS[k].uno}: ${have(k)} de ${r.pide[k]}`).join(' · '), puede: !sin.length && !lleno && alFuego(), porque: lleno ? 'Ya llevas suficiente' : sin.length ? `Falta ${sin.map((k) => ITEMS[k].uno).join(' y ')}` : 'Acércate a un fuego' }; });
   }
   function preparar(id) {
     const r = RECETAS.find((q) => q.id === id); if (!r || !r.sabe() || have(id) >= r.tope || !alFuego() || Object.keys(r.pide).some((k) => have(k) < r.pide[k])) return false;
@@ -303,6 +303,12 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
   // Sentarse en un tronco: camina hasta quedar delante (si venía por detrás, pasa por encima), se gira hacia el fuego
   // y baja de a poco doblando las rodillas. Sentado respira, mira el fuego y a ratos acerca las manos. Al levantarse, lo contrario.
   let sit = null, fuegoI = 0, here = { x: 0, z: 0 };
+  // Lo que se hace con la tecla de acción se ve: agacharse a recoger, estirar la mano, verter, beber, saludar. Lo que la
+  // acción hace de verdad (sumar la planta a la bolsa, llenar la vasija) pasa a mitad del gesto. hacia: hacia dónde se vuelve.
+  const DUR = { recoger: 1.5, alcanzar: 1.1, verter: 1.5, beber: 1.6, saludar: 1.9, cargar: 2.3 };
+  const GESTOS = [['Alcanzarle', 'alcanzar', { x: -10.6, z: -4.2 }], ['Llenar', 'recoger'], ['Echar', 'verter', OLLA], ['Cortar', 'recoger'], ['Dar pasto', 'verter', CORRAL], ['Saludar', 'saludar'], ['Mirar las huellas', 'recoger'], ['Tirar una piedra', 'alcanzar'], ['Beber', 'beber'], ['Agradecer', 'cargar'], ['Tomar', 'beber']]; // según cómo empieza el nombre de la acción
+  let hace = null; // el gesto en curso: { tipo, t, dur, run, hecho, hacia }
+  const haz = (tipo, run, hacia) => { hace = { tipo, t: 0, dur: DUR[tipo], run, hecho: false, hacia: hacia || null }; };
   const SIT_IN = 1.3, SIT_OUT = 0.8, mix = (a, b, k) => a + (b - a) * k, sm = (a, b, x) => { const k = Math.min(1, Math.max(0, (x - a) / (b - a))); return k * k * (3 - 2 * k); };
   function sentarse(l, p) {
     const dx = -Math.cos(l.a), dz = -Math.sin(l.a); // del tronco hacia el fuego
@@ -319,10 +325,11 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
   }
   function scan(p) {
     if (sit) return sit.st === 'on' ? { label: 'Levantarse', run: stand } : null;
-    if (arco) return null; // con el arco tenso no se hace otra cosa
-    const out = [], add = (d, label, run) => out.push({ d, label, run }), n = needs();
-    for (const id in n) if (n[id] > 0) { const s = source(id, p); if (s) add(s.d - 5, `Recoger ${ITEMS[id].uno}`, () => pick(id, s.rec)); }
-    const lb = libres(); for (const id in lb) if (!(n[id] > 0) && lb[id] > 0) { const s = source(id, p); if (s) add(s.d - 4, `Recoger ${ITEMS[id].uno}`, () => pick(id, s.rec)); }
+    if (arco || hace) return null; // con el arco tenso o a medio gesto no se hace otra cosa
+    const out = [], n = needs();
+    const add = (d, label, run, g, hacia) => { if (g === undefined) { const q = GESTOS.find(([k]) => label.startsWith(k)); if (q) { g = q[1]; hacia = q[2]; } } out.push({ d, label, run: g ? () => haz(g, run, hacia) : run }); };
+    for (const id in n) if (n[id] > 0) { const s = source(id, p); if (s) add(s.d - 5, `Recoger ${ITEMS[id].uno}`, () => pick(id, s.rec), ITEMS[id].tree || ITEMS[id].bush ? 'alcanzar' : 'recoger', s.rec); }
+    const lb = libres(); for (const id in lb) if (!(n[id] > 0) && lb[id] > 0) { const s = source(id, p); if (s) add(s.d - 4, `Recoger ${ITEMS[id].uno}`, () => pick(id, s.rec), ITEMS[id].tree || ITEMS[id].bush ? 'alcanzar' : 'recoger', s.rec); }
     // el arco: al blanco de paja siempre; al pudú, solo durante el encargo de Ñamku
     if (f.cz >= 2 && !arco && have('flecha')) {
       const db = d2(p, BLANCO.x, BLANCO.z); if (db > 4 && db < 24) add(6, 'Tirar al blanco', () => { arco = { tg: {}, st: 'tensa', t: 0 }; });
@@ -335,7 +342,7 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
     const tr = TRONCOS.map((l) => ({ l, d: d2(p, l.x, l.z) })).sort((a, b) => a.d - b.d)[0];
     if (tr.d < 1.5) add(tr.d, 'Sentarse en el tronco', () => sentarse(tr.l, here));
     // tareas de la aldea
-    if (ui.has('millaray') && !f.lana && (f.m1 || f.tu === 2) && d2(p, -10.6, -4.2) < 3) add(1, 'Alcanzarle la lana a Millaray', () => { set('lana', 1); const gracias = 'Gracias, hijo. La roja primero… esa. Así no tengo que soltar el hilo.'; if (f.m1) speak('Millaray', [gracias]); else speak('Millaray', [gracias, ...ENCARGO], () => set('m1', 1)); }); // la primera vez, con esto te da la misión
+    if (ui.has('millaray') && !f.lana && (f.m1 || f.tu === 2) && d2(p, -10.6, -4.2) < 3) add(1, 'Alcanzarle la lana a Millaray', () => { set('lana', 1); const gracias = 'Gracias, hijo. La roja primero… esa. Así no tengo que soltar el hilo.'; if (f.m1) speak('Millaray', [gracias], null, [[0, 'da', 'lana']]); else speak('Millaray', [gracias, ...ENCARGO], () => set('m1', 1), [[0, 'da', 'lana']]); }); // la primera vez, con esto te da la misión
     const rz = riverZ(p.x), dr = Math.abs(p.z - rz);
     if (!f.agua && !have('agua') && dr < 5 && p.y < WATER_Y + 1.6) add(2, 'Llenar la vasija con agua', () => { inv.agua = 1; save(); snd.play('paso-agua-1', 0.5); hint('Llenaste la vasija. Llévala a la olla del fogón.', 5); });
     if (!f.agua && have('agua') && df < 4.2) add(0.5, 'Echar el agua a la olla', () => { inv.agua = 0; set('agua', 1); snd.play('paso-agua-2', 0.5); speak('La abuela', ['¡Agua fresca! Con esto alcanza para el caldo. Así da gusto.']); });
@@ -358,6 +365,8 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
     here = p; if (palin) updatePalin(dt, p);
     if (sit) updateSit(dt);
     if (arco) updateArco(dt, p);
+    if (hace) { const h = hace; h.t += dt; if (h.hacia) player.facing += giro(Math.atan2(h.hacia.x - p.x, h.hacia.z - p.z) - player.facing) * Math.min(1, dt * 9);
+      if (!h.hecho && h.t >= h.dur * 0.55) { h.hecho = true; h.run(); } if (h.t >= h.dur && hace === h) hace = null; }
     blanco.visible = f.cz >= 2;
     if (mama && mama.mode === 'cook' && f.m1 !== 1 && d2(p, mama.x, mama.z) > 45) madreCocina(false); // entregados los piñones, cuando ya no la ves vuelve al telar
     if (padre) {
@@ -370,7 +379,16 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
   // La postura al sentarse se mezcla con la de pie según w (0 de pie, 1 sentado). La cadera sigue un camino
   // desde donde está parado hasta el asiento, y el cuerpo se inclina hacia adelante mientras baja o sube.
   function pose(boy) {
-    if (boy.arcoM) boy.arcoM.visible = !!arco && arco.st === 'tensa' && !sit;
+    if (boy.arcoM) boy.arcoM.visible = !!arco && arco.st === 'tensa' && !sit && !boy.sinArco; // con el cuerpo nuevo, el arco lo lleva main.js en su mano
+    if (hace && !sit) { // el gesto de lo que está haciendo con las manos
+      const u = Math.min(1, hace.t / hace.dur), k = sm(0, 0.35, u) * (1 - sm(0.7, 1, u)), T = hace.tipo, G = (o, v) => { o.rotation.x = mix(o.rotation.x, v, k); };
+      if (T === 'recoger' || T === 'cargar') { G(boy.legL, -1.0); G(boy.legR, -0.75); G(boy.shinL, 1.75); G(boy.shinR, 1.6); boy.body.position.y = mix(boy.body.position.y, -0.19, k); boy.body.rotation.x = mix(boy.body.rotation.x, 0.55, k); G(boy.armR, -1.15); G(boy.foreR, -0.25); if (T === 'cargar') { G(boy.armL, -1.15); G(boy.foreL, -0.25); } } // se agacha y estira la mano hacia el suelo
+      else if (T === 'alcanzar') { boy.body.rotation.x = mix(boy.body.rotation.x, 0.1, k); G(boy.armR, -1.5); G(boy.foreR, -0.12); } // estira la mano a la altura del pecho
+      else if (T === 'verter') { boy.body.rotation.x = mix(boy.body.rotation.x, 0.22, k); G(boy.armL, -1.05); G(boy.armR, -1.05); G(boy.foreL, -0.55); G(boy.foreR, -0.55); } // las dos manos adelante
+      else if (T === 'beber') { G(boy.armR, -0.85); G(boy.foreR, -2.0); boy.head.rotation.x = mix(boy.head.rotation.x, -0.2, k); } // la mano a la boca
+      else if (T === 'saludar') { G(boy.armR, -2.5); G(boy.foreR, -0.35); boy.head.rotation.x = mix(boy.head.rotation.x, 0.22, k); } // la mano en alto y la cabeza inclinada
+      return;
+    }
     if (arco && !sit) { // con el arco: el brazo izquierdo estirado hacia donde apunta, el derecho llevando la cuerda atrás, el cuerpo de medio lado
       if (!boy.arcoM) { const g = new THREE.TorusGeometry(0.3, 0.008, 5, 16, Math.PI * 0.8).rotateZ(-Math.PI * 0.9).rotateY(Math.PI / 2); boy.arcoM = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x4a3626, roughness: 1 })); boy.arcoM.position.set(0, 0.125, 0); boy.foreL.add(boy.arcoM); }
       const u = arco.t / TENSA, k = arco.st === 'tensa' ? sm(0, 0.45, u) : 1 - sm(0, 1, arco.t / 0.3);
@@ -396,8 +414,8 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
   }
 
   return { scan, talk, wants, update, pose, stand, madreCocina, f, pins: S.pin, pin(i) { if (!S.pin.includes(i)) { S.pin.push(i); save(); } },
-    get sitting() { return !!sit; }, get busy() { return (!!sit && sit.st !== 'on') || !!arco; }, // busy: está sentándose o levantándose
-    ctx: () => ({ f, hierbas: Math.min(2, have('canelo')) + Math.min(1, have('quillay')) + Math.min(2, have('maqui')), llevo: { canelo: Math.min(2, have('canelo')), quillay: Math.min(1, have('quillay')), maqui: Math.min(2, have('maqui')) } }),
+    get sitting() { return !!sit; }, get busy() { return (!!sit && sit.st !== 'on') || !!arco || !!hace; }, get abrigado() { return alFuego(); }, get hace() { return hace; }, get tensa() { return arco && arco.st === 'tensa' ? Math.min(1, arco.t / TENSA) : 0; }, // hace: el gesto en curso; tensa: cuánto lleva tensado el arco // abrigado: junto a un fuego // busy: está sentándose o levantándose
+    ctx: () => ({ f, tengo: (id) => have(id), hierbas: Math.min(2, have('canelo')) + Math.min(1, have('quillay')) + Math.min(2, have('maqui')), llevo: { canelo: Math.min(2, have('canelo')), quillay: Math.min(1, have('quillay')), maqui: Math.min(2, have('maqui')) } }),
     // Dónde ir a buscar lo que falta para las misiones abiertas: los árboles más cercanos de cada especie y las matas de maqui del claro.
     goals(p) {
       const n = needs(), out = [];

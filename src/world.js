@@ -169,7 +169,7 @@ export function buildWorld(scene, RAPIER, physics) {
   });
 
   return {
-    items, trees, life, strokes: Math.round(tris),
+    items, trees, life, strokes: Math.round(tris), refugio: emit.refugio, // refugio: dónde arde el fuego del refugio del bosque
     nearTree(x, z, r) { const ci = Math.floor(x / 8), cj = Math.floor(z / 8); let best = null; for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const l = grid.get(ci + i + ',' + (cj + j)); if (l) for (const t of l) { const d = Math.hypot(t.x - x, t.z - z); if (d < r && (!best || d < best.d)) best = { ...t, d }; } } return best; },
     nearPlant: flora.nearScatter, findPlant: flora.findScatter, nearBush: flora.nearBush, bushesIn: flora.bushesIn, blockers: flora.blockers, clearView: flora.clearView, restoreView: flora.restoreView, volcano: new THREE.Vector3(VOL.x, 380, VOL.z),
     update(dt, t, camPos, playerPos, speed) { flora.update(camPos); life.update(dt, t, playerPos, speed); for (const sp of plume) { sp.position.x = sp.userData.x + Math.sin(t * 0.13 + sp.userData.i * 2) * 9; sp.position.y = sp.userData.y + Math.sin(t * 0.21 + sp.userData.i) * 5; } if (emit.glow) { emit.glow.intensity = 12 + Math.sin(t * 11) * 2.5 + Math.sin(t * 23.7) * 1.5; emit.ember.emissiveIntensity = 1.8 + Math.sin(t * 3.1) * 0.5 + Math.sin(t * 7.3) * 0.25; } },
