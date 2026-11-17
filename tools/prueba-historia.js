@@ -110,7 +110,8 @@
     return [
       ['Entrar desde la portada y pasar el prólogo', () => g.state === 'play', () => {
         if (g.menuOpen) g.setMenu(false);
-        if (g.state === 'title') g.enter();
+        if (g.state === 'title') { g.portadaMenu(); g.enter(); }
+        if (g.acto) g.cerrarActo();
         if (g.prologo) g.cerrarPrologo();
         exigir(esperar(() => g.state === 'play', 30), `No se llegó al juego: el estado quedó en «${g.state}».`);
         exigir(ui.has('leftraru'), 'Al empezar no quedó Leftraru anotado en el cuaderno.');

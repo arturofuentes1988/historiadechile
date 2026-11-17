@@ -56,12 +56,13 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
     { const [x, y] = P(CORRAL.x, CORRAL.z); b.beginPath(); b.arc(x, y, CORRAL.r * k, 0, 7); b.stroke(); }
   }
   paintBase(); base.addEventListener('contextrestored', paintBase);
-  // La línea de guía: trazos claros con borde oscuro, que avanzan hacia el destino. pts son puntos [x, z] del mundo.
+  // La línea de guía: trazos rojos con borde claro, que avanzan hacia el destino. Roja para que no se confunda con los
+  // senderos, que en el mapa también son de trazos. pts son puntos [x, z] del mundo.
   function trazo(g, pts, toXY, w = 1) {
     if (!pts || pts.length < 2) return;
     g.save(); g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath(); pts.forEach((q, n) => { const [x, y] = toXY(q[0], q[1]); n ? g.lineTo(x, y) : g.moveTo(x, y); });
     g.setLineDash([10 * w, 9 * w]); g.lineDashOffset = -((performance.now() / 55) % (19 * w));
-    g.strokeStyle = '#14110f'; g.lineWidth = 7 * w; g.stroke(); g.strokeStyle = '#ffe9a8'; g.lineWidth = 3.4 * w; g.stroke(); g.restore();
+    g.strokeStyle = '#14110f'; g.lineWidth = 9.5 * w; g.stroke(); g.strokeStyle = '#fff1d0'; g.lineWidth = 7.2 * w; g.stroke(); g.strokeStyle = '#e8321c'; g.lineWidth = 4.2 * w; g.stroke(); g.restore();
   }
   // el destino: un banderín rojo
   function meta(g, x, y, k = 1) { g.save(); g.translate(x, y); g.lineWidth = 2.4 * k; g.strokeStyle = '#14110f'; g.fillStyle = '#d0483a'; g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -22 * k); g.stroke(); g.beginPath(); g.moveTo(0, -22 * k); g.lineTo(15 * k, -16 * k); g.lineTo(0, -10 * k); g.closePath(); g.fill(); g.stroke(); g.fillStyle = '#14110f'; g.beginPath(); g.arc(0, 0, 3.2 * k, 0, 7); g.fill(); g.restore(); }
@@ -94,7 +95,7 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
     ctx.beginPath(); ctx.arc(S / 2, S / 2, R, 0, 7); ctx.clip();
     ctx.fillStyle = '#8f7d52'; ctx.fillRect(0, 0, S, S);
     ctx.save(); ctx.translate(S / 2, S / 2); ctx.rotate(rot); ctx.scale(ZOOM, ZOOM); ctx.translate(-px, -py); ctx.drawImage(base, 0, 0); ctx.restore();
-    if (api.guide) { const q = (x, z) => { const [dx, dy] = off(x, z); return [S / 2 + dx, S / 2 + dy]; }; trazo(ctx, api.guide.pts, q, 1.15); const [mx, my] = q(api.guide.x, api.guide.z); if (Math.hypot(mx - S / 2, my - S / 2) < R - 8) meta(ctx, mx, my, 1.1); }
+    if (api.guide) { const q = (x, z) => { const [dx, dy] = off(x, z); return [S / 2 + dx, S / 2 + dy]; }; trazo(ctx, api.guide.pts, q, 1.15); }
     if (open === 'mapa') drawBig(); // con el mapa abierto, se va actualizando
     ctx.strokeStyle = '#3a2408'; ctx.lineWidth = 2.5;
     for (const it of world.items) if (!it.taken && !it.off) { const [dx, dy, far] = edge(...off(it.base.x, it.base.z), 20); ctx.fillStyle = far ? '#ffe9a8' : '#f2b441'; ctx.beginPath(); ctx.arc(S / 2 + dx, S / 2 + dy, far ? 7 : 10, 0, 7); ctx.fill(); ctx.stroke(); }
@@ -102,6 +103,8 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
     for (const mk of [{ x: 0, z: 0, kind: 'aldea' }, ...api.people]) { const [dx, dy, far] = edge(...off(mk.x, mk.z), 18); if (far && mk.kind === 'nuevo') continue; sym(ctx, S / 2 + dx, S / 2 + dy, mk.kind, far ? 0.75 : 1); }
     for (const gl of api.goals) { const [dx, dy, far] = edge(...off(gl.x, gl.z), 20); hoja(ctx, S / 2 + dx, S / 2 + dy, far ? 0.8 : 1.15); }
     for (const mk of api.marks) { const [dx, dy] = off(mk.x, mk.z); if (Math.hypot(dx, dy) < R - 14) { ctx.fillStyle = '#14110f'; ctx.beginPath(); ctx.arc(S / 2 + dx, S / 2 + dy, 9, 0, 7); ctx.fill(); ctx.fillStyle = '#e9dfc6'; ctx.font = 'bold 14px Georgia'; ctx.textAlign = 'center'; ctx.fillText('?', S / 2 + dx, S / 2 + dy + 5); } }
+    // el banderín del destino va encima de todo lo demás; si queda fuera del minimapa, se ve en el borde, hacia donde está
+    if (api.guide) { const [ex, ey, far] = edge(...off(api.guide.x, api.guide.z), 14); meta(ctx, S / 2 + ex, S / 2 + ey, far ? 0.95 : 1.15); }
     // Leftraru: siempre al centro y con la flecha hacia arriba
     ctx.translate(S / 2, S / 2); ctx.fillStyle = '#fff'; ctx.strokeStyle = '#14110f'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(12, 13); ctx.lineTo(0, 6); ctx.lineTo(-12, 13); ctx.closePath(); ctx.fill(); ctx.stroke();
@@ -164,7 +167,7 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
     panel.dataset.kind = open;
     if (open === 'mapa') {
       $('panel-title').textContent = 'Mapa del territorio';
-      body.innerHTML = '<canvas id="bigmap"></canvas><div class="guiabar"><span id="guia-txt"></span><button id="guia-off" class="btn" hidden>Quitar la guía</button></div><p class="muted">Haz clic en el mapa para marcar un destino: una línea de trazos te muestra el camino y se va acortando a medida que avanzas. También puedes hacer clic en una estrella, un rombo o una hoja. Los lugares muestran su nombre cuando los visitas, y todo lo que descubres queda anotado con su nombre donde lo encontraste. Los puntos dorados son piñones; la estrella, la historia; el rombo, un encargo; el círculo, alguien que aún no conoces; la hoja verde, algo que te pidieron ir a buscar.</p>';
+      body.innerHTML = '<canvas id="bigmap"></canvas><div class="guiabar"><span id="guia-txt"></span><button id="guia-off" class="btn" hidden>Quitar la guía</button></div><p class="muted">Haz clic en el mapa para marcar un destino: una línea roja de trazos te muestra el camino y se va acortando a medida que avanzas. También puedes hacer clic en una estrella, un rombo o una hoja. Los lugares muestran su nombre cuando los visitas, y todo lo que descubres queda anotado con su nombre donde lo encontraste. Los puntos dorados son piñones; la estrella, la historia; el rombo, un encargo; el círculo, alguien que aún no conoces; la hoja verde, algo que te pidieron ir a buscar.</p>';
       drawBig();
     } else if (open === 'misiones') {
       // Principales: todas a la vista y en orden; cada una se abre al terminar la anterior.

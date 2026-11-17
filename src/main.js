@@ -60,30 +60,42 @@ let state = 'title', got = 0, time = 0;
 const cine = new Cinematic(camera);
 const pp = () => pCol.translation();
 
-// De la portada al juego: «Entrar al mundo» lleva a elegir «Historia». El capítulo parte con un prólogo —una hoja
-// escrita que va pasando y cuenta dónde estamos— y dos planos que llevan del relato al juego. Si ya habías empezado, se entra directo.
-let coverT = 0, prologo = false;
-function coverPage(n) { coverT = performance.now(); $('cover-1').hidden = n !== 1; $('cover-2').hidden = n !== 2; }
+// De la portada al juego. Primero solo el título y «haz clic»; después el menú (Aventura y Opciones). Al elegir
+// Aventura aparece la pantalla del acto y, si la historia recién empieza, el prólogo —un aviso antiguo cuya tinta va
+// apareciendo— y dos planos que llevan del relato al juego. Si ya habías empezado, del acto se pasa directo al juego.
+let coverT = 0, prologo = false, acto = false, actoT = 0, prologoT = [];
+const TACTIL = matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches; // celular o tableta, sin ratón
+const fuera = () => state === 'title' || prologo || acto; // todavía no se está en el mundo
+$('c-toca').textContent = TACTIL ? 'Toca la pantalla para comenzar' : 'Haz clic para comenzar';
+function portadaMenu() { if (!$('cover-1').hidden) return; coverT = performance.now(); $('c-toca').hidden = true; $('cover-1').hidden = false; $('title').classList.add('menu'); }
 function enter() {
-  if (state !== 'title' || performance.now() - coverT < 250) return;
+  if (state !== 'title' || $('cover-1').hidden || performance.now() - coverT < 250) return;
   setMenu(false); $('title').classList.add('hide');
   if (!document.fullscreenElement) { try { document.documentElement.requestFullscreen?.()?.catch?.(() => {}); } catch { /* el navegador no lo permitió */ } }
   lock();
+  state = 'cine'; acto = true; coverT = performance.now(); $('acto').classList.add('on'); actoT = setTimeout(cerrarActo, 4600); // la pantalla del acto se va sola; un clic o Enter la adelantan
+}
+function cerrarActo() {
+  if (!acto) return; acto = false; clearTimeout(actoT); $('acto').classList.remove('on');
   if (acc.f.m1 || acc.f.tu) play(); else abrirPrologo();
 }
+$('acto').addEventListener('click', () => { if (performance.now() - coverT > 500) cerrarActo(); });
 function play() {
   state = 'play'; document.body.classList.add('playing'); $('hud').classList.add('on'); lock();
   if (!ui.has('leftraru')) { const t = pp(); ui.discover('leftraru', photo({ x: t.x, y: t.y + 0.25, z: t.z }, { dist: 2.3, up: 0.2, fov: 40, self: true })); }
 }
-// Prólogo: la hoja sube sola y se aleja hacia el fondo, con la aldea a oscuras detrás. Dura lo que tarda en pasar
-// entera, a un ritmo que se alcanza a leer; Enter o un clic la saltan.
+// Prólogo: un aviso antiguo, con la aldea a oscuras detrás. La tinta va apareciendo párrafo a párrafo, al ritmo en que
+// se lee. Un clic (o Enter) muestra todo de una vez; con todo a la vista, otro clic sigue con la historia.
 function abrirPrologo() {
-  state = 'cine'; prologo = true; const el = $('prologo'), hoja = el.querySelector('.papel');
-  el.style.setProperty('--dur', `${Math.round(Math.max(36, (hoja.offsetHeight + innerHeight) / 40))}s`);
-  el.classList.add('on'); hoja.addEventListener('animationend', cerrarPrologo, { once: true });
+  state = 'cine'; prologo = true; const el = $('prologo'), ps = [...el.querySelectorAll('.papel p')];
+  ps.forEach((q) => q.classList.remove('ya')); el.classList.remove('listo'); $('prologo-sigue').textContent = TACTIL ? 'Toca para ver todo' : 'Clic o Enter · ver todo'; el.classList.add('on');
+  let t = 1300; prologoT = ps.map((q) => { const id = setTimeout(() => q.classList.add('ya'), t); t += 800 + q.textContent.split(/\s+/).length * 175; return id; });
+  prologoT.push(setTimeout(prologoListo, t));
 }
-function cerrarPrologo() { if (!prologo) return; prologo = false; $('prologo').classList.remove('on'); intro(); }
-$('prologo').addEventListener('click', cerrarPrologo);
+function prologoListo() { const el = $('prologo'); prologoT.forEach(clearTimeout); el.querySelectorAll('.papel p').forEach((q) => q.classList.add('ya')); el.classList.add('listo'); $('prologo-sigue').textContent = TACTIL ? 'Toca para continuar' : 'Haz clic para continuar'; }
+function avanzarPrologo() { if (!prologo) return; if ($('prologo').classList.contains('listo')) cerrarPrologo(); else prologoListo(); }
+function cerrarPrologo() { if (!prologo) return; prologo = false; prologoT.forEach(clearTimeout); $('prologo').classList.remove('on'); intro(); }
+$('prologo').addEventListener('click', avanzarPrologo);
 // Del relato al juego: Leftraru, y su madre que lo llama.
 function intro() {
   state = 'cine';
@@ -144,7 +156,7 @@ $('btn-menu').onclick = () => setMenu(!menuOpen);
 $('o-controles').onclick = () => menuPage('controles'); $('ctl-volver').onclick = () => menuPage('opciones');
 $('ctl-reset').onclick = () => { for (const [a, , k] of ACTIONS) opts.keys[a] = k; applyOpts(); drawKeys(); };
 $('ctl-list').onclick = (e) => { const b = e.target.closest('[data-act]'); if (b) { rebinding = b.dataset.act; drawKeys(); } };
-$('c-entrar').onclick = () => coverPage(2); $('c-historia').onclick = enter; $('c-volver').onclick = () => coverPage(1); $('c-opciones').onclick = () => setMenu(true);
+$('title').addEventListener('click', portadaMenu); $('c-aventura').onclick = enter; $('c-opciones').onclick = () => setMenu(true);
 // pantalla completa
 const toggleFull = () => { if (document.fullscreenElement) document.exitFullscreen?.(); else document.documentElement.requestFullscreen?.().catch(() => hint('Este navegador no permitió la pantalla completa', 4)); };
 $('btn-full').onclick = toggleFull; $('o-full').onchange = toggleFull;
@@ -212,7 +224,7 @@ $('dialogo').addEventListener('click', () => interact());
 // Escenas dentro del juego: se quita la interfaz, corre la lista de planos y se vuelve a jugar
 function playScene(shots, after) {
   setMenu(false); state = 'cine'; ui.show(null); document.body.classList.remove('playing'); $('hud').classList.remove('on');
-  near = doable = null; for (const id of ['prompt', 'prompt2', 'hint']) $(id).classList.remove('on'); // nada de la interfaz queda encima de la escena
+  near = doable = null; for (const id of ['prompt', 'prompt2', 'hint', 'ayuda']) $(id).classList.remove('on'); // nada de la interfaz queda encima de la escena
   cine.play(shots, () => { state = 'play'; document.body.classList.add('playing'); $('hud').classList.add('on'); lock(); if (after) after(); });
 }
 // Al recoger el último piñón: Leftraru agradece al pewen y, en la aldea, su madre lo espera. (Se muestra cuando ya pisa el suelo.)
@@ -264,6 +276,11 @@ let hintT = 0, toastGap = 0, apunteGap = 0; const toasts = [], apuntes = [], vis
 function showHint(txt, secs, grande = false) { const h = $('hint'); h.textContent = txt; h.classList.toggle('grande', grande); h.classList.add('on'); hintT = secs; toastGap = Math.min(secs, 2.8); }
 function hint(txt, secs) { if (toasts.length) toasts.push([txt, secs]); else showHint(txt, secs); }
 function toast(txt, secs = 5, sound = null, grande = GRANDE.includes(sound)) { if (sound === 'hallazgo' || sound === 'foto') apuntes.push([txt, sound]); else toasts.push([txt, secs, sound, grande]); } // sound: qué toque lo acompaña
+// Las instrucciones de cómo jugar (qué tecla hace qué, y los pasos del tutorial) van aparte: al centro de la pantalla,
+// en letra blanca y sin recuadro, para que no se confundan con los avisos de misión ni con los puntos.
+let ayudaT = 0, ayudaGap = 0; const ayudas = [];
+const teclasHTML = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])).replace(/\{(\w+)\}/g, (_, a) => `<kbd>${keyName(opts.keys[a] || a)}</kbd>`); // {observar} → la tecla, dibujada como tecla
+function showAyuda(txt, secs) { const el = $('ayuda'); el.innerHTML = teclasHTML(txt); el.classList.add('on'); ayudaT = secs; ayudaGap = 4; }
 function apunte(txt, sound) { // un renglón sobre el minimapa, que se va solo a los pocos segundos
   const el = document.createElement('div'); el.className = 'ap'; el.textContent = txt; $('apuntes').appendChild(el); vistos.push({ el, t: 5.5 });
   while (vistos.length > 4) vistos.shift().el.remove();
@@ -279,7 +296,8 @@ addEventListener('keydown', (e) => {
     if (e.code !== 'Escape') { const old = opts.keys[rebinding]; for (const a in opts.keys) if (opts.keys[a] === e.code) opts.keys[a] = old; opts.keys[rebinding] = e.code; applyOpts(); } // si ya estaba en uso, se intercambian
     rebinding = null; drawKeys(); return;
   }
-  if (e.code === 'Enter' && !e.repeat) { if (state === 'title') { if (!menuOpen) { if ($('cover-2').hidden) coverPage(2); else enter(); } } else if (prologo) cerrarPrologo(); else if (!talk) cine.skip(); }
+  if ((e.code === 'Enter' || e.code === 'Space') && !e.repeat && state === 'title' && !menuOpen && $('cover-1').hidden) { portadaMenu(); e.preventDefault(); return; } // en la portada, cualquiera de las dos sirve de «clic»
+  if (e.code === 'Enter' && !e.repeat) { if (state === 'title') { if (!menuOpen) enter(); } else if (acto) { if (performance.now() - coverT > 500) cerrarActo(); } else if (prologo) avanzarPrologo(); else if (!talk) cine.skip(); }
   if (is(e, 'pantalla') && !e.repeat) toggleFull();
   if (is(e, 'menu') && !e.repeat && state !== 'cine') { if (ui.open) ui.show(null); setMenu(!menuOpen); return; }
   if (menuOpen) { if (e.code === 'Escape') { if (page === 'controles') menuPage('opciones'); else setMenu(false); } return; }
@@ -357,9 +375,10 @@ function updatePlayer(dt) {
     destinoGuia(t);
     // cuando la historia avanza un paso, se avisa qué sigue (después de los avisos de lo recién logrado)
     const av = m ? m.aviso : 'Hasta aquí llega la historia por ahora: pronto llegarán los invitados de la costa. Mientras tanto, explora el valle y termina tus encargos.';
-    const list = (Array.isArray(av) ? av : [av]).map(teclas), key = list.join('|');
-    if (key !== lastAviso) { lastAviso = key; list.forEach((t, n) => toast(t, 10, n ? null : 'mision', true)); }
-    else if (m && m.fijo && hintT < 0.6 && !toasts.length) showHint(list[0], 8, true); // el paso del tutorial sigue a la vista hasta que lo haces
+    const crudo = Array.isArray(av) ? av : [av], key = crudo.map(teclas).join('|'), esAyuda = (t) => !!(m && m.fijo) || /\{\w+\}/.test(t); // los pasos del tutorial y lo que nombra teclas son instrucciones de cómo jugar
+    if (key !== lastAviso) { lastAviso = key; ayudas.length = 0; ayudaT = 0; ayudaGap = 0; $('ayuda').classList.remove('on'); let primero = true;
+      for (const t of crudo) { if (esAyuda(t)) ayudas.push([t, 12]); else { toast(teclas(t), 10, primero ? 'mision' : null, true); primero = false; } } }
+    else if (m && m.fijo && ayudaT < 0.6 && !ayudas.length) showAyuda(crudo[0], 8); // el paso del tutorial sigue a la vista hasta que lo haces
     // La guía de la historia se pone sola: apunta a la misión principal abierta, salvo que el jugador haya marcado otra cosa o se la haya quitado.
     if (m && !guia && guiaNo !== m.id) setGuia({ kind: 'mision', id: m.id, auto: true }, 'sola');
     else if (guia && guia.auto && (!m || guia.id !== m.id)) setGuia(m && guiaNo !== m.id ? { kind: 'mision', id: m.id, auto: true } : null, 'sola');
@@ -482,7 +501,7 @@ function updateVida(dt) {
 }
 drawKeys(); applySkills();
 await assets.whenLoaded(); bar(1, 'Listo'); assets.onProgress = null; $('loading').classList.add('hide'); setTimeout(() => $('loading').remove(), 700);
-window.__g = { snd, height, ui, explorer, acc, story, toasts, murmur, setGuia, renderer, get vida() { return vida; }, set vida(v) { vida = v; }, camera, abrirPrologo, cerrarPrologo, get prologo() { return prologo; }, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, get guia() { return guia; }, get guiaT() { return guiaT; }, outro, apuntes, sueltaTodo, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
+window.__g = { snd, height, ui, explorer, acc, story, toasts, murmur, setGuia, renderer, get vida() { return vida; }, set vida(v) { vida = v; }, camera, abrirPrologo, cerrarPrologo, get prologo() { return prologo; }, get acto() { return acto; }, cerrarActo, portadaMenu, avanzarPrologo, ayudas, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, get guia() { return guia; }, get guiaT() { return guiaT; }, outro, apuntes, sueltaTodo, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter() { portadaMenu(); coverT = 0; enter(); }, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
   tp(x, y, z) { setPos(x, y, z); player.vy = 0; },
   view(x, y, z, lx, ly, lz) { camera.position.set(x, y, z); camera.lookAt(lx, ly, lz); world.update(0, time, camera.position, pp()); draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); },
   snap() { draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); } };
@@ -493,7 +512,7 @@ function tick(dt) {
   time += dt; uTime.value = time;
   updatePlayer(dt); updateVida(dt);
   if (cine.active) cine.update(dt);
-  else if (state === 'title' || prologo) { const a = time * 0.04 + 2.4; camera.position.set(Math.sin(a) * 31, 12, Math.cos(a) * 31); camera.lookAt(0, 4, 0); }
+  else if (fuera()) { const a = time * 0.04 + 2.4; camera.position.set(Math.sin(a) * 31, 12, Math.cos(a) * 31); camera.lookAt(0, 4, 0); }
   else if (focus) updateFocus(dt);
   else updateCamera(dt);
   updateItems();
@@ -506,9 +525,11 @@ function tick(dt) {
     // ondas en el agua al vadear
     ripT -= dt; if (player.wade > 0.05 && player.speed > 0.5 && ripT <= 0) { ripT = 0.22; const r = ripples[ripI++ % ripples.length]; r.position.set(p.x, WATER_Y + 0.03, p.z); r.userData.t = 0; r.visible = true; }
     for (const r of ripples) if (r.visible) { const k = (r.userData.t += dt) / 1.6; r.scale.setScalar(0.4 + k * 2.6); r.material.opacity = 0.5 * (1 - k); if (k >= 1) r.visible = false; } }
-  world.update(dt, time, camera.position, pp(), player.speed); lights.follow(state === 'title' || prologo ? { x: 0, y: 3, z: 0 } : cine.active ? camera.position : pp());
+  world.update(dt, time, camera.position, pp(), player.speed); lights.follow(fuera() ? { x: 0, y: 3, z: 0 } : cine.active ? camera.position : pp());
   if (state === 'play') { updateGuia(); ui.drawMap(pp(), player.facing); }
   if (hintT > 0 && (hintT -= dt) <= 0) $('hint').classList.remove('on');
+  if (ayudaT > 0 && (ayudaT -= dt) <= 0) $('ayuda').classList.remove('on');
+  ayudaGap -= dt; if (ayudas.length && ayudaGap <= 0 && state === 'play' && !talk) showAyuda(...ayudas.shift());
   toastGap -= dt; if (toasts.length && toastGap <= 0 && state === 'play' && !talk) { const [txt, secs, sound, grande] = toasts.shift(); showHint(txt, secs, grande); if (TOQUE[sound]) { snd.play(...TOQUE[sound]); apunteGap = Math.max(apunteGap, 0.9); } }
   apunteGap -= dt; if (apuntes.length && apunteGap <= 0 && state === 'play' && !talk) { apunte(...apuntes.shift()); apunteGap = 0.7; toastGap = Math.max(toastGap, 0.9); } // de a uno, para que sus toques no se pisen
   for (let i = vistos.length - 1; i >= 0; i--) { const a = vistos[i]; a.t -= dt; if (a.t < 0.6) a.el.classList.add('fuera'); if (a.t <= 0) { a.el.remove(); vistos.splice(i, 1); } }
@@ -520,7 +541,7 @@ window.__g.tick = tick; window.__g.physics = physics;
 const tracks = {}; for (const k of ['portada', 'aldea', 'bosque']) { const a = new Audio(`assets/musica/${k}.mp3`); a.loop = true; a.volume = 0; a.preload = k === 'portada' ? 'auto' : 'none'; tracks[k] = a; }
 let audioOK = false; { const ok = (e) => { if (!e.isTrusted) return; audioOK = true; for (const ev of ['pointerdown', 'keydown']) removeEventListener(ev, ok); }; for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, ok); } // el navegador solo deja sonar después del primer gesto del jugador
 function updateMusic(dt) {
-  const p = pp(), want = state === 'title' || prologo ? 'portada' : Math.hypot(p.x, p.z) < 50 ? 'aldea' : 'bosque';
+  const p = pp(), want = fuera() ? 'portada' : Math.hypot(p.x, p.z) < 50 ? 'aldea' : 'bosque';
   for (const k in tracks) { const a = tracks[k], goal = k === want && document.hasFocus() ? opts.musica : 0, v = a.volume + Math.sign(goal - a.volume) * Math.min(Math.abs(goal - a.volume), dt * 0.25);
     a.volume = Math.min(1, Math.max(0, v)); if (goal > 0 && a.paused && audioOK) a.play().catch(() => {}); if (goal === 0 && a.volume === 0 && !a.paused) a.pause(); }
 }
@@ -537,7 +558,7 @@ function updateSound(dt) {
     if (stepD > stride) { stepD = 0; const s = player.wade > 0.05 ? 'agua' : SUELO[zone(p.x, p.z, height(p.x, p.z), normalAt(p.x, p.z)[1])] || 'tierra'; snd.play(`paso-${s}-${Math.random() < 0.5 ? 1 : 2}`, (s === 'agua' ? 0.16 : 0.1) * (player.speed > 4.5 ? 1.2 : 1), 0.9 + Math.random() * 0.2); }
     roceT -= dt; if (roceT <= 0 && (world.nearBush(p.x, p.z, 1.0) || ROCE.some((k) => world.nearPlant(k, p.x, p.z, 0.6)))) { roceT = 0.55; snd.play(`arbusto-${Math.random() < 0.5 ? 1 : 2}`, 0.16, 0.85 + Math.random() * 0.3); } // roce al pasar entre las plantas
   }
-  const k = (play || state === 'cine') && !prologo ? 1 : 0, bosque = Math.min(1, Math.max(0, (d0 - 30) / 40));
+  const k = (play || state === 'cine') && !prologo && !acto ? 1 : 0, bosque = Math.min(1, Math.max(0, (d0 - 30) / 40));
   snd.loop('rio', k * 0.75 * Math.max(0, 1 - Math.abs(p.z - riverZ(p.x)) / 32) ** 2);
   snd.loop('viento', k * (0.1 + bosque * 0.22));
   snd.loop('pajaros', k * (0.12 + bosque * 0.3));
