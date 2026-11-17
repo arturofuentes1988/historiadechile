@@ -435,7 +435,7 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
     for (const p of actors) {
       if (p.mode === 'walk') {
         const [tx, tz] = p.pts[p.i], d = Math.hypot(tx - p.x, tz - p.z);
-        const near = Math.hypot(pp.x - p.x, pp.z - p.z); if (near < 1.7) { p.wait = Math.max(p.wait, 0.6); turn(p, pp.x, pp.z, dt, 3); } // si te cruzas, se detiene y te mira
+        const near = Math.hypot(pp.x - p.x, pp.z - p.z); if (near < 1.7 || p.habla) { p.wait = Math.max(p.wait, 0.6); turn(p, pp.x, pp.z, dt, 3); } // si te cruzas, se detiene y te mira; y no se va mientras conversan
         if (p.wait > 0) { p.wait -= dt; p.speed += (0 - p.speed) * Math.min(1, dt * 8); }
         else if (d < 0.5) { p.i = (p.i + 1) % p.pts.length; p.wait = R(1.5, 5); }
         else { turn(p, tx, tz, dt); p.speed += (p.pace - p.speed) * Math.min(1, dt * 5); p.x += Math.sin(p.face) * p.speed * dt; p.z += Math.cos(p.face) * p.speed * dt; }
@@ -448,6 +448,16 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
         p.armL.rotation.x = -0.2; p.foreL.rotation.x = -1.2; }
       else if (p.mode === 'lead') { p.phase += dt * (1.5 + p.speed * 3.4 / Math.sqrt(p.h)); animatePerson(p, p.phase, Math.min(1, p.speed / 2.4) * 0.75 + (p.speed > 0.1 ? 0.2 : 0), false, slopeOf(p, dt)); p.head.rotation.y += ((p.mira || 0) - p.head.rotation.y) * Math.min(1, dt * 4); } // va guiando: su paso lo decide acciones.js
       else { p.phase += dt; animatePerson(p, 0, 0); p.armL.rotation.x = Math.sin(p.phase * 0.6) * 0.05; p.body.rotation.z = Math.sin(p.phase * 0.35) * 0.015; p.head.rotation.y = Math.sin(p.phase * 0.23) * 0.3; if (p.quieto) p.head.rotation.y *= 0.2; else if (Math.hypot(pp.x - p.x, pp.z - p.z) < 6) { turn(p, pp.x, pp.z, dt, 2.5); p.head.rotation.y *= 0.3; } }
+      // Conversando con Leftraru (p.habla: dónde está su cara, y si además se vuelve entera hacia él): lo mira a los ojos y
+      // deja lo que tenía entre manos. Al terminar, la cabeza vuelve a lo suyo y quien trabajaba se vuelve otra vez a su trabajo.
+      const hk = p.hablaK = Math.max(0, Math.min(1, (p.hablaK || 0) + (p.habla ? dt : -dt) * 4)); if (p.habla) p.hablaP = p.habla;
+      if (hk > 0) { const h = p.hablaP, suelta = p.mode === 'work' || p.mode === 'walk'; if (p.habla && h.cuerpo) turn(p, h.x, h.z, dt, 8); // suelta: en ese modo nadie más le mueve la cabeza
+        let ry = Math.atan2(h.x - p.x, h.z - p.z) - p.face; ry = Math.max(-1, Math.min(1, Math.atan2(Math.sin(ry), Math.cos(ry))));
+        const rx = Math.max(-0.3, Math.min(0.5, Math.atan2(height(p.x, p.z) + p.h * 0.94 - h.y, Math.hypot(h.x - p.x, h.z - p.z) || 1))), bx = p.mode === 'work' ? 0.2 : p.mode === 'cook' ? 0.4 : 0, by = suelta ? 0 : p.head.rotation.y;
+        p.head.rotation.x = bx + (rx - bx) * hk; p.head.rotation.y = by + (ry - by) * hk;
+        if (p.mode === 'work') for (const o of [p.armL, p.armR, p.foreL, p.foreR]) o.rotation.x *= 1 - hk * 0.8;
+      } else { if (p.hablaP) { p.hablaP = null; if (p.mode === 'work' || p.mode === 'walk') p.head.rotation.y = 0; if (p.mode !== 'work' && p.mode !== 'cook') p.head.rotation.x = 0; }
+        if (p.mode === 'work' && p.face0 !== undefined) { let d = p.face0 - p.face; d = Math.atan2(Math.sin(d), Math.cos(d)); p.face += d * Math.min(1, dt * 4); if (Math.abs(d) < 0.01) p.face0 = undefined; } }
       const gy = height(p.x, p.z); p.g.position.set(p.x, gy + Math.sin(p.phase * 0.8) * 0.008, p.z); p.g.rotation.y = p.face;
       if (p.mark) { p.mark.position.set(p.x, gy + p.h + 0.36 + Math.sin(t * 2.2 + p.x) * 0.045, p.z); p.mark.material.rotation = Math.sin(t * 0.9) * 0.12; }
     }

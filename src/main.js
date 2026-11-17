@@ -212,15 +212,15 @@ let near = null, scanT = 0, talk = null, misT = 0, lastAviso = null, still = 0;
 function applySkills() { explorer.reach = ui.skill('vista') ? 1.7 : 1; world.life.shyR = ui.skill('pudu') ? 3.5 : 9; }
 function say() { snd.play('hablar-sigue', 0.4, 0.96 + Math.random() * 0.08); document.body.classList.add('talking'); const t = talk; $('dlg-name').textContent = t.name; $('dlg-text').textContent = t.lines[t.i]; $('dlg-more').textContent = `${keyName(opts.keys.observar)} · ${t.i < t.lines.length - 1 ? 'seguir' : 'cerrar'}`; $('dialogo').classList.add('on'); }
 function interact() {
-  if (talk) { if (++talk.i < talk.lines.length) return say(); const t = talk; talk = null; $('dialogo').classList.remove('on'); document.body.classList.remove('talking'); snd.play('hablar-fin', 0.3); if (t.done) t.done(); return; }
+  if (talk) { if (++talk.i < talk.lines.length) return say(); const t = talk; talk = null; $('dialogo').classList.remove('on'); document.body.classList.remove('talking'); snd.play('hablar-fin', 0.3); if (t.who) t.who.habla = null; if (t.done) t.done(); return; }
   if (!near || state !== 'play' || ui.open || focus) return;
   const c = near; near = null; $('prompt').classList.remove('on');
   if (c.person) {
-    const d = TALK[c.id], a = c.person; if (a.mode !== 'cook') a.face = Math.atan2(pp().x - a.x, pp().z - a.z); player.facing = Math.atan2(a.x - pp().x, a.z - pp().z);
+    const d = TALK[c.id], a = c.person; // no se giran de golpe: charla() hace que se vuelvan el uno hacia el otro y acerca la cámara
     // La primera vez, la persona se presenta (y queda en el cuaderno). Si la historia sigue con ella, se presenta con eso mismo.
     const q = acc.talk(c.id), first = !c.known, story = q && (c.known || q.main) ? q : null;
     const meet = first ? () => { ui.discover(c.id, photo(c.target, c.shot)); for (const id of d.da) ui.discover(id, VIEWS[id] ? viewPhoto(id) : ''); } : null;
-    talk = { name: d.name, lines: story ? story.lines : first ? d.lines : [d.again], i: 0, done: () => { if (meet) meet(); if (story && story.done) story.done(); } }; say();
+    talk = { name: d.name, lines: story ? story.lines : first ? d.lines : [d.again], i: 0, who: a, gira: true, done: () => { if (meet) meet(); if (story && story.done) story.done(); } }; charla(a, true); say();
   } else { snd.play('hablar-sigue', 0.4, 0.96 + Math.random() * 0.08); if (c.shot.view) ui.discover(c.id, viewPhoto(c.shot.view)); else startFocus(c); } // el mismo toque que al pasar una línea de diálogo
 }
 $('dialogo').addEventListener('click', () => interact());
@@ -228,7 +228,8 @@ $('dialogo').addEventListener('click', () => interact());
 
 // Escenas dentro del juego: se quita la interfaz, corre la lista de planos y se vuelve a jugar
 function playScene(shots, after) {
-  setMenu(false); state = 'cine'; ui.show(null); document.body.classList.remove('playing'); $('hud').classList.remove('on');
+  setMenu(false); state = 'cine'; ui.show(null); plano = null; planoK = 0; if (camera.fov !== FOV_JUEGO) { camera.fov = FOV_JUEGO; camera.updateProjectionMatrix(); } // la escena parte con el lente de siempre, no con el de una conversación
+  document.body.classList.remove('playing'); $('hud').classList.remove('on');
   near = doable = null; for (const id of ['prompt', 'prompt2', 'hint', 'ayuda']) $(id).classList.remove('on'); // nada de la interfaz queda encima de la escena
   cine.play(shots, () => { state = 'play'; document.body.classList.add('playing'); $('hud').classList.add('on'); lock(); if (after) after(); });
 }
@@ -354,15 +355,16 @@ function updatePlayer(dt) {
   let dx = fx * iz + rx * ix, dz = fz * iz + rz * ix; if (andar) { dx = andar[0]; dz = andar[1]; } const l = Math.hypot(dx, dz);
   if (l > 0) { dx /= l; dz /= l; player.dirX = dx; player.dirZ = dz; let d = Math.atan2(dx, dz) - player.facing; d = Math.atan2(Math.sin(d), Math.cos(d)); player.facing += d * Math.min(1, dt * 12); }
   if (acc.sitting && (ix || iz || down('saltar'))) acc.stand(); // cualquier movimiento lo hace levantarse
-  // La mirada: Leftraru mira hacia donde mira la cámara. Primero vuelve la cabeza (y un poco los hombros); si la vista
-  // pasa más allá de su costado, se da vuelta entero con pasitos en el lugar, hasta quedar otra vez de frente a lo que miras.
+  // La mirada y el giro: quieto, Leftraru se vuelve hacia donde mira la cámara, así que al girar con el ratón gira él también.
+  // La cabeza llega primero y el cuerpo la sigue de cerca, con pasitos en el lugar. Conversando, mira a la cara a quien le habla.
   { const libre = state === 'play' && !talk && !focus && !acc.sitting && !auto && desmayo <= 0;
-    let d = cam.yaw + Math.PI - player.facing; d = Math.atan2(Math.sin(d), Math.cos(d));
-    if (libre && l === 0 && player.grounded) {
-      if (Math.abs(d) > 1.15) player.girando = true; else if (Math.abs(d) < 0.22) player.girando = false; // una vez que empieza a girar, sigue hasta quedar casi de frente
-      if (player.girando) { const paso = Math.sign(d) * Math.min(Math.abs(d), dt * 3.4); player.facing += paso; d -= paso; }
-    } else player.girando = false;
-    const yaw = libre ? Math.max(-1.15, Math.min(1.15, d)) * Math.max(0, 1 - player.speed / 3) : 0, pit = libre ? Math.max(-0.2, Math.min(0.36, (cam.pitch - 0.2) * 0.45)) : 0;
+    let d = cam.yaw + Math.PI - player.facing, yaw = 0, pit = 0, giro = 0; d = Math.atan2(Math.sin(d), Math.cos(d));
+    if (libre && l === 0 && player.grounded && !acc.busy) { const paso = Math.sign(d) * Math.min(Math.abs(d), dt * Math.min(6.5, 0.5 + Math.abs(d) * 8)); player.facing += paso; d -= paso; giro = Math.min(1, Math.abs(paso) / dt / 2.5); }
+    if (libre) { yaw = Math.max(-1.15, Math.min(1.15, d)) * Math.max(0, 1 - player.speed / 3); pit = Math.max(-0.2, Math.min(0.36, (cam.pitch - 0.2) * 0.45)); }
+    else if (talk && talk.who && state === 'play' && !acc.sitting) { const a = talk.who, q = pp(); let c = Math.atan2(a.x - q.x, a.z - q.z) - player.facing; c = Math.atan2(Math.sin(c), Math.cos(c));
+      if (talk.gira) { const paso = c * Math.min(1, dt * 9); player.facing += paso; c -= paso; giro = Math.min(1, Math.abs(paso) / dt / 2.5); } // se vuelve hacia quien le habla
+      yaw = Math.max(-0.9, Math.min(0.9, c)); pit = Math.max(-0.4, Math.min(0.3, -Math.atan2(a.g.position.y + a.h * 0.94 - (q.y - FEET + boy.h * 0.94), Math.hypot(a.x - q.x, a.z - q.z) || 1))); } // y levanta o baja la vista hasta su cara
+    player.giro = (player.giro || 0) + (giro - (player.giro || 0)) * Math.min(1, dt * 10); // cuánto está girando en el lugar: da los pasitos
     player.miraY = (player.miraY || 0) + (yaw - (player.miraY || 0)) * Math.min(1, dt * 6); player.miraX = (player.miraX || 0) + (pit - (player.miraX || 0)) * Math.min(1, dt * 6); }
   if (player.grounded && state === 'play' && !ui.open && !talk && !focus && !acc.sitting && !auto && down('saltar')) { player.vy = 6.6 * (ui.skill('salto') ? 1.22 : 1); player.grounded = false; }
   player.vy = Math.max(-25, player.vy - 18 * dt);
@@ -383,9 +385,9 @@ function updatePlayer(dt) {
 
   // animación procedural
   const t = pp(); boy.g.position.set(t.x, t.y - FEET, t.z); boy.g.rotation.y = player.facing;
-  player.phase += dt * (2.5 + player.speed * 1.9);
+  player.phase += dt * (2.5 + player.speed * 1.9 + (player.giro || 0) * 4);
   player.slope = (player.slope || 0) + ((player.speed > 0.3 ? slopeAhead(t.x, t.z, player.facing) : 0) - (player.slope || 0)) * Math.min(1, dt * 5); // pendiente hacia donde camina, suavizada
-  animatePerson(boy, player.phase, Math.max(player.girando ? 0.24 : 0, Math.min(1, player.speed / 6.2) * 0.9 + (player.speed > 0.2 ? 0.25 : 0)), !player.grounded, player.slope);
+  animatePerson(boy, player.phase, Math.max((player.giro || 0) * 0.24, Math.min(1, player.speed / 6.2) * 0.9 + (player.speed > 0.2 ? 0.25 : 0)), !player.grounded, player.slope);
   if (!acc.sitting) { boy.head.rotation.y = player.miraY * 0.8; boy.head.rotation.x = player.miraX; boy.body.rotation.y += player.miraY * 0.2; } // la cabeza lleva casi todo el giro de la mirada; los hombros, un poco
   for (const k in POI) if (state === 'play' && Math.hypot(t.x - POI[k].x, t.z - POI[k].z) < 20) { ui.place(k); if (!ui.has('l-' + k) && !talk && player.grounded) ui.discover('l-' + k, herePhoto()); }
   if ((misT -= dt) <= 0 && state === 'play' && !talk) { // misiones y ayudas de los saberes
@@ -407,6 +409,36 @@ function updatePlayer(dt) {
   if ((scanT -= dt) <= 0 && state === 'play') { scanT = 0.2; still = player.speed < 0.3 ? still + 0.2 : 0; near = talk || ui.open || focus ? null : explorer.scan(t, still > 0.8); $('prompt').classList.toggle('on', !!near); if (near) $('prompt-text').textContent = `${near.verb} ${near.label}`; }
 }
 
+// ---------- conversación: la cámara se acerca y deja a los dos en primer plano, vistos en ángulo ----------
+// Mientras dura un diálogo la cámara deja de seguir a Leftraru: se pone detrás de él y a un costado, a la altura de su
+// cabeza, y cierra el lente. Él queda de espaldas en tres cuartos a un lado del cuadro y quien le habla, de frente, al otro.
+// De los dos costados se elige el más despejado, el que deja ver mejor la cara de quien habla y, a igualdad, el que le
+// queda más cerca a la cámara. Al terminar, la cámara vuelve sola a su lugar de siempre.
+const FOV_JUEGO = camera.fov, FOV_CHARLA = 38;
+let plano = null, planoK = 0; // plano: { pos, look } del diálogo en curso; planoK: cuánto ha entrado (0 la cámara de juego, 1 el plano)
+const cabeza = (p) => p.head.getWorldPosition(V3());
+function abrePlano(a, frente) { // frente: quien habla va a quedar vuelto hacia Leftraru
+  plano = null; boy.g.updateMatrixWorld(true); a.g.updateMatrixWorld(true);
+  const B = cabeza(boy), A = cabeza(a); let ux = A.x - B.x, uz = A.z - B.z; const D = Math.hypot(ux, uz);
+  if (D < 0.35 || D > 4.6) return; ux /= D; uz /= D; // uno encima del otro, o muy lejos: se queda la cámara de siempre
+  const look = V3(B.x + ux * D * 0.6, (B.y + A.y) / 2 - 0.24, B.z + uz * D * 0.6), atras = 0.85 + D * 0.12, lado = 1.4, fx = frente ? -ux : Math.sin(a.face), fz = frente ? -uz : Math.cos(a.face);
+  let best = null;
+  for (const sd of [1, -1]) {
+    const pos = V3(B.x - ux * atras + uz * sd * lado, B.y + 0.18, B.z - uz * atras - ux * sd * lado); pos.y = Math.max(pos.y, height(pos.x, pos.z) + 0.5);
+    const dir = pos.clone().sub(look), L = dir.length(); dir.divideScalar(L);
+    const hit = physics.castRay(new RAPIER.Ray(look, dir), L + 0.35, true, undefined, undefined, pCol), free = hit ? (hit.timeOfImpact ?? hit.toi) : L + 0.35;
+    const cara = ((pos.x - A.x) * fx + (pos.z - A.z) * fz) / (Math.hypot(pos.x - A.x, pos.z - A.z) || 1); // 1: la cámara queda justo frente a quien habla
+    const score = Math.min(1, free / (L + 0.35)) * 4 + cara - camera.position.distanceTo(pos) * 0.05;
+    if (!best || score > best.score) best = { score, pos, dir, L, free };
+  }
+  if (best.free < best.L + 0.35) { if (best.free - 0.35 < best.L * 0.8) return; best.pos.copy(look).addScaledVector(best.dir, best.free - 0.35); } // un tronco o un muro a la espalda: la cámara se acerca un poco; si no cabe, no hay plano
+  plano = { pos: best.pos, look };
+}
+function charla(a, gira) { // empieza una conversación con alguien del mundo: se miran a la cara y la cámara los encuadra
+  plano = null; if (!a) return;
+  const cuerpo = gira && a.mode !== 'cook'; abrePlano(a, cuerpo); // la que está revolviendo la olla no la suelta: solo vuelve la cabeza
+  const B = cabeza(boy); a.habla = { x: B.x, y: B.y, z: B.z, cuerpo }; if (cuerpo && a.mode === 'work' && a.face0 === undefined) a.face0 = a.face; // quien trabajaba vuelve después a lo suyo
+}
 function chase() { // dónde debe estar la cámara de juego: detrás del personaje, sin atravesar troncos ni rocas
   const t = pp(), cp = Math.cos(cam.pitch), d = { x: Math.sin(cam.yaw) * cp, y: Math.sin(cam.pitch), z: Math.cos(cam.yaw) * cp };
   const hit = physics.castRay(new RAPIER.Ray({ x: t.x, y: t.y + 0.75, z: t.z }, d), cam.dist, true, undefined, undefined, pCol);
@@ -414,7 +446,15 @@ function chase() { // dónde debe estar la cámara de juego: detrás del persona
   const x = t.x + d.x * dist, z = t.z + d.z * dist;
   return [V3(x, Math.max(t.y + 0.75 + d.y * dist, height(x, z) + 0.5), z), V3(t.x, t.y + 0.75, t.z)];
 }
-function updateCamera(dt) { const [pos, look] = chase(); camera.position.lerp(pos, Math.min(1, dt * 9)); camera.lookAt(look); }
+function updateCamera(dt) {
+  const [pos, look] = chase(), on = !!(talk && plano);
+  planoK = Math.max(0, Math.min(1, planoK + (on ? dt / 0.8 : -dt / 0.65)));
+  const k = ease(planoK), cerrado = Math.min(FOV_JUEGO, Math.max(FOV_CHARLA, 2 * Math.atan(0.55 / camera.aspect) * 180 / Math.PI)), fov = FOV_JUEGO + (cerrado - FOV_JUEGO) * k; // en una pantalla angosta el lente cierra menos, para que quepan los dos
+  if (k > 0 && plano) { pos.lerp(plano.pos, k); look.lerp(plano.look, k); } else if (!on) plano = null;
+  if (on && planoK === 1 && talk.gira && !talk.detras) { talk.detras = true; const d = player.facing - Math.PI - cam.yaw; cam.yaw += Math.atan2(Math.sin(d), Math.cos(d)); } // al terminar, la cámara vuelve a quedar a su espalda, mirando a quien le hablaba
+  if (camera.fov !== fov) { camera.fov = fov; camera.updateProjectionMatrix(); }
+  camera.position.lerp(pos, Math.min(1, dt * 9)); camera.lookAt(look);
+}
 
 // ---------- observar: la cámara se acerca sola al objeto, lo encuadra, toma la foto y vuelve ----------
 let focus = null;
@@ -422,6 +462,7 @@ let focus = null;
 const lamp = new THREE.PointLight(0xfff2dc, 0, 9, 1.4); scene.add(lamp);
 const ease = (k) => k * k * (3 - 2 * k);
 function startFocus(c) {
+  plano = null; planoK = 0;
   const t = pp(), T = c.live ? c.live() : c.target, sh = c.shot, pos = V3(), tv = V3(T.x, T.y, T.z);
   let dx = t.x - T.x, dz = t.z - T.z; const l = Math.hypot(dx, dz) || 1; dx /= l; dz /= l;
   const place = (ax, az) => { pos.set(T.x + ax * sh.dist, T.y + sh.up, T.z + az * sh.dist); pos.y = Math.max(pos.y, height(pos.x, pos.z) + (sh.tree ? 1.6 : 0.3)); return pos; };
@@ -473,7 +514,8 @@ const ui = createUI({ world, onToast: (t, kind) => toast(t, 5, kind || 'hallazgo
 renderer.domElement.addEventListener('webglcontextrestored', () => ui.repaint()); // si el navegador pierde y recupera el contexto gráfico, el fondo del minimapa se vuelve a pintar
 const acc = createActions({ world, ui, snd, scene, hint, murmur, player, story, pinones: () => [got, world.items.length],
   place: (x, z, facing) => { setPos(x, height(x, z) + FEET + 0.05, z); player.vy = 0; player.speed = 0; player.facing = facing; },
-  speak: (name, lines, done) => { talk = { name, lines, i: 0, done: done || null }; say(); },
+  speak: (name, lines, done) => { const who = world.life.actors.find((a) => a.name && a.name.toLowerCase() === name.toLowerCase()) || null, gira = !!who && !who.quieto && !acc.sitting; // quien habla, si está en el mundo; el que está mirando el valle no se da vuelta
+    talk = { name, lines, i: 0, done: done || null, who, gira }; charla(who, gira); say(); },
   ripple: (x, z) => { const r = ripples[ripI++ % ripples.length]; r.position.set(x, WATER_Y + 0.03, z); r.userData.t = 0; r.visible = true; } });
 const explorer = createExplorer({ world, ui }); explorer.urgent = (id) => acc.wants(id);
 for (const i of acc.pins) { const it = world.items[i]; if (it && !it.taken) { it.taken = true; it.mesh.visible = false; got++; if (acc.f.m1 === 1) ui.addItem('pinon'); } } // piñones recogidos en una sesión anterior
@@ -509,7 +551,7 @@ const hojaMat = (() => { // una hoja verde sobre un disco claro con borde oscuro
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return new THREE.SpriteMaterial({ map: t, fog: false, toneMapped: false, depthWrite: false, depthTest: false, transparent: true }); })();
 const hojas = Array.from({ length: 6 }, () => { const sp = new THREE.Sprite(hojaMat); sp.visible = false; sp.renderOrder = 6; scene.add(sp); return sp; });
 function updateHojas() {
-  const p = pp(), gl = state === 'play' && !focus ? ui.goals : [];
+  const p = pp(), gl = state === 'play' && !focus && !talk ? ui.goals : [];
   hojas.forEach((sp, i) => { const q = gl[i], d = q ? Math.hypot(q.x - p.x, q.z - p.z) : 0; sp.visible = !!q && d < 80; if (!sp.visible) return;
     sp.scale.setScalar(0.5 + Math.min(1, d / 40) * 0.75); sp.position.set(q.x, height(q.x, q.z) + (q.alto || 2.6) + Math.sin(time * 2.2 + i * 1.3) * 0.07, q.z); });
 }
@@ -533,7 +575,7 @@ function updateVida(dt) {
 }
 drawKeys(); applySkills();
 await assets.whenLoaded(); bar(1, 'Listo'); assets.onProgress = null; $('loading').classList.add('hide'); setTimeout(() => $('loading').remove(), 700);
-window.__g = { snd, height, ui, explorer, acc, story, toasts, murmur, setGuia, renderer, get vida() { return vida; }, set vida(v) { vida = v; }, camera, abrirPrologo, cerrarPrologo, get prologo() { return prologo; }, get acto() { return acto; }, hojas, cerrarActo, portadaMenu, avanzarPrologo, ayudas, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, get guia() { return guia; }, get guiaT() { return guiaT; }, outro, apuntes, sueltaTodo, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter() { portadaMenu(); coverT = 0; enter(); }, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
+window.__g = { snd, height, ui, explorer, acc, story, toasts, murmur, setGuia, renderer, get vida() { return vida; }, set vida(v) { vida = v; }, camera, abrirPrologo, cerrarPrologo, get prologo() { return prologo; }, get acto() { return acto; }, hojas, cerrarActo, portadaMenu, avanzarPrologo, ayudas, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, get guia() { return guia; }, get guiaT() { return guiaT; }, get plano() { return plano; }, get planoK() { return planoK; }, outro, apuntes, sueltaTodo, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter() { portadaMenu(); coverT = 0; enter(); }, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
   tp(x, y, z) { setPos(x, y, z); player.vy = 0; },
   view(x, y, z, lx, ly, lz) { camera.position.set(x, y, z); camera.lookAt(lx, ly, lz); world.update(0, time, camera.position, pp()); draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); },
   snap() { draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); } };
@@ -551,7 +593,7 @@ function tick(dt) {
   { const p = pp(); uPlayer.value.set(p.x, p.y - FEET, p.z); // las plantas se apartan al paso
     ui.people.length = 0;
     for (const a of world.life.actors) if (a.mark) { const id = PERSON[a.name], w = acc.wants(id), kind = w === 'main' ? 'main' : ui.has(id) ? w : 'nuevo'; // estrella: con esta persona sigue la historia; rombo: encargo; círculo: aún no la conoces
-      a.mark.visible = state === 'play' && !!kind; if (kind) { a.mark.material = world.life.markMats[kind]; ui.people.push({ x: a.x, z: a.z, kind, id }); } }
+      a.mark.visible = state === 'play' && !!kind && !talk; if (kind) { a.mark.material = world.life.markMats[kind]; ui.people.push({ x: a.x, z: a.z, kind, id }); } }
     acc.update(dt, time, p); acc.pose(boy);
     if ((actT -= dt) <= 0) { actT = 0.2; doable = state === 'play' && !talk && !ui.open && !focus ? acc.scan(p) : null; $('prompt2').classList.toggle('on', !!doable); if (doable) $('prompt2-text').textContent = doable.label; } // estrella sobre quien aún tiene algo que contarte
     // ondas en el agua al vadear
