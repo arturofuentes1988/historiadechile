@@ -87,6 +87,20 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
     if (mama.palo) mama.palo.visible = si;
   }
   if (f.m1 === 1 && S.pin.length >= world.items.length) madreCocina(true); // si se cerró el juego con los piñones ya juntos
+  // Entregados los piñones, al rato deja la olla y vuelve caminando al telar, rodeando el fogón por entre los troncos.
+  // (Si Leftraru se aleja mucho antes de que parta, aparece allá, como siempre.)
+  const RUTA_TELAR = [[0.0, 2.05], [-2.15, 1.95], [-8.6, -4.9]]; let vuelve = null; // vuelve: { t: cuánto espera antes de partir, i: en qué tramo va }
+  function updateVuelve(dt) {
+    const v = vuelve; if (!mama) { vuelve = null; return; }
+    if (mama.mode === 'cook') { if (!mama.habla && (v.t -= dt) <= 0) { mama.mode = 'lead'; mama.speed = 0; mama.mira = 0; if (mama.palo) mama.palo.visible = false; } return; }
+    if (mama.mode !== 'lead') { vuelve = null; return; }
+    if (mama.habla) { mama.speed += (0 - mama.speed) * Math.min(1, dt * 6); return; } // si le hablan en el camino, se detiene
+    const dest = v.i < RUTA_TELAR.length ? RUTA_TELAR[v.i] : TELAR_M, dx = dest[0] - mama.x, dz = dest[1] - mama.z, d = Math.hypot(dx, dz);
+    mama.speed += (1.15 - mama.speed) * Math.min(1, dt * 3); const paso = mama.speed * dt; let g = Math.atan2(dx, dz) - mama.face; g = Math.atan2(Math.sin(g), Math.cos(g)); mama.face += g * Math.min(1, dt * 5);
+    if (d > Math.max(paso, 0.12)) { mama.x += dx / d * paso; mama.z += dz / d * paso; return; }
+    if (v.i < RUTA_TELAR.length) { v.i++; return; }
+    mama.x = TELAR_M[0]; mama.z = TELAR_M[1]; mama.speed = 0; mama.mode = 'work'; mama.face0 = TELAR_M[2]; vuelve = null; // llegó: se vuelve hacia la tela y sigue tejiendo
+  }
 
   // ---------- lo que hace falta ahora, según los encargos abiertos ----------
   function needs() {
@@ -120,7 +134,7 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
           : { lines: ['Primero el telar, hijo. Acércate y obsérvalo con calma.'] };
         return f.lana ? { main: true, lines: ENCARGO, done: () => set('m1', 1) } : { lines: ['La lana roja, hijo. Está ahí mismo, junto al telar.'] };
       }
-      if (f.m1 === 1 && got >= total) return { main: true, lines: ['¿Los trajiste todos? A ver… Sí. Con estos alcanza para la noche más larga.', 'Cuando yo era niña, mi madre me mandaba por los mismos piñones al mismo bosque. El pewen no se ha olvidado de nosotros ni un solo invierno.', 'Ahora anda con tu padre. Te está esperando para subir al Treng Treng: dice que hay algo que solo se ve desde arriba.'], gestos: [[0, 'muestra', 'pinon'], [1, 'echa', 'pinon'], [2, 'caricia']], done: () => { set('m1', 2); ui.takeItem('pinon', total); } };
+      if (f.m1 === 1 && got >= total) return { main: true, lines: ['¿Los trajiste todos? A ver… Sí. Con estos alcanza para la noche más larga.', 'Cuando yo era niña, mi madre me mandaba por los mismos piñones al mismo bosque. El pewen no se ha olvidado de nosotros ni un solo invierno.', 'Ahora anda con tu padre. Te está esperando para subir al Treng Treng: dice que hay algo que solo se ve desde arriba.'], gestos: [[0, 'muestra', 'pinon'], [1, 'echa', 'pinon'], [2, 'caricia']], done: () => { set('m1', 2); ui.takeItem('pinon', total); vuelve = { t: 5, i: 0 }; } };
       if (!f.mi) return { lines: ['Hijo, me quedé sin amarillo para la manta. Se saca de la raíz del michay, ese arbusto de espinas y flores anaranjadas.', 'Tráeme dos raíces. Escarba con cuidado y deja la mata en pie: tiene que seguir dando.'], done: () => set('mi', 1) };
       if (f.mi === 1 && listo(['michay'])) return { lines: ['Estas sirven. Mira: se hierven con la lana y sale un amarillo como de sol de invierno.', 'Cada color viene de un lugar. Cuando te pongas esta manta vas a llevar encima el monte entero, aunque estés lejos.'], gestos: [[0, 'da', 'michay']], done: () => { take('michay', 2); set('mi', 2); } };
       if (f.m1 === 1) return { lines: [`Todavía faltan piñones: llevas ${got} de ${total}. Están en el bosque del norte, siguiendo el sendero.`] };
@@ -430,6 +444,7 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
     if (hace) { const h = hace; h.t += dt; if (h.hacia) player.facing += giro(Math.atan2(h.hacia.x - p.x, h.hacia.z - p.z) - player.facing) * Math.min(1, dt * 9);
       if (!h.hecho && h.t >= h.dur * 0.55) { h.hecho = true; h.run(); } if (h.t >= h.dur && hace === h) hace = null; }
     blanco.visible = f.cz >= 2;
+    if (vuelve) updateVuelve(dt);
     if (mama && mama.mode === 'cook' && f.m1 !== 1 && d2(p, mama.x, mama.z) > 45) madreCocina(false); // entregados los piñones, cuando ya no la ves vuelve al telar
     if (padre) {
       if (padre.yendo) guia(dt, p);
