@@ -3,7 +3,7 @@
 //
 // Uso:  node tools/kie-personaje.mjs millaray        pide todas las opciones de Millaray
 //       node tools/kie-personaje.mjs millaray 1      pide solo esa
-//       node tools/kie-personaje.mjs curinancu       pide las de Curiñancu
+//       node tools/kie-personaje.mjs curinancu       pide las de Curiñancu (namku: la de Ñamku)
 //       node tools/kie-personaje.mjs leftraru c      (sin nombre, se entiende Leftraru)
 //
 // La clave se lee de la variable de entorno KIE_API_KEY o del archivo .env.local de la carpeta del juego (git lo ignora).
@@ -39,6 +39,12 @@ const MILLARAY = POSE
 const CURINANCU = POSE
   + 'The figure is a Mapuche man of about forty from southern Chile in the year 1545, the head of his community (lonko) and a father: tall for his people, about 1.68 m, broad back and shoulders, large strong hands, warm brown skin, calm upright posture. Firm jaw, marked cheekbones, deep wrinkles beside the eyes, a steady serene gaze, closed mouth. No beard, no moustache. Straight thick black hair, long, reaching the middle of the back, with the first grey hairs at the temples. '
   + 'A light cream hand-woven wool headband (trarilonko) across the forehead. He wears a short black hand-woven wool poncho (makuñ), open at the sides and reaching only to the waist so that both arms are bare and fully visible from the shoulders, over a dark brown wool wrap (chamal) tied at the waist with a woven sash and reaching just below the knees, so that the calves and bare feet show. Barefoot. ';
+// Ñamku: el anciano que guarda la memoria de la aldea. En la ficha va encorvado; aquí se pide derecho, con los hombros apenas
+// caídos, porque el modelo necesita nacer de pie (lo encorvado se le da después, al moverlo). La manta extra va atrás, como capa
+// corta, para no tapar los brazos.
+const NAMKU = POSE
+  + 'The figure is a very old Mapuche man of about eighty from southern Chile in the year 1545, the elder who keeps the memory of his village: thin and bony, about 1.58 m tall, shoulders slightly rounded with age but standing upright, long bony hands. Weathered, deeply wrinkled warm brown skin, an aquiline nose, deep-set bright dark eyes, thin lips with a hint of a wry smile. No beard, no moustache. Long, thin, white hair falling behind the shoulders, held by a plain light cream hand-woven wool headband. An old pale scar on the left forearm. '
+  + 'He wears a short faded-brown hand-woven wool poncho (makuñ) with one light cream horizontal stripe, open at the sides and reaching only to the waist so that both thin arms are bare and fully visible from the shoulders, over a darker brown wool wrap (chamal) tied at the waist with a plain woven sash and reaching just below the knees, so that the thin calves and bare feet show. A small folded brown wool blanket rests on the back of his shoulders and hangs down his back like a short cape, not covering the arms. A very old hammered copper pendant, dull and greenish at the edges, hangs from a cord on his chest. Barefoot. ';
 const PERSONAJES = {
   leftraru: { a: `${LEFTRARU} ${FOTO}`, c: `${LEFTRARU} ${PINTADO}` },
   millaray: {
@@ -52,6 +58,7 @@ const PERSONAJES = {
     1: `${CURINANCU}His hair hangs loose behind the shoulders. The black poncho has three horizontal woven bands across the chest and back: red, white and red, each a few centimetres wide, finely woven. A necklace of polished green stone beads (llanka) lies on his chest. ${SIN} ${PINTADO}`,
     2: `${CURINANCU}His hair is gathered behind and tied low at the nape with a cream wool cord, falling down his back. The black poncho carries one wide horizontal band of white stepped-diamond figures between two thin red stripes across the chest and back, the most elaborate weaving of the village; the headband has small red stepped figures. A necklace of green stone beads (llanka) with one small hammered copper disc at the centre. The woven sash at his waist is red and white. ${SIN} ${PINTADO}`,
   },
+  namku: { 1: `${NAMKU}${SIN} ${PINTADO}` }, // una sola opción, tal como la ficha
 };
 
 const pide = async (ruta, cuerpo) => { const r = await fetch(API + ruta, cuerpo ? { method: 'POST', headers: CAB, body: JSON.stringify(cuerpo) } : { headers: CAB }); const t = await r.text(); try { return JSON.parse(t); } catch { throw new Error(`Respuesta que no se entiende (${r.status}): ${t.slice(0, 200)}`); } };

@@ -139,6 +139,7 @@ Todo lo físico es propuesta nuestra. Solo Leftraru y el nombre de su padre vien
 | **Ropa** | Makuñ café descolorido con una franja clara, manta extra sobre los hombros. Un colgante de cobre muy antiguo, traído del norte. |
 | **Color propio** | Café y cobre. |
 | **Gesto** | Levanta un dedo cuando va a decir algo importante. |
+| **En el juego** | Modelo 3D pintado a mano (un solo boceto). De pie, con la espalda algo redondeada. Camina, habla y escucha con movimientos traspasados de Leftraru y Millaray. |
 
 ---
 
