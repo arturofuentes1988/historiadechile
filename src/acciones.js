@@ -35,7 +35,7 @@ const LUGARES = { viejo: 'el bosque viejo', menoko: 'el menoko', antiguos: 'el l
 const HUELLAS = [[-70, -70], [40, -52], [-60, 66]];
 const NOMBRE = { curinancu: 'Curiñancu', millaray: 'Millaray', abuela: 'la abuela', ayelen: 'Ayelén', rayen: 'Rayen', machi: 'la machi', namku: 'Ñamku' }; // cómo se llama en el mundo cada persona del cuaderno
 
-export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripple, player, place, pinones, story, sanar, choca }) {
+export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripple, player, place, pinones, story, sanar, choca, tecla = (a) => a }) {
   const TRONCOS = [0, 1, 2, 3, 4].map((i) => { const a = 0.6 + i * 1.2; return { x: FOGON.x + Math.cos(a) * 2.9, z: FOGON.z + Math.sin(a) * 2.9, a }; }); // los troncos alrededor del fogón
   const S = Object.assign({ f: {}, inv: {} }, JSON.parse(localStorage.getItem(KEY) || '{}')), save = () => localStorage.setItem(KEY, JSON.stringify(S));
   const f = S.f, inv = S.inv, have = (id) => inv[id] || 0, d2 = (p, x, z) => Math.hypot(p.x - x, p.z - z), actor = (name) => world.life.actors.find((a) => a.name === name);
@@ -157,7 +157,7 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
     if (id === 'namku' && f.m3 === 3) {
       if (!f.cz) return { main: true, lines: ['Leftraru. Mira estas manos: ya no tiemblan. Te debo una, y yo pago enseñando.', 'Vienen los de la costa y en la olla no hay más que piñones. Hace falta carne, y mis piernas todavía no están para el monte. Vas a ir tú.', 'Pero primero se hacen las flechas. Tráeme tres cañas de quila, derechas, y tres plumas: las encuentras al pie de los árboles donde se posan los pájaros.'], done: () => set('cz', 1) };
       if (f.cz === 1 && !listo(['quila', 'pluma'])) return { lines: [`Falta: ${falta()}.`, 'La caña, derecha. Las plumas, enteras.'] };
-      if (f.cz === 1) return { main: true, lines: ['A ver… Sirven. Siéntate y mira.', 'La caña se endereza al calor del fuego y la punta se endurece en la brasa: queda dura como hueso. La pluma se parte por el medio y se amarra atrás, para que la flecha vuele derecho y no dé tumbos.', 'Este arco fue de mi padre. Ahora lo llevas tú, y también estas tres flechas. Las que falten las haces tú junto al fogón: una caña y una pluma por cada una.', 'Antes de salir al monte, pruébalo. Dejé un atado de paja amarrado a un poste, aquí al oriente. Dale tres veces, desde unos pasos, y vuelve. El arco se tensa con calma y se suelta de una vez.'], gestos: [[0, 'da', 'quila'], [1, 'obra'], [4, 'recibe', 'arco']], done: () => { take('quila', 3); take('pluma', 3); give('arco', 1); give('flecha', 3); set('blanco', 0); set('cz', 2); hint('Aprendiste a hacer flechas. Se hacen junto al fogón, desde la bolsa.', 8); } };
+      if (f.cz === 1) return { main: true, lines: ['A ver… Sirven. Siéntate y mira.', 'La caña se endereza al calor del fuego y la punta se endurece en la brasa: queda dura como hueso. La pluma se parte por el medio y se amarra atrás, para que la flecha vuele derecho y no dé tumbos.', 'Este arco fue de mi padre. Ahora lo llevas tú, y también estas tres flechas. Las que falten las haces tú mismo, donde estés: una caña y una pluma por cada una.', 'Antes de salir al monte, pruébalo. Dejé un atado de paja amarrado a un poste, aquí al oriente. Dale tres veces, desde unos pasos, y vuelve. El arco se tensa con calma y se suelta de una vez.'], gestos: [[0, 'da', 'quila'], [1, 'obra'], [4, 'recibe', 'arco']], done: () => { take('quila', 3); take('pluma', 3); give('arco', 1); give('flecha', 3); set('blanco', 0); set('cz', 2); S.eq = true; save(); COSAS.arco.usar = 'Guardar'; hint(`Aprendiste a hacer flechas: con una caña de quila y una pluma, pulsa ${tecla('flecha')}. El arco se guarda y se saca con ${tecla('arma')}.`, 9); } };
       if (f.cz === 2 && (f.blanco || 0) < 3) return { lines: [`Llevas ${f.blanco || 0} de 3 en el blanco. Párate a unos pasos, quédate quieto y suelta.`] };
       if (f.cz === 2) return { main: true, lines: ['Tres de tres. Tienes el ojo de tu nombre.', 'Ahora escucha, que esto es lo que importa. Al pudú no se le corre: se le sigue. Busca sus huellas y camina despacio. Si corres, no lo ves más.', 'Antes de soltar la flecha, pide. Al dueño del monte se le dice para quién es la carne. Y se toma uno solo: el monte da, pero lleva la cuenta.', 'Anda. Y si vuelves con las manos vacías, también se aprende.'], done: () => set('cz', 3) };
       if (f.cz === 3) return { lines: ['Las huellas, despacio, y de cerca. Uno solo.'] };
@@ -238,23 +238,24 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
   // Cada receta la enseña alguien (sabe) y se prepara junto al fogón, desde la bolsa. tope: cuántas se llevan a la vez.
   const RECETAS = [
     { id: 'remedio', sabe: () => f.rm === 2, title: 'Agua de hierbas', pide: { maqui: 1, boldo: 1 }, tope: 3, text: 'Devuelve las fuerzas después del frío, del cansancio o de un golpe. Te la enseñó la machi: no es un lawen, es lo que se sabe en toda casa.' },
-    { id: 'flecha', sabe: () => f.cz >= 2, title: 'Flecha', pide: { quila: 1, pluma: 1 }, tope: 6, text: 'Una caña de quila enderezada al calor, con la punta endurecida en la brasa y media pluma amarrada atrás. Te la enseñó Ñamku.' },
+    { id: 'flecha', sabe: () => f.cz >= 2, title: 'Flecha', pide: { quila: 1, pluma: 1 }, tope: 12, sinFuego: true, text: 'Una caña de quila enderezada al calor, con la punta endurecida en la brasa y media pluma amarrada atrás. Te la enseñó Ñamku.' },
   ];
   const alFuego = () => d2(here, FOGON.x, FOGON.z) < 6.5 || (!!world.refugio && d2(here, world.refugio.x, world.refugio.z) < 5.5); // el fogón de la aldea o el fuego del refugio del bosque
   function recetas() {
     return RECETAS.filter((r) => r.sabe()).map((r) => { const sin = Object.keys(r.pide).filter((k) => have(k) < r.pide[k]), lleno = have(r.id) >= r.tope;
-      return { id: r.id, title: r.title, text: r.text, lleva: Object.keys(r.pide).map((k) => `${ITEMS[k].uno}: ${have(k)} de ${r.pide[k]}`).join(' · '), puede: !sin.length && !lleno && alFuego(), porque: lleno ? 'Ya llevas suficiente' : sin.length ? `Falta ${sin.map((k) => ITEMS[k].uno).join(' y ')}` : 'Acércate a un fuego' }; });
+      return { id: r.id, title: r.title, text: r.text, lleva: Object.keys(r.pide).map((k) => `${ITEMS[k].uno}: ${have(k)} de ${r.pide[k]}`).join(' · '), puede: !sin.length && !lleno && (r.sinFuego || alFuego()), porque: lleno ? 'Ya llevas suficiente' : sin.length ? `Falta ${sin.map((k) => ITEMS[k].uno).join(' y ')}` : 'Acércate a un fuego' }; });
   }
   function preparar(id) {
-    const r = RECETAS.find((q) => q.id === id); if (!r || !r.sabe() || have(id) >= r.tope || !alFuego() || Object.keys(r.pide).some((k) => have(k) < r.pide[k])) return false;
+    const r = RECETAS.find((q) => q.id === id); if (!r || !r.sabe() || have(id) >= r.tope || !(r.sinFuego || alFuego()) || Object.keys(r.pide).some((k) => have(k) < r.pide[k])) return false;
     for (const k in r.pide) take(k, r.pide[k]); give(id, 1); snd.play('ui-logro', 0.4); return true;
   }
   function usar(id) {
+    if (id === 'arco') return equipar();
     if (id !== 'remedio' || !have('remedio')) return false;
     if ((S.vida ?? 100) >= 100) { hint('Ahora no te hace falta: guárdala para cuando la necesites.', 4); return false; }
     take('remedio', 1); sanar(60); snd.play('paso-agua-2', 0.4); hint('Tibia y amarga. El cuerpo se te afirma de a poco.', 5); return true;
   }
-  ui.cosas = COSAS; ui.recetas = recetas; ui.preparar = preparar; ui.usar = usar;
+  ui.cosas = COSAS; ui.recetas = recetas; ui.preparar = preparar; ui.usar = usar; COSAS.arco.usar = S.eq ? 'Guardar' : 'Equipar';
 
   // ---------- plumas: al pie de los árboles donde se posan las aves ----------
   const plumas = [];
@@ -278,32 +279,52 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
   const flechaG = new THREE.CylinderGeometry(0.009, 0.009, 0.72, 5), flechaMat = new THREE.MeshStandardMaterial({ color: 0x9a8458, roughness: 1 });
   const flechaM = new THREE.Mesh(flechaG, flechaMat); flechaM.visible = false; flechaM.castShadow = true; scene.add(flechaM); // la que va volando
   const N_CLAV = 8, clavM = new THREE.InstancedMesh(flechaG, flechaMat, N_CLAV), clav = [], clavO = new THREE.Object3D(); clavM.count = 0; clavM.castShadow = true; clavM.frustumCulled = false; scene.add(clavM); // las que quedaron clavadas: una sola malla
-  const UP = new THREE.Vector3(0, 1, 0), VF = new THREE.Vector3(), P0 = new THREE.Vector3(), TENSA = 0.75, GRAV = 9.8, V_FLECHA = 38, giro = (d) => Math.atan2(Math.sin(d), Math.cos(d));
+  const UP = new THREE.Vector3(0, 1, 0), VF = new THREE.Vector3(), P0 = new THREE.Vector3(), TENSA = 0.75, GRAV = 9.8, V_MIN = 15, V_MAX = 58, CARGA = 1.05, RECARGA = 0.55, TOPE_FL = 12, giro = (d) => Math.atan2(Math.sin(d), Math.cos(d));
   const TACTIL = typeof matchMedia === 'function' && matchMedia('(hover: none)').matches; // sin ratón, la flecha se tira con la tecla de acción y apunta sola
-  const punt = { on: false, t: 0 }; let vuelo = null; // punt: está apuntando, y cuánto lleva tensando; vuelo: la flecha en el aire { p, v, de, t }
+  const punt = { on: false, t: 0, carga: 0, tira: false, pausa: 0 }; let vuelo = null; // punt: está apuntando, y cuánto lleva tensando; vuelo: la flecha en el aire { p, v, de, t }
   const puduCerca = (p, r) => { let b = null; for (const q of world.life.quads) { if (q.kind !== 'pudu' || q.caido || q.fuera || (q.g.scale.x || 1) < 0.8) continue; const d = d2(p, q.x, q.z); if (d < r && (!b || d < b.d)) b = { d, q }; } return b; }; // los grandes: a las crías no se les tira
   const hayCaido = () => world.life.quads.some((q) => q.caido && !q.fuera);
   const pintaClav = () => { clavM.count = clav.length; clav.forEach((c, i) => { clavO.position.copy(c.p); clavO.quaternion.copy(c.q); clavO.updateMatrix(); clavM.setMatrixAt(i, clavO.matrix); }); clavM.instanceMatrix.needsUpdate = true; };
   const clava = (p, v) => { const dir = VF.copy(v).normalize(); clav.push({ p: p.clone().addScaledVector(dir, -0.27), q: new THREE.Quaternion().setFromUnitVectors(UP, dir) }); if (clav.length > N_CLAV) clav.shift(); pintaClav(); }; // queda con la punta hundida
-  const puedeApuntar = () => f.cz >= 2 && have('arco') > 0 && !sit && !hace && !palin;
+  const puedeApuntar = () => !!S.eq && f.cz >= 2 && have('arco') > 0 && !sit && !hace && !palin;
   function apuntar(si) {
     if (si && !puedeApuntar()) return false;
     if (si && !punt.on) { punt.t = 0; if (f.cz === 3 && !hayCaido() && puduCerca(here, 22)) hint('«Dueño de este monte: es para mi gente.»', 3); }
-    punt.on = !!si; return punt.on;
+    punt.on = !!si; if (!punt.on) { punt.carga = 0; punt.tira = false; } return punt.on;
+  }
+  // El arco se saca y se guarda (desde la bolsa o con su tecla). Solo con el arco en la mano se puede apuntar.
+  function equipar(si) {
+    if (!(f.cz >= 2 && have('arco') > 0)) return false;
+    S.eq = si === undefined ? !S.eq : !!si; save(); COSAS.arco.usar = S.eq ? 'Guardar' : 'Equipar'; if (!S.eq) apuntar(false);
+    snd.play('ui-clic', 0.4, S.eq ? 1.1 : 0.8); hint(S.eq ? `Arco en la mano. Botón derecho para apuntar; mantén el izquierdo para tensar y suéltalo para tirar. ${tecla('flecha')} hace una flecha.` : 'Guardaste el arco.', S.eq ? 7 : 3); return true;
+  }
+  // Tensar: mientras se mantiene apretado el botón, el arco se va cargando; al soltarlo, sale la flecha con esa fuerza.
+  function tensar(si) {
+    if (!si) { punt.tira = false; return false; }
+    if (!punt.on || vuelo || punt.pausa > 0) return false;
+    if (!have('flecha')) { hint(clav.length ? 'No te quedan flechas en la bolsa. Recoge las que quedaron clavadas.' : `No te quedan flechas. Con una caña de quila y una pluma haces otra: pulsa ${tecla('flecha')}.`, 6); return false; }
+    punt.tira = true; return true;
+  }
+  // Hacer una flecha, donde sea: una caña de quila y una pluma. Ñamku lo enseña en la misión 4.
+  function hacerFlecha() {
+    if (!(f.cz >= 2) || sit || hace || punt.on) return false;
+    if (have('flecha') >= TOPE_FL) { hint('Ya llevas todas las flechas que caben.', 3); return false; }
+    if (!have('quila') || !have('pluma')) { hint(`Para una flecha hacen falta una caña de quila y una pluma. Tienes ${have('quila')} y ${have('pluma')}.`, 5); return false; }
+    haz('labrar', () => { take('quila', 1); take('pluma', 1); give('flecha', 1); snd.play('ui-logro', 0.35, 1.2); hint(`Hiciste una flecha. Llevas ${have('flecha')}.`, 3); }); return true;
   }
   function soltar(desde, hacia) { // desde: de dónde sale la flecha (el arco); hacia: el punto del mundo que marca la mira
-    if (!punt.on || vuelo) return false; const k = Math.min(1, punt.t / TENSA);
-    if (k < 0.4) return false; // todavía no está tenso
-    if (!have('flecha')) { hint(clav.length ? 'No te quedan flechas en la bolsa. Recoge las que quedaron clavadas.' : 'No te quedan flechas. Se hacen junto al fogón, desde la bolsa: una caña de quila y una pluma por cada una.', 6); return false; }
-    const d = new THREE.Vector3().subVectors(hacia, desde), dh = Math.hypot(d.x, d.z), v0 = V_FLECHA * (0.45 + 0.55 * k);
+    if (!punt.on || vuelo || !punt.tira) return false; const k = punt.carga; punt.tira = false;
+    if (k < 0.12) { punt.carga = 0; return false; } // apenas la tocó: no sale
+    if (!have('flecha')) { punt.carga = 0; return false; }
+    const d = new THREE.Vector3().subVectors(hacia, desde), dh = Math.hypot(d.x, d.z), v0 = V_MIN + (V_MAX - V_MIN) * k; // mientras más tenso, más rápido sale
     if (dh > 0.01) for (const a of world.life.actors) { const ax = a.x - desde.x, az = a.z - desde.z, al = (ax * d.x + az * d.z) / dh; if (al > 0.5 && al < 35 && Math.abs(ax * d.z - az * d.x) / dh < 0.9) { hint('Hay gente adelante. El arco no se apunta hacia las personas.', 4); return false; } }
     take('flecha', 1);
     let ang = Math.atan2(d.y, dh); const disc = v0 ** 4 - GRAV * (GRAV * dh * dh + 2 * d.y * v0 * v0); if (disc > 0 && dh > 0.5) ang = Math.atan2(v0 * v0 - Math.sqrt(disc), GRAV * dh); // el ángulo con que, cayendo, pasa justo por donde marca la mira
     const ch = Math.cos(ang) * v0, ux = dh > 0.01 ? d.x / dh : 0, uz = dh > 0.01 ? d.z / dh : 0;
     vuelo = { p: desde.clone(), v: new THREE.Vector3(ux * ch, Math.sin(ang) * v0, uz * ch), de: { x: here.x, z: here.z }, t: 0 };
-    punt.t = 0; flechaM.visible = true; snd.play('ui-clic', 0.5, 1.5); return true;
+    punt.carga = 0; punt.pausa = RECARGA; flechaM.visible = true; snd.play('ui-clic', 0.4 + 0.3 * k, 1.7 - 0.5 * k); return true;
   }
-  const tiroSolo = (x, y, z) => { punt.on = true; punt.t = TENSA; player.facing = Math.atan2(x - here.x, z - here.z); soltar(new THREE.Vector3(here.x, here.y + 0.35, here.z), new THREE.Vector3(x, y, z)); punt.on = false; }; // el tiro de las pantallas táctiles
+  const tiroSolo = (x, y, z) => { punt.on = true; punt.tira = true; punt.carga = 0.8; player.facing = Math.atan2(x - here.x, z - here.z); soltar(new THREE.Vector3(here.x, here.y + 0.35, here.z), new THREE.Vector3(x, y, z)); punt.on = false; }; // el tiro de las pantallas táctiles
   function mira(o, d) { // a qué distancia, siguiendo la línea de la mira, hay un blanco o un pudú (o nada)
     let best = null; const prueba = (cx, cy, cz, r) => { const tx = cx - o.x, ty = cy - o.y, tz = cz - o.z, al = tx * d.x + ty * d.y + tz * d.z; if (al < 1) return; if (tx * tx + ty * ty + tz * tz - al * al < r * r && (best === null || al < best)) best = al; };
     if (blanco.visible) prueba(BLANCO.x, BLANCO.y + 1.02, BLANCO.z, 0.4);
@@ -322,11 +343,12 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
     snd.play('arbusto-2', 0.3, 1.3);
     if (que === 'pudu' || que === 'cria') { q.susto = 4; return hint(que === 'cria' ? 'A las crías no se les tira. Déjala ir.' : 'Hoy no hace falta carne: el pudú se va.', 4); }
     const c = f.cz === 3 ? puduCerca(a.p, 10) : null;
-    if (c) { c.q.susto = 4; return hint(have('flecha') || clav.length ? 'La flecha pasó de largo y el pudú se perdió entre la quila. Búscalo otra vez, más de cerca y sin correr.' : 'Fallaste, y era tu última flecha. Haz más junto al fogón, desde la bolsa: una caña de quila y una pluma por cada una.', 7); }
+    if (c) { c.q.susto = 4; return hint(have('flecha') || clav.length ? 'La flecha pasó de largo y el pudú se perdió entre la quila. Búscalo otra vez, más de cerca y sin correr.' : 'Fallaste, y era tu última flecha. Con una caña de quila y una pluma haces otra.', 7); }
     if (f.cz === 2 && d2(a.p, BLANCO.x, BLANCO.z) < 6) hint('Casi. Si el blanco está lejos, apunta un poco más arriba.', 4);
   }
   function updateArco(dt, p) {
-    if (punt.on) { if (!puedeApuntar()) punt.on = false; else punt.t = Math.min(TENSA * 1.5, punt.t + dt); }
+    punt.pausa = Math.max(0, punt.pausa - dt);
+    if (punt.on) { if (!puedeApuntar()) apuntar(false); else { punt.t += dt; punt.carga = punt.tira ? Math.min(1, punt.carga + dt / CARGA) : Math.max(0, punt.carga - dt * 3); } }
     if (vuelo) { const a = vuelo; a.t += dt; let rest = dt;
       while (rest > 1e-5 && vuelo === a) { const h = Math.min(rest, 0.01); rest -= h; P0.copy(a.p); a.v.y -= GRAV * h; a.p.addScaledVector(a.v, h); // a pasos cortos, para que no atraviese nada
         if (blanco.visible && toca(P0, a.p, BLANCO.x, BLANCO.y + 1.02, BLANCO.z, 0.37)) { llega('blanco'); break; }
@@ -346,7 +368,7 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
   let sit = null, fuegoI = 0, here = { x: 0, z: 0 };
   // Lo que se hace con la tecla de acción se ve: agacharse a recoger, estirar la mano, verter, beber, saludar. Lo que la
   // acción hace de verdad (sumar la planta a la bolsa, llenar la vasija) pasa a mitad del gesto. hacia: hacia dónde se vuelve.
-  const DUR = { recoger: 1.5, alcanzar: 1.1, verter: 1.5, beber: 1.6, saludar: 1.9, cargar: 2.3 };
+  const DUR = { recoger: 1.5, alcanzar: 1.1, verter: 1.5, beber: 1.6, saludar: 1.9, cargar: 2.3, labrar: 2.0 };
   const GESTOS = [['Alcanzarle', 'alcanzar', { x: -10.6, z: -4.2 }], ['Llenar', 'recoger'], ['Echar', 'verter', OLLA], ['Cortar', 'recoger'], ['Dar pasto', 'verter', CORRAL], ['Saludar', 'saludar'], ['Mirar las huellas', 'recoger'], ['Tirar una piedra', 'alcanzar'], ['Beber', 'beber'], ['Agradecer', 'cargar'], ['Tomar', 'beber']]; // según cómo empieza el nombre de la acción
   let hace = null; // el gesto en curso: { tipo, t, dur, run, hecho, hacia }
   const haz = (tipo, run, hacia) => { hace = { tipo, t: 0, dur: DUR[tipo], run, hecho: false, hacia: hacia || null }; };
@@ -424,6 +446,7 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
       const u = Math.min(1, hace.t / hace.dur), k = sm(0, 0.35, u) * (1 - sm(0.7, 1, u)), T = hace.tipo, G = (o, v) => { o.rotation.x = mix(o.rotation.x, v, k); };
       if (T === 'recoger' || T === 'cargar') { G(boy.legL, -1.0); G(boy.legR, -0.75); G(boy.shinL, 1.75); G(boy.shinR, 1.6); boy.body.position.y = mix(boy.body.position.y, -0.19, k); boy.body.rotation.x = mix(boy.body.rotation.x, 0.55, k); G(boy.armR, -1.15); G(boy.foreR, -0.25); if (T === 'cargar') { G(boy.armL, -1.15); G(boy.foreL, -0.25); } } // se agacha y estira la mano hacia el suelo
       else if (T === 'alcanzar') { boy.body.rotation.x = mix(boy.body.rotation.x, 0.1, k); G(boy.armR, -1.5); G(boy.foreR, -0.12); } // estira la mano a la altura del pecho
+      else if (T === 'labrar') { boy.body.rotation.x = mix(boy.body.rotation.x, 0.16, k); G(boy.armL, -0.7); G(boy.armR, -0.7); G(boy.foreL, -1.2); G(boy.foreR, -1.2); boy.head.rotation.x = mix(boy.head.rotation.x, 0.35, k); }
       else if (T === 'verter') { boy.body.rotation.x = mix(boy.body.rotation.x, 0.22, k); G(boy.armL, -1.05); G(boy.armR, -1.05); G(boy.foreL, -0.55); G(boy.foreR, -0.55); } // las dos manos adelante
       else if (T === 'beber') { G(boy.armR, -0.85); G(boy.foreR, -2.0); boy.head.rotation.x = mix(boy.head.rotation.x, -0.2, k); } // la mano a la boca
       else if (T === 'saludar') { G(boy.armR, -2.5); G(boy.foreR, -0.35); boy.head.rotation.x = mix(boy.head.rotation.x, 0.22, k); } // la mano en alto y la cabeza inclinada
@@ -454,7 +477,7 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
   }
 
   return { scan, talk, wants, update, pose, stand, madreCocina, f, pins: S.pin, pin(i) { if (!S.pin.includes(i)) { S.pin.push(i); save(); } },
-    get sitting() { return !!sit; }, get busy() { return (!!sit && sit.st !== 'on') || !!hace; }, get abrigado() { return alFuego(); }, get hace() { return hace; }, get tensa() { return punt.on ? Math.min(1, punt.t / TENSA) : 0; }, get apunta() { return punt.on; }, get vuela() { return !!vuelo; }, get clavadas() { return clav.length; }, apuntar, soltar, mira, // hace: el gesto en curso; tensa: cuánto lleva tensado el arco // abrigado: junto a un fuego // busy: está sentándose o levantándose
+    get sitting() { return !!sit; }, get busy() { return (!!sit && sit.st !== 'on') || !!hace; }, get abrigado() { return alFuego(); }, get hace() { return hace; }, get tensa() { return punt.on ? punt.carga : 0; }, get equipado() { return !!S.eq && f.cz >= 2 && have('arco') > 0; }, get recarga() { return punt.pausa / RECARGA; }, get tira() { return punt.tira; }, equipar, tensar, hacerFlecha, get apunta() { return punt.on; }, get vuela() { return !!vuelo; }, get clavadas() { return clav.length; }, apuntar, soltar, mira, // hace: el gesto en curso; tensa: cuánto lleva tensado el arco // abrigado: junto a un fuego // busy: está sentándose o levantándose
     ctx: () => ({ f, tengo: (id) => have(id), hierbas: Math.min(2, have('canelo')) + Math.min(1, have('quillay')) + Math.min(2, have('maqui')), llevo: { canelo: Math.min(2, have('canelo')), quillay: Math.min(1, have('quillay')), maqui: Math.min(2, have('maqui')) } }),
     // Dónde ir a buscar lo que falta para las misiones abiertas: los árboles más cercanos de cada especie y las matas de maqui del claro.
     goals(p) {

@@ -504,7 +504,9 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
         else if (d < 0.5) { p.i = (p.i + 1) % p.pts.length; p.wait = R(1.5, 5); }
         else { turn(p, tx, tz, dt); p.speed += (p.pace - p.speed) * Math.min(1, dt * 5); p.x += Math.sin(p.face) * p.speed * dt; p.z += Math.cos(p.face) * p.speed * dt; }
         p.phase += dt * (1.5 + p.speed * 3.4 / Math.sqrt(p.h)); animatePerson(p, p.phase, Math.min(1, p.speed / 2.4) * 0.75 + (p.speed > 0.1 ? 0.2 : 0), false, slopeOf(p, dt));
-      } else if (p.mode === 'work') { p.phase += dt * 2.2; animatePerson(p, 0, 0); p.armL.rotation.x = -0.9 + Math.sin(p.phase) * 0.3; p.armR.rotation.x = -0.9 + Math.sin(p.phase + 2) * 0.3; p.foreL.rotation.x = -0.7 + Math.sin(p.phase + 1) * 0.3; p.foreR.rotation.x = -0.7 + Math.sin(p.phase + 3) * 0.3; p.head.rotation.x = 0.2; }
+      } else if (p.mode === 'work') { p.phase += dt * 2.2; animatePerson(p, 0, 0); // en el telar: teje un rato, descansa mirando la tela, la alisa con una mano y vuelve a tejer
+        const paso = (v0, v1, v) => { const q = Math.min(1, Math.max(0, (v - v0) / (v1 - v0))); return q * q * (3 - 2 * q); }, tt = (p.phase / 2.2) % 24, teje = paso(0, 1.4, tt) * (1 - paso(11, 12.6, tt)), alisa = paso(15, 16.2, tt) * (1 - paso(20, 21.4, tt));
+        p.armL.rotation.x = teje * (-0.9 + Math.sin(p.phase) * 0.3); p.armR.rotation.x = teje * (-0.9 + Math.sin(p.phase + 2) * 0.3) + alisa * (-1.2 + Math.sin(p.phase * 0.55) * 0.14); p.foreL.rotation.x = teje * (-0.7 + Math.sin(p.phase + 1) * 0.3); p.foreR.rotation.x = teje * (-0.7 + Math.sin(p.phase + 3) * 0.3) + alisa * -0.3; p.head.rotation.x = 0.1 + 0.1 * Math.max(teje, alisa); }
       else if (p.mode === 'cook') { // junto a la olla: algo inclinada, mirándola, y con el palo en la mano derecha dando vueltas
         p.phase += dt * 2.6; animatePerson(p, 0, 0); const s = Math.sin(p.phase), c = Math.cos(p.phase);
         p.body.rotation.x = 0.13; p.head.rotation.x = 0.4; p.head.rotation.y = -0.12;
@@ -523,7 +525,7 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
         let ry = Math.atan2(h.x - p.x, h.z - p.z) - p.face; ry = Math.max(-1, Math.min(1, Math.atan2(Math.sin(ry), Math.cos(ry))));
         const rx = Math.max(-0.3, Math.min(0.5, Math.atan2(height(p.x, p.z) + p.h * 0.94 - h.y, Math.hypot(h.x - p.x, h.z - p.z) || 1))), bx = p.mode === 'work' ? 0.2 : p.mode === 'cook' ? 0.4 : 0, by = suelta ? 0 : p.head.rotation.y;
         p.head.rotation.x = bx + (rx - bx) * hk; p.head.rotation.y = by + (ry - by) * hk;
-        if (p.mode === 'work') for (const o of [p.armL, p.armR, p.foreL, p.foreR]) o.rotation.x *= 1 - hk * 0.8;
+        if (p.mode === 'work') for (const o of [p.armL, p.armR, p.foreL, p.foreR]) o.rotation.x *= 1 - hk; // conversando, deja las manos quietas
       } else { if (p.hablaP) { p.hablaP = null; if (p.mode === 'work' || p.mode === 'walk') p.head.rotation.y = 0; if (p.mode !== 'work' && p.mode !== 'cook') p.head.rotation.x = 0; }
         if (p.mode === 'work' && p.face0 !== undefined) { let d = p.face0 - p.face; d = Math.atan2(Math.sin(d), Math.cos(d)); p.face += d * Math.min(1, dt * 4); if (Math.abs(d) < 0.01) p.face0 = undefined; } }
       // Gestos de una conversación (los lleva main.js). mano: estira el brazo para entregar o recibir; obra: trabaja con las
