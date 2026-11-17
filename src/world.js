@@ -1,6 +1,6 @@
 // Arma el mundo del Acto I: terreno, agua, bosque, aldea, lejanía y vida.
 import * as THREE from 'three';
-import { GeoBag, FOG, mulberry32, waterMaterial, buildSky, buildShafts, groundMaterial } from './gfx.js';
+import { GeoBag, FOG, TEX, mulberry32, waterMaterial, buildSky, buildShafts, groundMaterial } from './gfx.js';
 import { B, WATER_Y, CERRO, POI, height, normalAt, zone, pathDist, vnoise, fbm, smooth } from './terrain.js';
 import { makeFlora } from './flora.js';
 import { buildVillage, CORRAL } from './village.js';
@@ -142,12 +142,17 @@ export function buildWorld(scene, RAPIER, physics) {
   const life = buildLife({ scene, rng, emit, trees, physics, RAPIER });
 
   // ---------- piñones (coleccionables) ----------
-  const pm = new THREE.MeshStandardMaterial({ color: 0xd99a2c, emissive: 0xb86a10, emissiveIntensity: 1.3, roughness: 0.5 }), gm = new THREE.MeshBasicMaterial({ color: 0xffe9a0, transparent: true, opacity: 0.1, depthWrite: false });
+  // La cáscara lleva su textura (clara en la base, castaño rojizo y lustrosa hacia la punta) y brilla apenas por sí sola
+  // para que se distinga a la sombra del bosque; un resplandor suave avisa de lejos que hay algo que recoger.
+  const pm = new THREE.MeshStandardMaterial({ map: TEX.pinon, bumpMap: TEX.pinon, bumpScale: 0.6, roughness: 0.36, emissiveMap: TEX.pinon, emissive: 0xffffff, emissiveIntensity: 0.3 });
+  const gm = new THREE.SpriteMaterial({ map: TEX.soft, color: 0xffd58a, transparent: true, opacity: 0.34, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+  // la semilla del pewen: una cuña alargada, angosta en la base y gruesa arriba, que remata en una puntita
+  const seed = new THREE.LatheGeometry([[0, 0], [0.018, 0.015], [0.038, 0.1], [0.056, 0.21], [0.066, 0.3], [0.062, 0.36], [0.046, 0.4], [0.02, 0.418], [0.012, 0.435], [0, 0.442]].map(([r, y]) => new THREE.Vector2(r, y)), 14);
   const items = pin.map((p) => {
     const g = new THREE.Group(); g.position.copy(p);
-    // tres piñones de verdad: alargados, en cuña, con la punta clara
-    const core = new THREE.Group(); for (let i = 0; i < 3; i++) { const sd = new THREE.Mesh(new THREE.LatheGeometry([[0, 0], [0.035, 0.03], [0.06, 0.14], [0.07, 0.26], [0.05, 0.36], [0.02, 0.4], [0, 0.41]].map(([r, y]) => new THREE.Vector2(r, y)), 10), pm); sd.scale.z = 0.62; sd.rotation.set(0.5, i * 2.1, 0.35 * (i - 1)); sd.position.set(Math.cos(i * 2.1) * 0.07, -0.2, Math.sin(i * 2.1) * 0.07); sd.castShadow = true; core.add(sd); }
-    g.add(core, new THREE.Mesh(new THREE.SphereGeometry(0.42, 24, 16), gm)); scene.add(g);
+    const core = new THREE.Group(); for (let i = 0; i < 3; i++) { const sd = new THREE.Mesh(seed, pm); sd.scale.z = 0.62; sd.rotation.set(0.5, i * 2.1, 0.35 * (i - 1)); sd.position.set(Math.cos(i * 2.1) * 0.07, -0.2, Math.sin(i * 2.1) * 0.07); sd.castShadow = true; core.add(sd); }
+    const halo = new THREE.Sprite(gm); halo.scale.setScalar(1.25);
+    g.add(core, halo); scene.add(g);
     return { mesh: g, base: p.clone(), taken: false };
   });
 

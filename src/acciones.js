@@ -1,7 +1,9 @@
 // Cosas que Leftraru puede hacer en el mundo además de observar: recoger plantas, llevar encargos,
 // ayudar en la aldea, sentarse al fogón, saludar al bosque, seguir huellas, jugar palin y tirar piedras al río.
+// También lleva el hilo de la historia: qué misión principal está abierta y quién la da.
 import * as THREE from 'three';
-import { height, POI, riverZ, WATER_Y } from './terrain.js';
+import { height, POI, CERRO, riverZ, WATER_Y } from './terrain.js';
+import { animatePerson } from './life.js';
 import { FOGON, CORRAL } from './village.js';
 
 const KEY = 'leftraru.tareas';
@@ -20,7 +22,7 @@ const FUEGO = [
 const LUGARES = { viejo: 'el bosque viejo', menoko: 'el menoko', antiguos: 'el lugar de los antiguos' };
 const HUELLAS = [[-70, -70], [40, -52], [-60, 66]];
 
-export function createActions({ world, ui, snd, scene, hint, speak, ripple, player, place }) {
+export function createActions({ world, ui, snd, scene, hint, speak, ripple, player, place, pinones, story }) {
   const TRONCOS = [0, 1, 2, 3, 4].map((i) => { const a = 0.6 + i * 1.2; return { x: FOGON.x + Math.cos(a) * 2.9, z: FOGON.z + Math.sin(a) * 2.9, a }; }); // los troncos alrededor del fogón
   const S = Object.assign({ f: {}, inv: {} }, JSON.parse(localStorage.getItem(KEY) || '{}')), save = () => localStorage.setItem(KEY, JSON.stringify(S));
   const f = S.f, inv = S.inv, have = (id) => inv[id] || 0, d2 = (p, x, z) => Math.hypot(p.x - x, p.z - z), actor = (name) => world.life.actors.find((a) => a.name === name);
@@ -28,6 +30,16 @@ export function createActions({ world, ui, snd, scene, hint, speak, ripple, play
   const give = (id, n = 1) => { inv[id] = have(id) + n; if (ITEMS[id]) for (let i = 0; i < n; i++) ui.addItem(id); save(); };
   const take = (id, n) => { inv[id] = Math.max(0, have(id) - n); if (ITEMS[id]) ui.takeItem(id, n); save(); };
   const set = (k, v = 1) => { f[k] = v; save(); };
+  // la historia: m1 = piñones para Millaray (1 encargada, 2 entregados), m2 = el padre en el cerro (2 hecha), m3 = las plantas de la machi
+  { const d = ui.state.done; if (f.m3 || d.m2) { f.m1 = 2; f.m2 = 2; } else if (d.m1 && f.m1 !== 2) f.m1 = 2; } // partidas guardadas antes de que la historia fuera lineal
+  S.pin = S.pin || []; // piñones ya recogidos
+
+  // ---------- Curiñancu sube al cerro cuando llevas los piñones, y te espera en la cima ----------
+  const padre = actor('Curiñancu'), CIMA = [CERRO[0] + 4.6, CERRO[1] - 2.6], CASA = [2, -9], SUBIDA = [[5, -4], [22, -17], [40, -30]];
+  const enCima = () => !!padre && !padre.yendo && d2(padre, CERRO[0], CERRO[1]) < 12;
+  function ponPadre(arriba) { padre.mode = 'idle'; padre.yendo = false; [padre.x, padre.z] = arriba ? CIMA : CASA; padre.face = arriba ? -Math.PI / 2 : Math.PI; padre.speed = 0; }
+  function padreSube() { if (!padre) return; padre.mode = 'walk'; padre.pts = SUBIDA; padre.i = 0; padre.wait = 0; padre.pace = 2.6; padre.yendo = true; }
+  if (padre && f.m1 === 2 && f.m2 !== 2) ponPadre(true);
 
   // ---------- lo que hace falta ahora, según los encargos abiertos ----------
   function needs() {
@@ -42,30 +54,41 @@ export function createActions({ world, ui, snd, scene, hint, speak, ripple, play
   const falta = () => { const n = needs(), l = Object.keys(n).filter((k) => n[k] > 0).map((k) => `${n[k]} de ${ITEMS[k].uno}`); return l.length ? l.join(', ') : ''; };
   const listo = (ids) => { const n = needs(); return ids.every((k) => !n[k]); };
 
-  // ---------- conversaciones de los encargos ----------
-  // devuelve las líneas que corresponden a esta persona ahora, o nada si no hay encargo pendiente
+  // ---------- conversaciones de la historia y de los encargos ----------
+  // Devuelve lo que esta persona tiene que decirte ahora, o nada si no hay nada pendiente.
+  // main: es parte de la historia principal (si aún no la conocías, se presenta con estas mismas palabras).
   function talk(id) {
-    if (id === 'machi') {
-      if (!f.m3) return { lines: ['Leftraru, qué bueno que viniste. El viejo Ñamku amaneció con fiebre y la tos no lo deja dormir.', 'Voy a prepararle un lawen, pero mis piernas ya no están para andar por el monte. Tú serás mis pies.', 'Tráeme hojas de canelo, de dos árboles distintos: crece cerca del agua y en el lugar de los antiguos. Un trozo de corteza de quillay, del monte donde pega el sol. Y hojas de maqui, del claro del oriente.', 'Antes de cortar, pide. Di para quién es. La planta que se saca sin permiso no sana a nadie.'], done: () => { set('m3', 1); hint('Nueva misión: Las plantas de la machi. Usa la tecla de acción junto a cada planta.', 7); } };
+    const [got, total] = pinones();
+    if (id === 'millaray') {
+      if (!f.m1) return { main: true, lines: ['Leftraru, ven. Deja de mirar pájaros un momento, que te necesito.', 'Faltan pocos días para el We Tripantu, la noche más larga, y vienen los parientes de la costa. Los piñones no van a alcanzar para tanta gente.', 'Anda al bosque de pewenes, por el sendero del norte, y tráeme los que queden. Recoge los que cayeron solos: no sacudas el árbol, que él decide cuánto da.', 'Y no te quedes mirando las nubes, que la olla no espera.'], done: () => set('m1', 1) };
+      if (f.m1 === 1 && got >= total) return { main: true, lines: ['¿Los trajiste todos? A ver… Sí. Con estos alcanza para la noche más larga.', 'Cuando yo era niña, mi madre me mandaba por los mismos piñones al mismo bosque. El pewen no se ha olvidado de nosotros ni un solo invierno.', 'Ahora anda con tu padre. Subió al Treng Treng y preguntó por ti: dice que hay algo que solo se ve desde arriba.'], done: () => { set('m1', 2); ui.takeItem('pinon', total); padreSube(); } };
+      if (!f.mi) return { lines: ['Hijo, me quedé sin amarillo para la manta. Se saca de la raíz del michay, ese arbusto de espinas y flores anaranjadas.', 'Tráeme dos raíces. Escarba con cuidado y deja la mata en pie: tiene que seguir dando.'], done: () => set('mi', 1) };
+      if (f.mi === 1 && listo(['michay'])) return { lines: ['Estas sirven. Mira: se hierven con la lana y sale un amarillo como de sol de invierno.', 'Cada color viene de un lugar. Cuando te pongas esta manta vas a llevar encima el monte entero, aunque estés lejos.'], done: () => { take('michay', 2); set('mi', 2); } };
+      if (f.m1 === 1) return { lines: [`Todavía faltan piñones: llevas ${got} de ${total}. Están en el bosque del norte, siguiendo el sendero.`] };
+      if (f.mi === 1) return { lines: [`Aún falta: ${falta()}. Crece en las laderas donde pega el sol.`] };
+    }
+    if (id === 'curinancu') {
+      if (f.m1 === 2 && f.m2 !== 2) {
+        if (!enCima()) return { lines: ['Voy subiendo al Treng Treng. Alcánzame arriba, hijo: hay algo que quiero mostrarte.'] };
+        return { main: true, lines: ['Llegaste. Ven, párate aquí, donde no tapa ningún árbol.', 'Mira. Hacia donde se esconde el sol está el lafken, el mar. Hacia donde nace, el volcán, la casa del pillán. Y allá abajo, el humo de nuestras rukas.', '¿Ves al traro, dando vueltas sobre el cerro? Mira mucho antes de bajar, y cuando baja, no falla. Por él te llamas Leftraru: traro veloz.', 'El que va a cuidar a su gente tiene que aprender a mirar así: primero todo, después lo suyo.', 'Ahora baja. Ñamku amaneció con fiebre y la machi anda preguntando por ti. Yo me quedo un rato más: desde aquí se ve venir a los invitados de la costa.'], done: () => { set('m2', 2); story('cima'); } };
+      }
+      if (ui.has('nalca')) {
+        if (!f.na) return { lines: ['Para el We Tripantu vamos a cocer la comida bajo tierra, y hay que taparla con hojas grandes.', 'Tráeme dos tallos de nalca con su hoja. Crece junto al agua, en el menoko y a la orilla del río.'], done: () => set('na', 1) };
+        if (f.na === 1 && !listo(['nalca'])) return { lines: [`Falta: ${falta()}. Busca cerca del agua.`] };
+        if (f.na === 1) return { lines: ['Buenas hojas. Con estas no entra ni una piedra a la comida.', 'El tallo pélalo y cómetelo: es ácido y quita la sed. Te lo ganaste.'], done: () => { take('nalca', 2); set('na', 2); } };
+      }
+    }
+    if (id === 'machi' && f.m2 === 2) {
+      if (!f.m3) return { main: true, lines: ['Leftraru, qué bueno que viniste. El viejo Ñamku amaneció con fiebre y la tos no lo deja dormir.', 'Voy a prepararle un lawen, pero mis piernas ya no están para andar por el monte. Tú serás mis pies.', 'Tráeme hojas de canelo, de dos árboles distintos: crece cerca del agua y en el lugar de los antiguos. Un trozo de corteza de quillay, del monte donde pega el sol. Y hojas de maqui, del claro del surponiente.', 'Antes de cortar, pide. Di para quién es. La planta que se saca sin permiso no sana a nadie.'], done: () => set('m3', 1) };
       if (f.m3 === 1 && !listo(['canelo', 'quillay', 'maqui'])) return { lines: [`Todavía falta: ${falta()}.`, 'No te apures. Mira bien cada planta antes de cortarla: hay que conocerla para pedirle.'] };
-      if (f.m3 === 1) return { lines: ['Déjame ver… Sí. Las cortaste con cuidado, se nota.', 'El canelo abre el camino, el quillay suelta el pecho y el maqui baja la fiebre. Pero lo que sana es que alguien fue a buscarlas pensando en el enfermo.', 'Ya está. Llévaselo a Ñamku mientras está tibio. Y dile que se lo tome todo, que yo sé que es porfiado.'], done: () => { take('canelo', 2); take('quillay', 1); take('maqui', 2); inv.lawen = 1; set('m3', 2); hint('Recibiste el lawen. Llévaselo a Ñamku.', 6); } };
+      if (f.m3 === 1) return { main: true, lines: ['Déjame ver… Sí. Las cortaste con cuidado, se nota.', 'El canelo abre el camino, el quillay suelta el pecho y el maqui baja la fiebre. Pero lo que sana es que alguien fue a buscarlas pensando en el enfermo.', 'Ya está. Llévaselo a Ñamku mientras está tibio. Y dile que se lo tome todo, que yo sé que es porfiado.'], done: () => { take('canelo', 2); take('quillay', 1); take('maqui', 2); inv.lawen = 1; set('m3', 2); } };
       if (f.m3 === 2) return { lines: ['El lawen se enfría, niño. Ñamku está en su ruka, al oriente.'] };
     }
-    if (id === 'namku' && f.m3 === 2) return { lines: ['¿Eso es para mí? Huele al monte entero… La machi te mandó a ti, ¿no? Así se aprende.', 'Amargo. Bien amargo. Así tiene que ser.', 'Cuando yo tenía tu edad, mi abuelo se enfermó y fui yo a buscar las plantas. Me perdí dos días. Volví con las hojas equivocadas, y él se mejoró igual, de puro reírse.', 'Gracias, Leftraru. Uno no se sana solo: lo sana su gente.'], done: () => { inv.lawen = 0; set('m3', 3); } };
+    if (id === 'namku' && f.m3 === 2) return { main: true, lines: ['¿Eso es para mí? Huele al monte entero… La machi te mandó a ti, ¿no? Así se aprende.', 'Amargo. Bien amargo. Así tiene que ser.', 'Cuando yo tenía tu edad, mi abuelo se enfermó y fui yo a buscar las plantas. Me perdí dos días. Volví con las hojas equivocadas, y él se mejoró igual, de puro reírse.', 'Gracias, Leftraru. Uno no se sana solo: lo sana su gente.', 'Y prepárate, que ya vienen los de la costa para el We Tripantu. Alguien tendrá que salir a recibirlos.'], done: () => { inv.lawen = 0; set('m3', 3); } };
     if (id === 'abuela') {
       if (!f.ab) return { lines: ['Leftraru, ¿me harías un favor? Tengo antojo de murtilla y ya no llego hasta donde crece.', 'Es una mata bajita de frutos rojos. Se da en los claros y en las laderas con sol. Tráeme tres puñados.'], done: () => set('ab', 1) };
       if (f.ab === 1 && !listo(['murtilla'])) return { lines: [`Todavía me falta: ${falta()}. Busca donde llega el sol.`] };
       if (f.ab === 1) return { lines: ['¡Qué perfume! Así olía la ruka de mi madre al final del verano.', 'Ella las secaba al sol y las guardaba para el invierno. En las noches largas nos daba un puñado a cada uno, y había que hacerlo durar hasta que terminara el cuento.', 'Toma, come tú también. Y cuando seas viejo, acuérdate de a qué sabía.'], done: () => { take('murtilla', 3); set('ab', 2); } };
-    }
-    if (id === 'millaray') {
-      if (!f.mi) return { lines: ['Hijo, me quedé sin amarillo para la manta. Se saca de la raíz del michay, ese arbusto de espinas y flores anaranjadas.', 'Tráeme dos raíces. Escarba con cuidado y deja la mata en pie: tiene que seguir dando.'], done: () => set('mi', 1) };
-      if (f.mi === 1 && !listo(['michay'])) return { lines: [`Aún falta: ${falta()}. Crece en las laderas donde pega el sol.`] };
-      if (f.mi === 1) return { lines: ['Estas sirven. Mira: se hierven con la lana y sale un amarillo como de sol de invierno.', 'Cada color viene de un lugar. Cuando te pongas esta manta vas a llevar encima el monte entero, aunque estés lejos.'], done: () => { take('michay', 2); set('mi', 2); } };
-    }
-    if (id === 'curinancu' && ui.has('nalca')) {
-      if (!f.na) return { lines: ['Para el We Tripantu vamos a cocer la comida bajo tierra, y hay que taparla con hojas grandes.', 'Tráeme dos tallos de nalca con su hoja. Crece junto al agua, en el menoko y a la orilla del río.'], done: () => set('na', 1) };
-      if (f.na === 1 && !listo(['nalca'])) return { lines: [`Falta: ${falta()}. Busca cerca del agua.`] };
-      if (f.na === 1) return { lines: ['Buenas hojas. Con estas no entra ni una piedra a la comida.', 'El tallo pélalo y cómetelo: es ácido y quita la sed. Te lo ganaste.'], done: () => { take('nalca', 2); set('na', 2); } };
     }
     if (id === 'rayen') {
       if (palin) return { lines: ['¡Menos conversa y más juego!'] };
@@ -74,9 +97,11 @@ export function createActions({ world, ui, snd, scene, hint, speak, ripple, play
     }
     return null;
   }
-  // ¿esta persona tiene algo pendiente contigo? 'main' = misión principal, 'sec' = encargo secundario
+  // ¿esta persona tiene algo pendiente contigo? 'main' = la historia sigue con ella, 'sec' = tiene un encargo secundario
   const wants = (id) => {
-    if ((id === 'machi' && (!f.m3 || (f.m3 === 1 && listo(['canelo', 'quillay', 'maqui'])))) || (id === 'namku' && f.m3 === 2)) return 'main';
+    const [got, total] = pinones();
+    if ((id === 'millaray' && (!f.m1 || (f.m1 === 1 && got >= total))) || (id === 'curinancu' && f.m1 === 2 && f.m2 !== 2)
+      || (id === 'machi' && f.m2 === 2 && (!f.m3 || (f.m3 === 1 && listo(['canelo', 'quillay', 'maqui'])))) || (id === 'namku' && f.m3 === 2)) return 'main';
     const sec = { abuela: !f.ab || (f.ab === 1 && listo(['murtilla'])), millaray: !f.mi || (f.mi === 1 && listo(['michay'])), curinancu: ui.has('nalca') && (!f.na || (f.na === 1 && listo(['nalca']))), rayen: !f.palin }[id];
     return sec ? 'sec' : null;
   };
@@ -124,14 +149,30 @@ export function createActions({ world, ui, snd, scene, hint, speak, ripple, play
   const piedra = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshStandardMaterial({ color: 0x8a8880, roughness: 1 })); piedra.visible = false; scene.add(piedra); let tiro = null;
 
   // ---------- qué se puede hacer aquí ----------
-  let sitting = null, fuegoI = 0;
+  // Sentarse en un tronco: camina hasta quedar delante (si venía por detrás, pasa por encima), se gira hacia el fuego
+  // y baja de a poco doblando las rodillas. Sentado respira, mira el fuego y a ratos acerca las manos. Al levantarse, lo contrario.
+  let sit = null, fuegoI = 0, here = { x: 0, z: 0 };
+  const SIT_IN = 1.3, SIT_OUT = 0.8, mix = (a, b, k) => a + (b - a) * k, sm = (a, b, x) => { const k = Math.min(1, Math.max(0, (x - a) / (b - a))); return k * k * (3 - 2 * k); };
+  function sentarse(l, p) {
+    const dx = -Math.cos(l.a), dz = -Math.sin(l.a); // del tronco hacia el fuego
+    sit = { l, dx, dz, st: 'in', t: 0, x0: p.x, z0: p.z, f0: player.facing, f1: Math.atan2(dx, dz), sx: l.x + dx * 0.62, sz: l.z + dz * 0.62, over: (p.x - l.x) * dx + (p.z - l.z) * dz < 0.3 };
+  }
+  function stand() { if (sit && sit.st === 'on' && sit.t > 0.3) { sit.st = 'out'; sit.t = 0; } }
+  function updateSit(dt) {
+    const s = sit; s.t += dt;
+    if (s.st === 'in') {
+      const u = Math.min(1, s.t / SIT_IN), a = sm(0, 0.5, u); let d = s.f1 - s.f0; d = Math.atan2(Math.sin(d), Math.cos(d));
+      place(mix(s.x0, s.sx, a), mix(s.z0, s.sz, a), s.f0 + d * sm(0, 0.55, u));
+      if (u >= 1) { s.st = 'on'; s.t = 0; const [who, line] = FUEGO[fuegoI++ % FUEGO.length], ab = actor('la abuela'); if (ab && d2(ab, FOGON.x, FOGON.z) < 6) speak(who, [line]); else hint('El fuego crepita. Se está bien aquí.', 5); if (!f.fogon) set('fogon', 1); }
+    } else if (s.st === 'out') { place(s.sx, s.sz, s.f1); if (s.t >= SIT_OUT) sit = null; }
+  }
   function scan(p) {
-    if (sitting) return { label: 'Levantarse', run: () => { sitting = null; } };
+    if (sit) return sit.st === 'on' ? { label: 'Levantarse', run: stand } : null;
     const out = [], add = (d, label, run) => out.push({ d, label, run }), n = needs();
     for (const id in n) if (n[id] > 0) { const s = source(id, p); if (s) add(s.d - 5, `Recoger ${ITEMS[id].uno}`, () => pick(id, s.rec)); }
     const df = d2(p, FOGON.x, FOGON.z);
     const tr = TRONCOS.map((l) => ({ l, d: d2(p, l.x, l.z) })).sort((a, b) => a.d - b.d)[0];
-    if (tr.d < 1.5) add(tr.d, 'Sentarse en el tronco', () => { const l = tr.l; sitting = l; place(l.x - Math.cos(l.a) * 0.62, l.z - Math.sin(l.a) * 0.62, Math.atan2(-Math.cos(l.a), -Math.sin(l.a))); const [who, line] = FUEGO[fuegoI++ % FUEGO.length]; const ab = actor('la abuela'); if (ab && d2(ab, FOGON.x, FOGON.z) < 6) speak(who, [line]); else hint('El fuego crepita. Se está bien aquí.', 5); if (!f.fogon) set('fogon', 1); });
+    if (tr.d < 1.5) add(tr.d, 'Sentarse en el tronco', () => sentarse(tr.l, here));
     // tareas de la aldea
     if (ui.has('millaray') && !f.lana && d2(p, -10.6, -4.2) < 3) add(1, 'Alcanzarle la lana a Millaray', () => { set('lana', 1); speak('Millaray', ['Gracias, hijo. La roja primero… esa. Así no tengo que soltar el hilo.']); });
     const rz = riverZ(p.x), dr = Math.abs(p.z - rz);
@@ -153,15 +194,37 @@ export function createActions({ world, ui, snd, scene, hint, speak, ripple, play
   }
 
   function update(dt, t, p) {
-    if (palin) updatePalin(dt, p);
+    here = p; if (palin) updatePalin(dt, p);
+    if (sit) updateSit(dt);
+    if (padre) { // sale caminando de la aldea y, cuando ya no lo ves, te espera en la cima; hecha la misión, vuelve a la aldea
+      if (padre.yendo) { const [ex, ez] = SUBIDA[SUBIDA.length - 1]; padre.wait = Math.min(padre.wait, 0.3); if (d2(padre, ex, ez) < 1.5 || d2(p, padre.x, padre.z) > 38) ponPadre(true); }
+      else if (f.m2 === 2 && d2(padre, CERRO[0], CERRO[1]) < 12 && d2(p, padre.x, padre.z) > 70) ponPadre(false);
+    }
     if (luzT > 0) { luzT -= dt; const k = Math.min(1, luzT, (8 - luzT) * 2); luces.forEach((s, i) => { const a = t * (0.5 + (i % 4) * 0.12) + i * 0.9, r = 1.1 + (i % 5) * 0.35; s.visible = luzT > 0; s.position.set(p.x + Math.cos(a) * r, p.y + 0.2 + Math.sin(t * 0.8 + i) * 0.5 + (i % 3) * 0.3, p.z + Math.sin(a) * r); s.material.opacity = Math.max(0, k) * 0.9; }); }
     if (tiro) { tiro.t += dt / 0.9; const u = tiro.t, x = tiro.x0 + (tiro.x1 - tiro.x0) * u, z = tiro.z0 + (tiro.z1 - tiro.z0) * u, y = tiro.y0 + (WATER_Y - tiro.y0) * u + Math.sin(Math.PI * u) * 2.2; piedra.position.set(x, y, z); if (u >= 1) { piedra.visible = false; ripple(tiro.x1, tiro.z1); snd.play('paso-agua-1', 0.6, 0.8); tiro = null; } }
   }
-  // postura sentado: se dobla por la cadera y las rodillas
-  function pose(boy) { if (!sitting) return; const l = sitting; boy.g.position.set(l.x - Math.cos(l.a) * 0.05, height(l.x, l.z) + 0.47 - (boy.h || 1.38) * 0.52, l.z - Math.sin(l.a) * 0.05); boy.g.rotation.y = Math.atan2(-Math.cos(l.a), -Math.sin(l.a)); // la cadera sobre el tronco, mirando al fuego
-    boy.legL.rotation.x = boy.legR.rotation.x = -1.45; boy.shinL.rotation.x = boy.shinR.rotation.x = 1.5; boy.armL.rotation.x = boy.armR.rotation.x = -0.5; boy.foreL.rotation.x = boy.foreR.rotation.x = -0.6; }
+  // La postura al sentarse se mezcla con la de pie según w (0 de pie, 1 sentado). La cadera sigue un camino
+  // desde donde está parado hasta el asiento, y el cuerpo se inclina hacia adelante mientras baja o sube.
+  function pose(boy) {
+    if (!sit) return;
+    const s = sit, l = s.l, HIP = 0.52 * (boy.h || 1.38); let w = 1, a = 1;
+    if (s.st === 'in') { const u = Math.min(1, s.t / SIT_IN); a = sm(0, 0.5, u); w = sm(0.36, 1, u); } else if (s.st === 'out') w = 1 - sm(0, 0.85, s.t / SIT_OUT);
+    const on = s.st === 'on' ? s.t : 0, face = s.st === 'in' ? player.facing : s.f1, fx = Math.sin(face), fz = Math.cos(face);
+    animatePerson(boy, s.t * 9, s.st === 'in' ? (1 - a) * 0.5 : 0); // da los pasos que le faltan para llegar
+    const lean = 0.1 * w + Math.sin(Math.PI * w) * 0.42 + Math.sin(on * 1.2) * 0.012 * w;
+    const px = s.st === 'in' ? mix(s.x0, s.sx, a) : s.sx, pz = s.st === 'in' ? mix(s.z0, s.sz, a) : s.sz, hop = s.st === 'in' && s.over ? Math.sin(Math.PI * a) * 0.32 : 0;
+    const hx = mix(px, l.x + s.dx * 0.06, w), hz = mix(pz, l.z + s.dz * 0.06, w), hy = mix(height(px, pz) + HIP + hop, height(l.x, l.z) + 0.49, w) + Math.sin(Math.PI * w) * 0.06;
+    boy.g.position.set(hx - fx * Math.sin(lean) * HIP, hy - Math.cos(lean) * HIP, hz - fz * Math.sin(lean) * HIP); boy.g.rotation.y = face; // el cuerpo se inclina desde los pies: se corrige para que la cadera quede donde debe
+    const warm = sm(0.55, 0.95, Math.sin(on * 0.42 - 1.4)) * (s.st === 'on' ? 1 : 0), B = (o, v) => { o.rotation.x = mix(o.rotation.x, v, w); };
+    boy.body.rotation.x = lean; boy.body.rotation.y *= 1 - w; boy.body.position.y *= 1 - w;
+    B(boy.legL, -1.3 - lean); B(boy.legR, -1.3 - lean + Math.sin(on * 0.6) * 0.025); boy.legL.rotation.z = 0.13 * w; boy.legR.rotation.z = -0.13 * w; // muslos hacia adelante, rodillas algo abiertas
+    B(boy.shinL, 1.42); B(boy.shinR, 1.42 + Math.max(0, Math.sin(on * 0.6)) * 0.12);
+    B(boy.armL, mix(-0.5, -1.2, warm)); B(boy.armR, mix(-0.5, -1.15, warm)); B(boy.foreL, mix(-0.3, -0.45, warm)); B(boy.foreR, mix(-0.3, -0.5, warm)); // las manos descansan en las rodillas; a ratos se acercan al fuego
+    boy.head.rotation.x = w * (0.16 - (lean - 0.1) * 0.7); boy.head.rotation.y = Math.sin(on * 0.31) * 0.2 * w;
+  }
 
-  return { scan, talk, wants, update, pose, get sitting() { return !!sitting; }, stand() { sitting = null; },
+  return { scan, talk, wants, update, pose, stand, f, pins: S.pin, pin(i) { if (!S.pin.includes(i)) { S.pin.push(i); save(); } },
+    get sitting() { return !!sit; }, get busy() { return !!sit && sit.st !== 'on'; }, // busy: está sentándose o levantándose
     ctx: () => ({ f, hierbas: Math.min(2, have('canelo')) + Math.min(1, have('quillay')) + Math.min(2, have('maqui')) }),
     reset() { localStorage.removeItem(KEY); } };
 }

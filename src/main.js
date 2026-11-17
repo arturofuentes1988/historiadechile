@@ -54,13 +54,33 @@ let state = 'title', got = 0, time = 0;
 const cine = new Cinematic(camera);
 const pp = () => pBody.translation();
 
-// Entrar al mundo directamente desde la portada (sin cinemática de inicio)
+// De la portada al juego: «Entrar al mundo» lleva a elegir «Historia», y el capítulo parte con un relato breve
+// que cuenta dónde estamos y a quién vamos a acompañar. Si ya habías empezado, se entra directo al juego.
+let coverT = 0;
+function coverPage(n) { coverT = performance.now(); $('cover-1').hidden = n !== 1; $('cover-2').hidden = n !== 2; }
 function enter() {
-  if (state !== 'title') return;
-  setMenu(false); state = 'play'; $('title').classList.add('hide'); document.body.classList.add('playing'); $('hud').classList.add('on');
+  if (state !== 'title' || performance.now() - coverT < 250) return;
+  setMenu(false); $('title').classList.add('hide');
   if (!document.fullscreenElement) { try { document.documentElement.requestFullscreen?.()?.catch?.(() => {}); } catch { /* el navegador no lo permitió */ } }
-  lock(); hint(`Sigue el sendero hacia el norte · Acércate a algo y pulsa ${keyName(opts.keys.observar)} para observarlo`, 10);
+  lock();
+  if (acc.f.m1) play(); else intro();
+}
+function play() {
+  state = 'play'; document.body.classList.add('playing'); $('hud').classList.add('on'); lock();
+  hint(`${keyName(opts.keys.adelante)}${keyName(opts.keys.izquierda)}${keyName(opts.keys.atras)}${keyName(opts.keys.derecha)} para caminar · ${keyName(opts.keys.observar)} para hablar con alguien u observar algo de cerca`, 7);
   if (!ui.has('leftraru')) { const t = pp(); ui.discover('leftraru', photo({ x: t.x, y: t.y + 0.25, z: t.z }, { dist: 2.3, up: 0.2, fov: 40, self: true })); }
+}
+// Capítulo 1: el relato de entrada. Cada plano es una frase; Enter lo salta.
+function intro() {
+  state = 'cine'; const cap = $('capitulo'); cap.classList.add('on'); setTimeout(() => cap.classList.remove('on'), 5600);
+  const G = (x, y, z) => V3(x, height(x, z) + y, z), b = pp(), fx = Math.sin(player.facing), fz = Math.cos(player.facing), eye = V3(b.x, b.y - FEET + 1.02, b.z), c0 = camera.position.clone();
+  const front = (d, side, up) => V3(b.x + fx * d + fz * side, b.y - FEET + up, b.z + fz * d - fx * side);
+  cine.play([
+    { dur: 8, from: c0, to: V3(c0.x * 1.3, 21, c0.z * 1.3), lookFrom: V3(0, 4, 0), lookTo: V3(0, 6, 0), text: 'Nahuelbuta, invierno de 1545. Entre el mar y la cordillera, un valle de bosques y pewenes.' },
+    { dur: 10, from: G(13.5, 3.4, 11), to: G(7.5, 2.1, 6.2), lookFrom: G(0, 1.0, 0), text: 'Aquí vive un lof mapuche: unas pocas familias alrededor de un fuego que nunca se apaga. Lejos, al norte, han llegado hombres extraños. Aquí nadie los ha visto todavía.' },
+    { dur: 9, from: front(3.6, 0.9, 1.35), to: front(2.1, 0.35, 1.1), lookFrom: eye, text: 'Este es Leftraru, «traro veloz». Tiene once años y es hijo de Curiñancu, el lonko. Un día, la historia lo llamará Lautaro.' },
+    { dur: 9, from: G(-6.7, 1.75, -1.9), to: G(-7.9, 1.45, -3.5), lookFrom: G(-9.9, 1.15, -5.1), text: 'Faltan pocos días para el We Tripantu, la noche más larga del año, y toda la aldea se prepara. Su madre lo está llamando.' },
+  ], () => { cap.classList.remove('on'); play(); });
 }
 
 // ---------- opciones (se guardan en este navegador) ----------
@@ -112,7 +132,7 @@ $('btn-menu').onclick = () => setMenu(!menuOpen);
 $('o-controles').onclick = () => menuPage('controles'); $('ctl-volver').onclick = () => menuPage('opciones');
 $('ctl-reset').onclick = () => { for (const [a, , k] of ACTIONS) opts.keys[a] = k; applyOpts(); drawKeys(); };
 $('ctl-list').onclick = (e) => { const b = e.target.closest('[data-act]'); if (b) { rebinding = b.dataset.act; drawKeys(); } };
-$('c-entrar').onclick = enter; $('c-opciones').onclick = () => setMenu(true);
+$('c-entrar').onclick = () => coverPage(2); $('c-historia').onclick = enter; $('c-volver').onclick = () => coverPage(1); $('c-opciones').onclick = () => setMenu(true);
 // pantalla completa
 const toggleFull = () => { if (document.fullscreenElement) document.exitFullscreen?.(); else document.documentElement.requestFullscreen?.().catch(() => hint('Este navegador no permitió la pantalla completa', 4)); };
 $('btn-full').onclick = toggleFull; $('o-full').onchange = toggleFull;
@@ -162,7 +182,7 @@ const viewPhoto = (id) => withCamera(() => { const [from, look, fov] = VIEWS[id]
 const herePhoto = () => { draw(); return grab(); };
 
 // ---------- observar y conversar (tecla E) ----------
-let near = null, scanT = 0, talk = null, misT = 0, summit = false, still = 0;
+let near = null, scanT = 0, talk = null, misT = 0, lastAviso = null, still = 0;
 function applySkills() { explorer.reach = ui.skill('vista') ? 1.7 : 1; world.life.shyR = ui.skill('pudu') ? 3.5 : 9; }
 function say() { snd.play(talk.i ? 'hablar-sigue' : 'hablar', talk.i ? 0.5 : 0.6, 0.95 + Math.random() * 0.1); document.body.classList.add('talking'); const t = talk; $('dlg-name').textContent = t.name; $('dlg-text').textContent = t.lines[t.i]; $('dlg-more').textContent = `${keyName(opts.keys.observar)} · ${t.i < t.lines.length - 1 ? 'seguir' : 'cerrar'}`; $('dialogo').classList.add('on'); }
 function interact() {
@@ -171,23 +191,43 @@ function interact() {
   const c = near; near = null; $('prompt').classList.remove('on');
   if (c.person) {
     const d = TALK[c.id], a = c.person; a.face = Math.atan2(pp().x - a.x, pp().z - a.z); player.facing = Math.atan2(a.x - pp().x, a.z - pp().z);
-    const q = c.known ? acc.talk(c.id) : null;
-    talk = q ? { name: d.name, lines: q.lines, i: 0, done: q.done || null } : { name: d.name, lines: c.known ? [d.again] : d.lines, i: 0, done: c.known ? null : () => { ui.discover(c.id, photo(c.target, c.shot)); for (const id of d.da) ui.discover(id, VIEWS[id] ? viewPhoto(id) : ''); } }; say();
+    // La primera vez, la persona se presenta (y queda en el cuaderno). Si la historia sigue con ella, se presenta con eso mismo.
+    const q = acc.talk(c.id), first = !c.known, story = q && (c.known || q.main) ? q : null;
+    const meet = first ? () => { ui.discover(c.id, photo(c.target, c.shot)); for (const id of d.da) ui.discover(id, VIEWS[id] ? viewPhoto(id) : ''); } : null;
+    talk = { name: d.name, lines: story ? story.lines : first ? d.lines : [d.again], i: 0, done: () => { if (meet) meet(); if (story && story.done) story.done(); } }; say();
   } else if (c.shot.view) ui.discover(c.id, viewPhoto(c.shot.view)); else startFocus(c);
 }
 $('dialogo').addEventListener('click', () => interact());
 
 
-function outro() {
+// Escenas dentro del juego: se quita la interfaz, corre la lista de planos y se vuelve a jugar
+function playScene(shots) {
   setMenu(false); state = 'cine'; ui.show(null); document.body.classList.remove('playing'); $('hud').classList.remove('on');
-  const p = V3(pp().x, pp().y + 0.6, pp().z), dir = world.volcano.clone().sub(p).setY(0).normalize();
-  cine.play([
-    { dur: 6, from: p.clone().addScaledVector(dir, 3.5).add(V3(0, 0.6, 0)), to: p.clone().addScaledVector(dir, 2.6).add(V3(0, 0.3, 0)), lookFrom: p, text: 'El último piñón. Suficientes para todos.' },
-    { dur: 10, from: p.clone().addScaledVector(dir, -4).add(V3(0, 2, 0)), to: p.clone().addScaledVector(dir, -8).add(V3(0, 36, 0)), lookFrom: p.clone().add(V3(0, 6, 0)), lookTo: world.volcano, text: 'Desde el cerro, su padre lo llama. Hay algo que quiere mostrarle.' },
-  ], () => { state = 'play'; document.body.classList.add('playing'); $('hud').classList.add('on'); lock(); });
+  near = doable = null; for (const id of ['prompt', 'prompt2', 'hint']) $(id).classList.remove('on'); // nada de la interfaz queda encima de la escena
+  cine.play(shots, () => { state = 'play'; document.body.classList.add('playing'); $('hud').classList.add('on'); lock(); });
 }
-let hintT = 0;
-function hint(txt, secs) { $('hint').textContent = txt; $('hint').classList.add('on'); hintT = secs; }
+function outro() { // al recoger el último piñón
+  const p = V3(pp().x, pp().y + 0.6, pp().z), dir = world.volcano.clone().sub(p).setY(0).normalize();
+  playScene([
+    { dur: 6, from: p.clone().addScaledVector(dir, 3.5).add(V3(0, 0.6, 0)), to: p.clone().addScaledVector(dir, 2.6).add(V3(0, 0.3, 0)), lookFrom: p, text: 'El último piñón. Suficientes para todos.' },
+    { dur: 9, from: p.clone().addScaledVector(dir, -4).add(V3(0, 2, 0)), to: p.clone().addScaledVector(dir, -8).add(V3(0, 36, 0)), lookFrom: p.clone().add(V3(0, 6, 0)), lookTo: world.volcano, text: 'En la aldea, su madre lo espera junto al telar.' },
+  ]);
+}
+// Momentos de la historia que piden una escena. 'cima': lo que el padre le muestra desde el cerro Treng Treng.
+function story(kind) {
+  if (kind !== 'cima') return;
+  const c = top();
+  playScene([
+    { dur: 8, from: V3(c.x + 2, c.y + 3, c.z + 1), to: V3(c.x, c.y + 7, c.z + 2), lookFrom: V3(-3000, 160, c.z + 700), lookTo: V3(-3000, -40, c.z + 300), text: 'Hacia donde se esconde el sol, el lafken: el mar y su gente.' },
+    { dur: 8, from: V3(c.x - 1, c.y + 1, c.z), to: V3(c.x - 4, c.y + 3, c.z + 1), lookFrom: world.volcano.clone().add(V3(0, -260, 500)), lookTo: world.volcano, text: 'Hacia donde nace, el volcán. Y en medio, el humo de las rukas: todo su mundo.' },
+  ]);
+}
+// Mensajes de arriba. hint lo muestra de inmediato; los avisos que llegan juntos (un hallazgo, una misión
+// cumplida, la misión que sigue) hacen fila para que cada uno alcance a leerse.
+let hintT = 0, toastGap = 0; const toasts = [];
+function showHint(txt, secs) { $('hint').textContent = txt; $('hint').classList.add('on'); hintT = secs; toastGap = Math.min(secs, 2.8); }
+function hint(txt, secs) { if (toasts.length) toasts.push([txt, secs]); else showHint(txt, secs); }
+function toast(txt, secs = 5, ding = false) { toasts.push([txt, secs, ding]); }
 
 addEventListener('keydown', (e) => {
   if (rebinding) { // se está eligiendo una tecla nueva para una acción
@@ -195,7 +235,7 @@ addEventListener('keydown', (e) => {
     if (e.code !== 'Escape') { const old = opts.keys[rebinding]; for (const a in opts.keys) if (opts.keys[a] === e.code) opts.keys[a] = old; opts.keys[rebinding] = e.code; applyOpts(); } // si ya estaba en uso, se intercambian
     rebinding = null; drawKeys(); return;
   }
-  if (e.code === 'Enter') { if (state === 'title') enter(); else if (!talk) cine.skip(); }
+  if (e.code === 'Enter' && !e.repeat) { if (state === 'title') { if (!menuOpen) { if ($('cover-2').hidden) coverPage(2); else enter(); } } else if (!talk) cine.skip(); }
   if (is(e, 'pantalla') && !e.repeat) toggleFull();
   if (is(e, 'menu') && !e.repeat && state !== 'cine') { if (ui.open) ui.show(null); setMenu(!menuOpen); return; }
   if (menuOpen) { if (e.code === 'Escape') { if (page === 'controles') menuPage('opciones'); else setMenu(false); } return; }
@@ -218,7 +258,7 @@ const ripples = Array.from({ length: 10 }, () => { const m = new THREE.Mesh(new 
 let ripT = 0, ripI = 0;
 function updatePlayer(dt) {
   let ix = 0, iz = 0;
-  if (state === 'play' && !ui.open && !talk && !focus) {
+  if (state === 'play' && !ui.open && !talk && !focus && !acc.busy) {
     ix = (down('derecha') || keys.ArrowRight ? 1 : 0) - (down('izquierda') || keys.ArrowLeft ? 1 : 0);
     iz = (down('adelante') || keys.ArrowUp ? 1 : 0) - (down('atras') || keys.ArrowDown ? 1 : 0);
     cam.yaw += ((down('camIzq') ? 1 : 0) - (down('camDer') ? 1 : 0)) * dt * 1.8;
@@ -229,7 +269,8 @@ function updatePlayer(dt) {
   const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw);
   let dx = fx * iz + rx * ix, dz = fz * iz + rz * ix; const l = Math.hypot(dx, dz);
   if (l > 0) { dx /= l; dz /= l; player.dirX = dx; player.dirZ = dz; let d = Math.atan2(dx, dz) - player.facing; d = Math.atan2(Math.sin(d), Math.cos(d)); player.facing += d * Math.min(1, dt * 12); }
-  if (player.grounded && state === 'play' && !ui.open && !talk && !focus && down('saltar')) { player.vy = 6.6 * (ui.skill('salto') ? 1.22 : 1); player.grounded = false; }
+  if (acc.sitting && (ix || iz || down('saltar'))) acc.stand(); // cualquier movimiento lo hace levantarse
+  if (player.grounded && state === 'play' && !ui.open && !talk && !focus && !acc.sitting && down('saltar')) { player.vy = 6.6 * (ui.skill('salto') ? 1.22 : 1); player.grounded = false; }
   player.vy = Math.max(-25, player.vy - 18 * dt);
   if (player.vy > 0) ctrl.disableSnapToGround(); else ctrl.enableSnapToGround(0.3);
   const mvx = (player.dirX || 0) * player.speed * dt, mvz = (player.dirZ || 0) * player.speed * dt;
@@ -245,13 +286,14 @@ function updatePlayer(dt) {
   // animación procedural
   const t = pp(); boy.g.position.set(t.x, t.y - FEET, t.z); boy.g.rotation.y = player.facing;
   player.phase += dt * (2.5 + player.speed * 1.9);
-  if (acc.sitting && (ix || iz)) acc.stand();
   animatePerson(boy, player.phase, Math.min(1, player.speed / 6.2) * 0.9 + (player.speed > 0.2 ? 0.25 : 0), !player.grounded);
   for (const k in POI) if (state === 'play' && Math.hypot(t.x - POI[k].x, t.z - POI[k].z) < 20) { ui.place(k); if (!ui.has('l-' + k) && !talk && player.grounded) ui.discover('l-' + k, herePhoto()); }
-  if (Math.hypot(t.x - CERRO[0], t.z - CERRO[1]) < 10) summit = true;
-  if ((misT -= dt) <= 0 && state === 'play') { // misiones y ayudas de los saberes
-    misT = 0.5; const m = ui.missions({ got, total: world.items.length, summit, ...acc.ctx() });
+  if ((misT -= dt) <= 0 && state === 'play' && !talk) { // misiones y ayudas de los saberes
+    misT = 0.5; const m = ui.missions({ got, total: world.items.length, ...acc.ctx() });
     $('mis-title').textContent = m ? m.title : 'Explora libremente'; $('mis-prog').textContent = m && m.prog[2] > 1 ? `${m.prog[1]} / ${m.prog[2]}` : '';
+    // cuando la historia avanza un paso, se avisa qué sigue (después de los avisos de lo recién logrado)
+    const av = m ? m.aviso : 'Hasta aquí llega la historia por ahora: pronto llegarán los invitados de la costa. Mientras tanto, explora el valle y termina tus encargos.';
+    if (av && av !== lastAviso) { lastAviso = av; toast(av, 10); }
     ui.marks = ui.skill('rastro') ? explorer.hints(t) : [];
   }
   // ¿hay algo cerca que observar o alguien con quien hablar?
@@ -285,9 +327,11 @@ function startFocus(c) {
       if (!best || score < best.score) best = { score, p2 }; }
     pos.copy(best.p2);
   } else if (sh.face && c.rec) { const nx = Math.sin(c.rec.yaw), nz = Math.cos(c.rec.yaw), sg = nx * dx + nz * dz >= 0 ? 1 : -1; place(nx * sg, nz * sg); } // planta plana: de frente
+  else if (sh.side) place(sh.side[0], sh.side[1]);               // ave posada: desde el lado de afuera de su rama
   else place(dx, dz);
   if (!sh.fromPlayer) world.clearView(pos, tv, c.rec, !sh.tree);  // lo que queda entre la cámara y el objeto se oculta mientras dura la observación
   lamp.userData.on = !sh.fromPlayer && sh.dist < 6;
+  if (c.bird) c.bird.hold = 6; // el ave no se va mientras la miras
   focus = { c, pos: pos.clone(), fov: sh.fov, t: 0, stage: 0, hold: 0, sp: camera.position.clone(), sf: camera.fov, look: V3(t.x, t.y + 0.75, t.z), done: false };
   $('prompt').classList.remove('on'); $('focus').textContent = `Observando ${c.label}…`; $('focus').classList.add('on'); document.body.classList.add('talking');
 }
@@ -304,28 +348,29 @@ function updateFocus(dt) {
 }
 
 function updateItems() {
-  const t = pp();
-  for (const it of world.items) {
-    if (it.taken) continue;
+  const t = pp(), on = acc.f.m1 === 1; // los piñones se recogen mientras dura el encargo de Millaray
+  for (const [i, it] of world.items.entries()) {
+    it.off = !on; it.mesh.visible = on && !it.taken; if (it.taken || !on) continue;
     it.mesh.position.y = it.base.y + Math.sin(time * 2 + it.base.x) * 0.15; it.mesh.rotation.y = time * 1.5;
     if (state === 'play' && Math.hypot(t.x - it.base.x, t.y - it.base.y + 0.3, t.z - it.base.z) < 1.25) {
       if (!ui.has('pinon')) ui.discover('pinon', photo({ x: it.base.x, y: it.mesh.position.y, z: it.base.z }, { dist: 1.5, up: 0.25, fov: 34 }));
-      it.taken = true; it.mesh.visible = false; got++; ui.addItem('pinon');
+      it.taken = true; it.mesh.visible = false; got++; ui.addItem('pinon'); acc.pin(i);
       if (got === world.items.length) outro();
       else if (got === world.items.length - 1) hint('Falta uno. Está sobre las rocas, al fondo del bosque: sube saltando.', 8);
     }
   }
 }
 
-const ui = createUI({ world, onToast: (t) => { hint(t, 5); snd.play('ui-hallazgo', 0.5); }, onClose: () => { if (state === 'play' && !menuOpen) lock(); }, onSkill: () => applySkills() });
-const acc = createActions({ world, ui, snd, scene, hint, player,
+const ui = createUI({ world, onToast: (t) => toast(t, 5, true), onClose: () => { if (state === 'play' && !menuOpen) lock(); }, onSkill: () => applySkills() });
+const acc = createActions({ world, ui, snd, scene, hint, player, story, pinones: () => [got, world.items.length],
   place: (x, z, facing) => { pBody.setTranslation({ x, y: height(x, z) + FEET + 0.05, z }, true); player.vy = 0; player.speed = 0; player.facing = facing; },
   speak: (name, lines, done) => { talk = { name, lines, i: 0, done: done || null }; say(); },
   ripple: (x, z) => { const r = ripples[ripI++ % ripples.length]; r.position.set(x, WATER_Y + 0.03, z); r.userData.t = 0; r.visible = true; } });
 const explorer = createExplorer({ world, ui }); explorer.urgent = (id) => acc.wants(id);
+for (const i of acc.pins) { const it = world.items[i]; if (it && !it.taken) { it.taken = true; it.mesh.visible = false; got++; if (acc.f.m1 === 1) ui.addItem('pinon'); } } // piñones recogidos en una sesión anterior
 drawKeys(); applySkills();
 await assets.whenLoaded(); bar(1, 'Listo'); assets.onProgress = null; $('loading').classList.add('hide'); setTimeout(() => $('loading').remove(), 700);
-window.__g = { snd, height, ui, explorer, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
+window.__g = { snd, height, ui, explorer, acc, story, toasts, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
   tp(x, y, z) { pBody.setTranslation({ x, y, z }, true); player.vy = 0; },
   view(x, y, z, lx, ly, lz) { camera.position.set(x, y, z); camera.lookAt(lx, ly, lz); world.update(0, time, camera.position, pp()); draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); },
   snap() { draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); } };
@@ -342,7 +387,7 @@ function tick(dt) {
   updateItems();
   { const p = pp(); uPlayer.value.set(p.x, p.y - FEET, p.z); // las plantas se apartan al paso
     ui.people.length = 0;
-    for (const a of world.life.actors) if (a.mark) { const id = PERSON[a.name], known = ui.has(id), kind = known ? acc.wants(id) : (id === 'curinancu' || id === 'machi' ? 'main' : 'nuevo'); // estrella: misión principal; rombo: encargo; círculo: aún no lo conoces
+    for (const a of world.life.actors) if (a.mark) { const id = PERSON[a.name], w = acc.wants(id), kind = w === 'main' ? 'main' : ui.has(id) ? w : 'nuevo'; // estrella: con esta persona sigue la historia; rombo: encargo; círculo: aún no la conoces
       a.mark.visible = state === 'play' && !!kind; if (kind) { a.mark.material = world.life.markMats[kind]; ui.people.push({ x: a.x, z: a.z, kind }); } }
     acc.update(dt, time, p); acc.pose(boy);
     if ((actT -= dt) <= 0) { actT = 0.2; doable = state === 'play' && !talk && !ui.open && !focus ? acc.scan(p) : null; $('prompt2').classList.toggle('on', !!doable); if (doable) $('prompt2-text').textContent = doable.label; } // estrella sobre quien aún tiene algo que contarte
@@ -352,6 +397,7 @@ function tick(dt) {
   world.update(dt, time, camera.position, pp(), player.speed); lights.follow(state === 'title' ? { x: 0, y: 3, z: 0 } : pp());
   if (state === 'play') ui.drawMap(pp(), player.facing);
   if (hintT > 0 && (hintT -= dt) <= 0) $('hint').classList.remove('on');
+  toastGap -= dt; if (toasts.length && toastGap <= 0 && state === 'play' && !talk) { const [txt, secs, ding] = toasts.shift(); showHint(txt, secs); if (ding) snd.play('ui-hallazgo', 0.5); }
 }
 window.__g.advance = (secs) => { for (let t = 0; t < secs; t += 1 / 60) tick(1 / 60); }; // para pruebas automáticas
 // ---------- música: una melodía en la portada y otra al estar en la aldea; se cruzan suavemente ----------

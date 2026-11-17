@@ -10,11 +10,11 @@ export function createUI({ world, onToast, onClose, onSkill }) {
   // lo descubierto se guarda en este navegador: id -> foto
   let data = {}; try { data = JSON.parse(localStorage.getItem(SAVE) || '{}'); } catch { data = {}; }
   if (!data.found) data = { found: data }; // formato antiguo: solo las fotos
-  let found = data.found, skills = data.skills || [], done = data.done || {}, extra = data.extra || 0, mctx = null;
+  let found = data.found, skills = data.skills || [], done = data.done || {}, extra = data.extra || 0, seen = data.seen || {}, mctx = null; // seen: encargos secundarios que ya te dieron
   for (const id in found) if (!BY[id]) delete found[id];
   const SK = Object.fromEntries(SKILLS.map((k) => [k.id, k]));
   const bag = {}; let open = null, cat = 'flora', sel = null, selM = null, selK = null;
-  const save = () => { try { localStorage.setItem(SAVE, JSON.stringify({ found, skills, done, extra })); } catch { /* sin espacio: se pierde al recargar */ } };
+  const save = () => { try { localStorage.setItem(SAVE, JSON.stringify({ found, skills, done, extra, seen })); } catch { /* sin espacio: se pierde al recargar */ } };
   // puntos ganados (cuaderno + misiones + extras) y puntos disponibles (ganados menos lo gastado en saberes)
   const earned = () => points() + extra + MISSIONS.reduce((t, m) => t + (done[m.id] ? m.pts : 0), 0);
   const avail = () => earned() - skills.reduce((t, id) => t + SK[id].cost, 0);
@@ -63,7 +63,7 @@ export function createUI({ world, onToast, onClose, onSkill }) {
     ctx.fillStyle = '#8f7d52'; ctx.fillRect(0, 0, S, S);
     ctx.save(); ctx.translate(S / 2, S / 2); ctx.scale(ZOOM, ZOOM); ctx.translate(-px, -py); ctx.drawImage(base, 0, 0); ctx.restore();
     ctx.strokeStyle = '#3a2408'; ctx.lineWidth = 2.5;
-    for (const it of world.items) if (!it.taken) {
+    for (const it of world.items) if (!it.taken && !it.off) {
       const [x, y] = P(it.base.x, it.base.z); let dx = (x - px) * ZOOM, dy = (y - py) * ZOOM; const d = Math.hypot(dx, dy), far = d > R - 20;
       if (far) { dx *= (R - 20) / d; dy *= (R - 20) / d; } // fuera de vista: se marca en el borde, indicando la dirección
       ctx.fillStyle = far ? '#ffe9a8' : '#f2b441'; ctx.beginPath(); ctx.arc(S / 2 + dx, S / 2 + dy, far ? 7 : 10, 0, 7); ctx.fill(); ctx.stroke();
@@ -89,25 +89,30 @@ export function createUI({ world, onToast, onClose, onSkill }) {
     panel.dataset.kind = open;
     if (open === 'mapa') {
       $('panel-title').textContent = 'Mapa del territorio';
-      body.innerHTML = '<canvas id="bigmap"></canvas><p class="muted">Los lugares muestran su nombre cuando los visitas. Los puntos dorados son los piñones que faltan. La ruka marca la aldea; la estrella dorada, una misión principal; el rombo celeste, un encargo; el círculo, alguien que aún no conoces.</p>';
+      body.innerHTML = '<canvas id="bigmap"></canvas><p class="muted">Los lugares muestran su nombre cuando los visitas. Los puntos dorados son los piñones que faltan por recoger. La ruka marca la aldea; la estrella dorada, una misión principal; el rombo celeste, un encargo; el círculo, alguien que aún no conoces.</p>';
       const c = $('bigmap'); c.width = base.width; c.height = base.height; const g = c.getContext('2d'); g.drawImage(base, 0, 0);
       g.textAlign = 'center'; g.font = 'italic bold 19px Georgia'; g.lineWidth = 5; g.strokeStyle = '#efe6cf'; g.fillStyle = '#2a2018';
       for (const key in POI) { const [x, y] = P(POI[key].x, POI[key].z), t = places.has(key) ? POI[key].name : '?'; g.strokeText(t, x, y - 14); g.fillText(t, x, y - 14); }
-      for (const it of world.items) if (!it.taken) { const [x, y] = P(it.base.x, it.base.z); g.fillStyle = '#f2b441'; g.strokeStyle = '#3a2408'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 6, 0, 7); g.fill(); g.stroke(); }
+      for (const it of world.items) if (!it.taken && !it.off) { const [x, y] = P(it.base.x, it.base.z); g.fillStyle = '#f2b441'; g.strokeStyle = '#3a2408'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 6, 0, 7); g.fill(); g.stroke(); }
       { const [x, y] = P(0, 0); sym(g, x, y + 6, 'aldea', 1.2); } for (const mk of api.people) { const [x, y] = P(mk.x, mk.z); sym(g, x, y, mk.kind, 1.1); }
       const [px, py] = P(last.x, last.z); g.translate(px, py); g.rotate(-last.f); g.fillStyle = '#fff'; g.strokeStyle = '#14110f'; g.lineWidth = 3;
       g.beginPath(); g.moveTo(0, 18); g.lineTo(11, -12); g.lineTo(0, -5); g.lineTo(-11, -12); g.closePath(); g.fill(); g.stroke();
     } else if (open === 'misiones') {
-      // lista simple: una línea por misión; el detalle aparece al elegirla
+      // Principales: todas a la vista y en orden; cada una se abre al terminar la anterior.
+      // Secundarias: solo las que ya te encargaron; las demás aparecen al conversar con la gente.
       $('panel-title').textContent = 'Misiones';
       const st = (m) => (done[m.id] ? 'done' : m.soon || (m.pide && !done[m.pide]) ? 'locked' : 'open');
+      const vis = (m) => m.main || !!done[m.id] || !!seen[m.id];
       const row = (m) => { const r = m.check && mctx ? m.check(mctx) : [false, 0, 1], k = st(m);
         return `<button class="mrow2 ${k}${m.id === selM ? ' on' : ''}" data-mis="${m.id}"><span class="dot"></span><span class="t">${m.title}</span><span class="p">${k === 'done' ? 'hecha' : k === 'locked' ? (m.soon ? 'próximamente' : 'bloqueada') : r[2] > 1 ? `${r[1]} / ${r[2]}` : 'en curso'}</span></button>`; };
-      const m = MISSIONS.find((x) => x.id === selM) || MISSIONS.find((x) => st(x) === 'open') || MISSIONS[0], k = st(m), r = m.check && mctx ? m.check(mctx) : [false, 0, 1];
-      body.innerHTML = '<div class="mis2"><div><h4 class="sec2">Principales</h4>' + MISSIONS.filter((x) => x.main).map(row).join('') + '<h4 class="sec2">Secundarias</h4>' + MISSIONS.filter((x) => !x.main).map(row).join('') + '</div>' +
-        `<aside><small>${m.main ? `Misión principal ${m.n}` : 'Misión secundaria'}</small><h3>${m.title}</h3>` +
+      const sec = MISSIONS.filter((x) => !x.main), mine = sec.filter(vis);
+      const m = MISSIONS.find((x) => x.id === selM && vis(x)) || MISSIONS.find((x) => x.main && st(x) === 'open') || MISSIONS[0], k = st(m), r = m.check && mctx ? m.check(mctx) : [false, 0, 1];
+      const text = typeof m.text === 'function' ? (mctx ? m.text(mctx) : '') : m.text;
+      body.innerHTML = '<div class="mis2"><div><h4 class="sec2">Historia</h4>' + MISSIONS.filter((x) => x.main).map(row).join('') + '<h4 class="sec2">Encargos</h4>' + mine.map(row).join('') +
+        (mine.length < sec.length ? `<p class="muted how">${mine.length ? 'Hay más encargos: conversa con la gente de la aldea.' : 'Aún no tienes encargos. Conversa con la gente de la aldea: cada quien tiene algo que pedirte o enseñarte.'}</p>` : '') + '</div>' +
+        `<aside><small>${m.main ? `Historia · misión ${m.n} de ${MISSIONS.filter((x) => x.main).length}` : 'Encargo · opcional'}</small><h3>${m.title}</h3>` +
         (m.soon ? '<p class="muted">Llegará con los próximos capítulos.</p>' : k === 'locked' ? '<p class="muted">Se abre al terminar la misión anterior.</p>' :
-          `<p>${m.text}</p>${m.who ? `<p class="muted">Te la encargó ${m.who}.</p>` : ''}<div class="prog"><i style="width:${(k === 'done' ? 1 : r[1] / r[2]) * 100}%"></i></div><em>${k === 'done' ? 'Completada' : `${r[1]} de ${r[2]}`} · ${m.pts} puntos</em>`) + '</aside></div>';
+          `<p>${text}</p>${m.who ? `<p class="muted">${m.main ? 'Misión' : 'Encargo'} de ${m.who}.</p>` : ''}<div class="prog"><i style="width:${(k === 'done' ? 1 : r[1] / r[2]) * 100}%"></i></div><em>${k === 'done' ? 'Completada' : `${r[1]} de ${r[2]}`} · ${m.pts} puntos</em>`) + '</aside></div>';
     } else if (open === 'saberes') {
       // árbol: Leftraru arriba, y de él bajan las ramas; cada nudo es un saber
       $('panel-title').textContent = 'Saberes';
@@ -141,7 +146,7 @@ export function createUI({ world, onToast, onClose, onSkill }) {
   }
   function show(which) {
     if (open === which || which === null) { const was = open; open = null; panel.classList.remove('on'); if (was) onClose?.(); return; }
-    open = which; document.exitPointerLock?.(); panel.classList.add('on'); if (which === 'notas') $('btn-notas').classList.remove('new'); render();
+    open = which; document.exitPointerLock?.(); panel.classList.add('on'); if (which === 'notas') $('btn-notas').classList.remove('new'); if (which === 'misiones') $('btn-misiones').classList.remove('new'); render();
   }
   body.addEventListener('click', (e) => {
     const c = e.target.closest('[data-cat]'), n = e.target.closest('[data-note]'), k = e.target.closest('[data-skill]'), mi = e.target.closest('[data-mis]'), nd = e.target.closest('[data-node]');
@@ -173,14 +178,23 @@ export function createUI({ world, onToast, onClose, onSkill }) {
     place(key) { places.add(key); },
     addItem(id) { bag[id] = (bag[id] || 0) + 1; if (open) render(); },
     takeItem(id, n = 1) { bag[id] = (bag[id] || 0) - n; if (bag[id] <= 0) delete bag[id]; if (open) render(); },
-    reset() { found = {}; skills = []; done = {}; extra = 0; save(); refreshScore(); },
+    reset() { found = {}; skills = []; done = {}; extra = 0; seen = {}; save(); refreshScore(); },
     skill: (id) => skills.includes(id), avail, earned,
-    // revisa las misiones con el estado actual; entrega recompensas y devuelve la principal activa
+    // Revisa las misiones con el estado actual: anota los encargos que te acaban de dar, entrega recompensas
+    // y devuelve la misión de la historia que está abierta, con el aviso de lo que toca hacer.
     missions(c) {
       mctx = { ...c, has: (id) => found[id] !== undefined };
-      for (const m of MISSIONS) if (m.check && !done[m.id] && (!m.pide || done[m.pide]) && m.check(mctx)[0]) { done[m.id] = 1; save(); refreshScore(); onToast(`Misión completada: ${m.title} · +${m.pts} puntos`); if (open) render(); }
+      const fresh = [], won = [];
+      for (const m of MISSIONS) {
+        if (!m.check || done[m.id] || (m.pide && !done[m.pide])) continue;
+        if (!m.main && !seen[m.id]) { if (m.ver && !m.ver(mctx)) continue; seen[m.id] = 1; fresh.push(m.title); } // un encargo no corre hasta que te lo dan
+        if (m.check(mctx)[0]) { done[m.id] = 1; won.push(m); }
+      }
+      if (fresh.length) { onToast(fresh.length > 3 ? `Tienes ${fresh.length} encargos nuevos: míralos en Misiones` : `${fresh.length === 1 ? 'Nuevo encargo' : 'Nuevos encargos'}: ${fresh.join(' · ')}`); $('btn-misiones').classList.add('new'); }
+      for (const m of won) onToast(`Misión completada: ${m.title} · +${m.pts} puntos`);
+      if (fresh.length || won.length) { save(); refreshScore(); if (open) render(); }
       const act = MISSIONS.find((m) => m.main && m.check && !done[m.id] && (!m.pide || done[m.pide]));
-      return act ? { title: act.title, prog: act.check(mctx) } : null;
+      return act ? { title: act.title, prog: act.check(mctx), aviso: typeof act.aviso === 'function' ? act.aviso(mctx) : act.aviso } : null;
     },
     marks: [], people: [],
     state: { get found() { return found; }, bag, get skills() { return skills; }, get done() { return done; } },

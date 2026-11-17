@@ -5,7 +5,8 @@ import { TALK } from './notes.js';
 
 export const PERSON = { 'Curiñancu': 'curinancu', 'Millaray': 'millaray', 'la abuela': 'abuela', 'Ayelén': 'ayelen', 'Rayen': 'rayen', 'la machi': 'machi', 'Ñamku': 'namku' };
 const TREE = { pewen: ['pewen', 'el pewen'], coigue: ['coigue', 'el coigüe'], roble: ['roble', 'el roble'], canelo: ['canelo', 'el canelo'], giant: ['gigante', 'el árbol abuelo'], peumo: ['peumo', 'el peumo'], boldo: ['boldo', 'el boldo'], quillay: ['quillay', 'el quillay'], litre: ['litre', 'el litre'] };
-const BIRD = { traro: ['traro', 'el traro', 85, 2.2], choroy: ['choroy', 'el choroy', 75, 1.6], small: ['rayadito', 'el rayadito', 16, 2.4] }; // el último número es el ángulo de visión: muy cerrado, como un catalejo
+// Las aves solo se observan posadas. Números: desde cuán lejos se la puede observar y a qué distancia se pone la cámara de ella.
+const BIRD = { traro: ['traro', 'el traro', 36, 2.5], choroy: ['choroy', 'el choroy', 32, 1.8], small: ['rayadito', 'el rayadito', 11, 0.72] };
 
 export function createExplorer({ world, ui }) {
   let reach = 1; // la «vista de traro» lo aumenta
@@ -17,7 +18,7 @@ export function createExplorer({ world, ui }) {
           add = (id, verb, label, d, target, shot, extra) => c.push({ id, verb, label, d, target, shot, known: ui.has(id), ...extra });
     for (const a of world.life.actors) { const id = PERSON[a.name], d = d2(p, a.x, a.z); if (id && d < 2.1) add(id, 'Hablar con', TALK[id].name, d - 10, { x: a.x, y: H(a.x, a.z) + a.h * 0.78, z: a.z }, { dist: 2.1, up: 0.1, fov: 40 }, { person: a }); }
     for (const q of world.life.quads) { const d = d2(p, q.x, q.z), w = q.kind === 'weke'; if (d < (w ? 5 : 5.5) * k) add(w ? 'weke' : 'pudu', 'Observar', w ? 'el weke' : 'el pudú', d, null, { dist: w ? 2.7 : 1.25, up: w ? 0.2 : 0.12, fov: w ? 42 : 34 }, { live: () => ({ x: q.x, y: H(q.x, q.z) + (w ? 0.95 : 0.3) * (q.g.scale.x), z: q.z }) }); }
-    for (const b of world.life.birds) { const [id, label, r, fov] = BIRD[b.type], bp = b.g.position, d = d2(p, bp.x, bp.z); if (d < r) add(id, 'Observar', label, 3 + d / 6, null, { fromPlayer: true, fov }, { live: () => b.g.position }); }
+    for (const b of world.life.birds) { if (!b.perched) continue; const [id, label, r, dist] = BIRD[b.type], bp = b.g.position, d = d2(p, bp.x, bp.z); if (d < r * reach) add(id, 'Observar', label, d / 8, null, { dist, up: dist * 0.1, fov: 36, side: b.perch.cam }, { live: () => b.g.position, rec: b.perch.tree.rec, bird: b.grp }); }
     let rk = null; for (const r of RUKAS) { const d = d2(p, r.x, r.z); if (d < 6 && (!rk || d < rk.d)) rk = { ...r, d }; }
     if (rk) add('ruka', 'Observar', 'la ruka', rk.d, { x: rk.x, y: H(rk.x, rk.z) + 1.7, z: rk.z }, { dist: 9.5, up: 1.2, fov: 48 });
     const fix = (id, label, x, z, r, y, shot) => { const d = d2(p, x, z); if (d < r * k) add(id, 'Observar', label, d, { x, y: H(x, z) + y, z }, shot); };

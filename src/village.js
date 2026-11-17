@@ -1,5 +1,6 @@
 // La aldea y los lugares construidos: rukas, fogón, rewe, corral, telar y otros detalles.
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { TEX, MAT, flameMaterial, photo } from './gfx.js';
 import { height, POI, CERRO } from './terrain.js';
 
@@ -35,8 +36,8 @@ export function buildVillage({ scene, rng, bag, flora, physics, RAPIER, fixed })
     const g = new THREE.LatheGeometry(pts, 28), P = g.attributes.position;
     for (let i = 0; i < P.count; i++) { const k = 1 + Math.sin(P.getX(i) * 9 + P.getZ(i) * 7) * 0.012; P.setX(i, P.getX(i) * k); P.setZ(i, P.getZ(i) * k * 0.82); }
     g.computeVertexNormals(); spin(add(g, thatch, x, y, z));
-    // entrada: un zaguán de paja en arco que sale hacia el oriente, con marco de varas curvadas,
-    // el fondo en penumbra y un cuero recogido a un lado
+    // entrada: un zaguán de paja en arco que sale hacia el oriente, con marco de varas curvadas
+    // y el fondo en penumbra (sin nada colgado ni apoyado delante: la entrada queda limpia)
     { const w = 0.82 * s, h = 1.9 * s, x0 = x + r * 0.7, x1 = x + r * 1.03 + 0.75 * s, N = 14, P = [], U = [], I = [];
       for (let k = 0; k <= 1; k++) for (let n = 0; n <= N; n++) { const a = PI * n / N, sag = 1 + Math.sin(a * 5 + k) * 0.015; P.push(k ? x1 : x0, y + Math.sin(a) * h * sag * (k ? 0.96 : 1), z + Math.cos(a) * w * (k ? 0.96 : 1)); U.push(k * 0.45, Math.abs(n / N - 0.5) * 1.6); }
       for (let n = 0; n < N; n++) I.push(n, n + N + 1, n + 1, n + 1, n + N + 1, n + N + 2);
@@ -46,9 +47,6 @@ export function buildVillage({ scene, rng, bag, flora, physics, RAPIER, fixed })
       // paredes del zaguán y fondo: no se atraviesan
       for (const dz of [-1, 1]) wall((x + r * 0.9 + x1) / 2, z + dz * (w + 0.06), (x1 - x - r * 0.9) / 2, 0.85 * s, 0.1); wall(x + r * 1.07 - 0.1, z, 0.1, 0.95 * s, w);
       for (const [xx, tube, col] of [[x1 - 0.02, 0.06, WOOD], [x1 - 0.4 * s, 0.035, WOOD2]]) { const arc = new THREE.TorusGeometry(1, tube / w, 6, 18, PI); arc.rotateY(PI / 2); rb.add(arc, M(xx, y, z, 0, 1, h * 0.985, w * 0.985), col); } // varas curvadas del marco
-      for (const dz of [-1, 1]) rb.add(cyl, M(x1 - 0.02, y + 0.5 * s, z + dz * w * 1.0, 0, 0.07, 1.0 * s, 0.07), WOOD); // horcones a los lados
-      const cu = new THREE.PlaneGeometry(0.62 * s, 1.55 * s, 4, 1), CP = cu.attributes.position; for (let n = 0; n < CP.count; n++) CP.setZ(n, Math.sin(CP.getX(n) * 14) * 0.05); // el cuero cae en pliegues
-      rb.add(cu, M(x1 - 0.12, y + 0.8 * s, z - w * 0.62, PI / 2 - 0.12, 0.7, 1, 1), 0x4a3424, 'cuero');
     }
     for (const rz of [0.5, -0.5]) rb.add(cyl, M(x, y + 3.6 * s, z, R(0, 3), 0.045, 1.6, 0.045, rz), WOOD2); // palos cruzados en la cumbre
     // amarras de fibra que sujetan la paja, a tres alturas
@@ -66,6 +64,25 @@ export function buildVillage({ scene, rng, bag, flora, physics, RAPIER, fixed })
     for (let i = 0; i < 30; i++) { const a = (i / 30) * 6.28 + R(-0.05, 0.05); if (Math.abs(a) < 0.4 || a > 5.9) continue; fl.scatter('reed', x + Math.cos(a) * r * 1.02, y, z + Math.sin(a) * r * 0.84, R(0.35, 0.55), 0xf0dca0); } // flecos de paja en el borde del techo
   }
   RUKAS.forEach(ruka);
+
+  // ---------- vasijas de greda: cada una con su perfil, su boca oscura y su textura de greda cocida ----------
+  // olla: panzona y de boca ancha, para el fuego; cántaro: de cuello angosto y con asa, para el agua; tinaja: grande, para guardar
+  const greda = { lisa: MAT.clay(TEX.greda), pintada: MAT.clay(TEX.gredaPintada), hollin: MAT.clay(TEX.gredaHollin) }, hueco = new THREE.MeshBasicMaterial({ color: 0x120c08 }), boca = new THREE.CircleGeometry(1, 18).rotateX(-PI / 2);
+  const PERFIL = {
+    olla: [[0, 0], [0.42, 0], [0.74, 0.16], [0.96, 0.5], [1.0, 0.82], [0.9, 1.16], [0.7, 1.42], [0.58, 1.56], [0.6, 1.7], [0.7, 1.82], [0.66, 1.85], [0.55, 1.72]],
+    cantaro: [[0, 0], [0.38, 0], [0.66, 0.2], [0.84, 0.6], [0.82, 1.0], [0.64, 1.38], [0.42, 1.68], [0.34, 1.95], [0.35, 2.2], [0.45, 2.38], [0.41, 2.41], [0.31, 2.24]],
+    tinaja: [[0, 0], [0.5, 0], [0.86, 0.22], [1.04, 0.7], [1.0, 1.2], [0.84, 1.6], [0.72, 1.78], [0.74, 1.9], [0.82, 1.98], [0.78, 2.01], [0.66, 1.88]],
+  }, formas = {};
+  function vasija(kind, x, y, z, s, yaw, mat) {
+    const pf = PERFIL[kind], H = Math.max(...pf.map((q) => q[1])), [mr, my] = pf[pf.length - 1];
+    if (!formas[kind]) { // la textura da tres vueltas a la pieza y sube de la base a la boca
+      let g = new THREE.LatheGeometry(pf.map(([r, yy]) => new THREE.Vector2(r, yy)), 24); const P = g.attributes.position, U = g.attributes.uv; for (let i = 0; i < P.count; i++) U.setXY(i, U.getX(i) * 3, P.getY(i) / H);
+      if (kind === 'cantaro') { const asa = new THREE.TorusGeometry(0.3, 0.05, 6, 12, PI).rotateZ(-PI / 2).scale(0.75, 1, 1.3).translate(0.42, 1.82, 0), AU = asa.attributes.uv; for (let i = 0; i < AU.count; i++) AU.setXY(i, AU.getX(i) * 0.3, 0.85 + AU.getY(i) * 0.1); g = mergeGeometries([g, asa]); }
+      formas[kind] = g;
+    }
+    const m = add(formas[kind], mat, x, y, z); m.scale.setScalar(s); m.rotation.y = yaw;
+    const d = new THREE.Mesh(boca, hueco); d.scale.setScalar(mr * s * 1.03); d.position.set(x, y + (my + 0.03) * s, z); scene.add(d); // adentro está oscuro
+  }
 
   // ---------- fogón central ----------
   { const { x, z } = FOGON, y = height(x, z);
@@ -85,7 +102,7 @@ export function buildVillage({ scene, rng, bag, flora, physics, RAPIER, fixed })
     const ember = new THREE.MeshStandardMaterial({ color: 0x1a0e08, emissive: 0xff4a12, emissiveIntensity: 2.2, roughness: 1 }); emit.ember = ember;
     for (let i = 0; i < 5; i++) { const e = add(new THREE.CylinderGeometry(0.06, 0.06, R(0.5, 0.9), 6), ember, x + R(-0.25, 0.25), y + 0.1, z + R(-0.25, 0.25)); e.rotation.set(PI / 2, 0, R(0, 3)); e.castShadow = false; }
     for (let i = 0; i < 3; i++) { const a = i * 2.1 + 0.4; flora.rock(x + 1.5 + Math.cos(a) * 0.22, y - 0.02, z + 0.9 + Math.sin(a) * 0.22, 0.16, { squash: 0.9, color: 0x6e6a62 }); }
-    bag.add(sph, M(x + 1.5, y + 0.42, z + 0.9, 0, 0.26, 0.24, 0.26), 0x5a3626, 'otros'); bag.add(new THREE.CylinderGeometry(0.2, 0.17, 0.12, 12, 1, true), M(x + 1.5, y + 0.66, z + 0.9), 0x6a4030, 'otros');
+    vasija('olla', x + 1.5, y + 0.17, z + 0.9, 0.27, 0.7, greda.hollin); // la olla del caldo, tiznada por el fuego
     const glow = new THREE.PointLight(0xff8a3a, 14, 14, 1.6); glow.position.set(x, y + 0.9, z); scene.add(glow); emit.glow = glow;
   }
 
@@ -120,7 +137,8 @@ export function buildVillage({ scene, rng, bag, flora, physics, RAPIER, fixed })
 
   // ---------- leña y vasijas ----------
   for (const [x, z, ry] of [[-19, -3, 0.3], [9, -12, 1.2], [-7, 15, 2.2], [17, 8, 0.6]]) { const y = height(x, z); for (let i = 0; i < 9; i++) bag.add(cyl, M(x + Math.sin(ry) * (i % 3) * 0.22, y + 0.11 + Math.floor(i / 3) * 0.2, z + Math.cos(ry) * (i % 3) * 0.22, ry, 0.1, 1.1, 0.1, PI / 2), i % 2 ? WOOD : WOOD2); physics.createCollider(RAPIER.ColliderDesc.cuboid(0.55, 0.33, 0.35).setTranslation(x + Math.sin(ry) * 0.22, y + 0.33, z + Math.cos(ry) * 0.22).setRotation(new THREE.Quaternion().setFromAxisAngle(UP, ry + PI / 2)), fixed); }
-  for (const [x, z] of [[-12.6, -11.5], [-12.2, -12.3], [3, 2.4], [13.6, 10.6], [14.2, 11.2], [-1.6, 16.2], [19.2, -4.6]]) { const y = height(x, z), s = R(0.22, 0.32); bag.add(sph, M(x, y + s * 0.85, z, 0, s, s * 0.95, s), 0x9a5a38, 'otros'); bag.add(cyl, M(x, y + s * 1.8, z, 0, s * 0.5, s * 0.4, s * 0.5), 0x86492c, 'otros'); physics.createCollider(RAPIER.ColliderDesc.cylinder(s, s).setTranslation(x, y + s, z), fixed); }
+  [[-12.6, -11.5, 'tinaja', 'lisa'], [-12.2, -12.3, 'cantaro', 'pintada'], [3, 2.4, 'olla', 'hollin'], [13.6, 10.6, 'cantaro', 'pintada'], [14.2, 11.2, 'olla', 'lisa'], [-1.6, 16.2, 'tinaja', 'pintada'], [19.2, -4.6, 'cantaro', 'lisa']].forEach(([x, z, kind, look], i) => {
+    const y = height(x, z), s = R(0.22, 0.32); vasija(kind, x, y - 0.015, z, s, i * 2.4, greda[look]); physics.createCollider(RAPIER.ColliderDesc.cylinder(s, s).setTranslation(x, y + s, z), fixed); });
 
   // ---------- cancha de palin: estacas en el borde ----------
   { const c0 = 0.94, s0 = 0.34; for (let i = -5; i <= 5; i++) for (const sd of [-1, 1]) { const u = i * 4, v = sd * 5.6, x = POI.cancha.x + u * c0 - v * s0, z = POI.cancha.z + u * s0 + v * c0; bag.add(cyl, M(x, height(x, z) + 0.3, z, 0, 0.035, 0.6, 0.035, R(-0.1, 0.1)), WOOD); } }

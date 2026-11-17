@@ -156,6 +156,43 @@ function textileCanvas() {
 }
 function softCanvas() { const [c, x] = canvas(64, 64), g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.5, 'rgba(255,255,255,0.45)'); g.addColorStop(1, 'rgba(255,255,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return c; }
 
+// Greda cocida para las vasijas. La textura envuelve la pieza (cierra sin costura de lado a lado) y va de la boca,
+// arriba, a la base, abajo. band: franja de engobe claro pintada en rojo en el hombro; soot: cuánto subió el hollín del fogón.
+function clayCanvas({ base = [168, 96, 60], band = false, soot = 0 } = {}) {
+  const S = 512, [c, x] = canvas(S, S), g = x.createLinearGradient(0, 0, 0, S);
+  g.addColorStop(0, rgb(base[0] * 1.06, base[1] * 1.05, base[2] * 1.03)); g.addColorStop(0.55, rgb(base[0], base[1], base[2])); g.addColorStop(1, rgb(base[0] * 0.8, base[1] * 0.76, base[2] * 0.74)); x.fillStyle = g; x.fillRect(0, 0, S, S);
+  // nubes de cocción: zonas más claras y más oscuras, donde el fuego tocó distinto
+  const blot = (cx, cy, r, col) => { for (const ox of [-S, 0, S]) { const q = x.createRadialGradient(cx + ox, cy, 0, cx + ox, cy, r); q.addColorStop(0, col(1)); q.addColorStop(1, col(0)); x.fillStyle = q; x.fillRect(cx + ox - r, cy - r, r * 2, r * 2); } };
+  for (let i = 0; i < 18; i++) { const dark = rnd() < 0.6, a = R(0.12, 0.32); blot(R(0, S), R(0, S), R(50, 150), (k) => (dark ? rgb(58, 28, 18, a * k) : rgb(230, 164, 112, a * 0.7 * k))); }
+  // huellas del alisado a mano: rayas finas que dan la vuelta a la pieza
+  for (let i = 0; i < 300; i++) { const y = R(0, S); x.strokeStyle = rnd() < 0.5 ? rgb(66, 34, 20, R(0.05, 0.22)) : rgb(238, 184, 138, R(0.04, 0.18)); x.lineWidth = R(0.6, 2.4); x.beginPath(); x.moveTo(0, y); x.bezierCurveTo(S * 0.3, y + R(-3, 3), S * 0.7, y + R(-3, 3), S, y); x.stroke(); }
+  // granos de arena y mica de la pasta, y poros
+  for (let i = 0; i < 3200; i++) { const v = rnd(); x.fillStyle = v < 0.5 ? rgb(58, 30, 20, R(0.15, 0.5)) : v < 0.86 ? rgb(232, 196, 158, R(0.15, 0.4)) : rgb(252, 244, 226, R(0.3, 0.75)); x.fillRect(R(0, S), R(0, S), R(0.8, 2.4), R(0.8, 2.4)); }
+  if (band) {
+    const y0 = S * 0.2, y1 = S * 0.43, N = 12, W = S / N, red = rgb(128, 38, 26, 0.92);
+    x.fillStyle = rgb(228, 210, 174, 0.93); x.fillRect(0, y0, S, y1 - y0);
+    for (let i = 0; i < 700; i++) { x.fillStyle = rnd() < 0.7 ? rgb(150, 108, 78, R(0.06, 0.25)) : rgb(168, 96, 60, R(0.2, 0.6)); x.fillRect(R(0, S), R(y0, y1), R(1, 6), R(1, 2.5)); } // el engobe, gastado por el uso
+    x.strokeStyle = red; x.fillStyle = red; x.lineCap = x.lineJoin = 'round';
+    for (const yy of [y0 + 8, y1 - 8]) { x.lineWidth = 5.5; x.beginPath(); x.moveTo(0, yy); x.bezierCurveTo(S * 0.3, yy + 1.5, S * 0.7, yy - 1.5, S, yy); x.stroke(); }
+    x.lineWidth = 4.5; x.beginPath(); for (let i = 0; i <= N * 2; i++) { const px = (i * W) / 2, py = i % 2 ? y0 + 24 : y1 - 24; if (i) x.lineTo(px, py); else x.moveTo(px, py); } x.stroke(); // zigzag
+    for (let i = 0; i <= N; i++) { const px = i * W; x.beginPath(); x.moveTo(px - W * 0.2, y1 - 13); x.lineTo(px + W * 0.2, y1 - 13); x.lineTo(px, y1 - 13 - W * 0.36); x.closePath(); x.fill(); } // triángulos entre las puntas
+  }
+  if (soot) { // el hollín sube en lenguas desde la base
+    const q = x.createLinearGradient(0, S * (1 - soot), 0, S); q.addColorStop(0, rgb(20, 14, 12, 0)); q.addColorStop(0.55, rgb(20, 14, 12, 0.78)); q.addColorStop(1, rgb(14, 10, 9, 0.94)); x.fillStyle = q; x.fillRect(0, S * (1 - soot), S, S * soot);
+    for (let i = 0; i < 10; i++) blot(R(0, S), S * R(1 - soot, 1 - soot * 0.35), R(40, 95), (k) => rgb(18, 13, 11, 0.55 * k));
+  }
+  return c;
+}
+// Cáscara del piñón: clara donde estuvo unido a la piña, castaño rojizo y brillante en el resto, con vetas a lo largo.
+function pinonCanvas() {
+  const W = 128, H = 256, [c, x] = canvas(W, H), g = x.createLinearGradient(0, H, 0, 0);
+  g.addColorStop(0, rgb(236, 208, 164)); g.addColorStop(0.16, rgb(226, 178, 118)); g.addColorStop(0.36, rgb(190, 110, 56)); g.addColorStop(0.7, rgb(150, 70, 34)); g.addColorStop(0.92, rgb(98, 44, 24)); g.addColorStop(0.97, rgb(70, 34, 20)); g.addColorStop(1, rgb(206, 176, 134)); x.fillStyle = g; x.fillRect(0, 0, W, H);
+  for (let i = 0; i < 260; i++) { const px = R(0, W), y0 = R(0, H), l = R(30, 150); x.strokeStyle = rnd() < 0.55 ? rgb(70, 30, 16, R(0.06, 0.26)) : rgb(244, 190, 130, R(0.05, 0.22)); x.lineWidth = R(0.5, 1.8); x.beginPath(); x.moveTo(px, y0); x.lineTo(px + R(-1.5, 1.5), y0 + l); x.stroke(); } // vetas finas a lo largo
+  for (const u of [0.25, 0.75]) { const q = x.createLinearGradient(W * (u - 0.07), 0, W * (u + 0.07), 0); q.addColorStop(0, rgb(255, 214, 160, 0)); q.addColorStop(0.5, rgb(255, 214, 160, 0.22)); q.addColorStop(1, rgb(255, 214, 160, 0)); x.fillStyle = q; x.fillRect(W * (u - 0.07), 0, W * 0.14, H); } // las dos aristas de la semilla
+  for (let i = 0; i < 180; i++) { x.fillStyle = rgb(60, 26, 14, R(0.1, 0.35)); x.fillRect(R(0, W), R(0, H), R(0.6, 1.6), R(1, 4)); }
+  return c;
+}
+
 const grain = noiseCanvas(512, { oct: 7, lo: 95, hi: 255, base: 6 });
 export const TEX = {
   grain: tex(grain), grainBump: tex(grain, { srgb: false }),
@@ -185,6 +222,7 @@ export const TEX = {
   textile: tex(textileCanvas()), soft: tex(softCanvas(), { wrap: false }),
   strand: (() => { const [c, x] = canvas(256, 256); x.fillStyle = '#000'; x.fillRect(0, 0, 256, 256); for (let i = 0; i < 9000; i++) { const v = (40 + rnd() * 215) | 0; x.fillStyle = rgb(v, v, v); x.beginPath(); x.arc(R(0, 256), R(0, 256), R(0.7, 1.5), 0, 6.3); x.fill(); } return tex(c, { srgb: false }); })(), // puntas de pelo: cada punto es una hebra, más clara mientras más larga
   fur: tex(streakCanvas(256, 256, [[236, 236, 236], [205, 205, 205], [255, 255, 255], [176, 176, 176]], 2200, { lw: [0.6, 1.6] })), // pelaje: pelos cortos en la dirección del cuerpo
+  greda: tex(clayCanvas()), gredaPintada: tex(clayCanvas({ base: [176, 100, 62], band: true })), gredaHollin: tex(clayCanvas({ base: [140, 80, 54], soot: 0.62 })), pinon: tex(pinonCanvas()),
 };
 
 // ---------- texturas fotográficas (generadas aparte y guardadas en public/assets/tex) ----------
@@ -268,6 +306,7 @@ export const MAT = {
   rock: () => { const t = photo('roca'); return new THREE.MeshStandardMaterial({ map: t, bumpMap: t, bumpScale: 5, color: 0xffffff, roughness: 0.95 }); },
   thatch: () => new THREE.MeshStandardMaterial({ map: TEX.thatch, bumpMap: TEX.thatch, bumpScale: 3, roughness: 1 }),
   solid: () => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95 }),
+  clay: (map) => new THREE.MeshStandardMaterial({ map, bumpMap: map, bumpScale: 1.4, roughness: 0.82, side: THREE.DoubleSide }), // greda cocida, apenas bruñida
 };
 
 // Junta muchas piezas sólidas en pocas mallas con sombras, una por material:

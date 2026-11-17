@@ -256,10 +256,43 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
     quad({ kind: 'pudu', body: 0x8a5230, belly: 0xa9764c, legs: 0x5a3420, horns: rng() < 0.5 }, x, z, { hx: x, hz: z, hr: 16, pace: 0.6, shy: true });
 
   // ---------- aves ----------
-  const bird = (color, span, f, type) => { const b = buildBird(type); b.f = f; b.type = type; b.o = R(0, 6.28); scene.add(b.g); birds.push(b); };
-  bird(0x2e2622, 1.5, (t, b) => [CERRO[0] + Math.cos(t * 0.16) * 46, 78 + Math.sin(t * 0.23) * 6, CERRO[1] + Math.sin(t * 0.16) * 46, 0.25, 1.6], 'traro'); // el traro
-  for (let i = 0; i < 9; i++) { const dx = R(-7, 7), dy = R(-2.5, 2.5), dz = R(-7, 7); bird(0x4f8a3a, 0.55, (t) => [Math.cos(t * 0.11) * 150 + dx, 38 + Math.sin(t * 0.3) * 6 + dy, Math.sin(t * 0.11) * 105 + dz, 0.7, 13], 'choroy'); } // bandada de choroyes
-  for (const [cx, cz] of [[6, -30], [-34, 14], [30, 26], [-70, -40], [0, -80], [-90, 50], [60, -30]]) { const r = R(5, 11), sp = R(0.5, 0.9) * (rng() < 0.5 ? 1 : -1), hh = R(5, 11); bird(0x6a4a34, 0.3, (t, b) => [cx + Math.cos(t * sp + b.o) * r, height(cx, cz) + hh + Math.sin(t * 1.7 + b.o) * 1.5, cz + Math.sin(t * sp + b.o) * r * 0.7, 0.8, 16], 'small'); }
+  // Cada ave (o bandada) alterna entre volar por su recorrido y posarse en una rama seca de un árbol.
+  // Solo se las observa posadas: quietas se ven bien; en vuelo y de lejos son un borrón que no se deja mirar.
+  const TR = { giant: 1.3, pewen: 0.48, pewenYoung: 0.16, coigue: 0.6, roble: 0.5, canelo: 0.2, peumo: 0.34, boldo: 0.26, quillay: 0.36, litre: 0.2 }, UP = new THREE.Vector3(0, 1, 0);
+  const ramaMat = new THREE.MeshStandardMaterial({ map: photo('corteza-roble'), color: 0xa89888, roughness: 1 }), groups = [];
+  const closest = (list, x, z, n = 1, minD = 0) => list.map((t) => [Math.hypot(t.x - x, t.z - z), t]).filter((q) => q[0] >= minD).sort((a, b) => a[0] - b[0]).slice(0, n).map((q) => q[1]);
+  // La percha: una rama seca que sale del tronco a cierta altura. Devuelve dónde queda el ave, hacia dónde mira y desde dónde se la ve mejor.
+  function percha(t, hh, ang, len) {
+    const L = (TR[t.rec.kind] || 0.3) * t.rec.s * 0.9 + len, tilt = 0.22, dx = Math.cos(ang) * Math.cos(tilt), dz = Math.sin(ang) * Math.cos(tilt), dy = Math.sin(tilt), y0 = t.y + hh;
+    const g = new THREE.CylinderGeometry(0.012 + len * 0.012, 0.03 + len * 0.028, L, 6); g.translate(0, L / 2, 0);
+    const m = new THREE.Mesh(g, ramaMat); m.position.set(t.x, y0, t.z); m.quaternion.setFromUnitVectors(UP, new THREE.Vector3(dx, dy, dz)); m.castShadow = true; scene.add(m);
+    const d = L - 0.1 - len * 0.1, ox = Math.cos(ang), oz = Math.sin(ang), cl = Math.hypot(ox * 0.9 - oz * 0.42, oz * 0.9 + ox * 0.42); // el ave se posa cerca de la punta, atravesada en la rama; se la mira casi de perfil, con el tronco de fondo
+    return { x: t.x + dx * d, y: y0 + dy * d, z: t.z + dz * d, r: 0.018 + len * 0.014, yaw: Math.atan2(-oz, ox), cam: [(ox * 0.9 - oz * 0.42) / cl, (oz * 0.9 + ox * 0.42) / cl], tree: t };
+  }
+  // grupo: lo que comparten las aves que andan juntas (una bandada baja y se levanta junta). fly y rest: cuánto vuela y cuánto descansa.
+  const group = (o) => { const g = { ft: 0, st: 'fly', tm: 0, dur: 0, hold: 0, list: [], T: 4, ...o }; groups.push(g); return g; };
+  const bird = (type, f, g, perch) => { const b = buildBird(type); b.f = f; b.type = type; b.o = R(0, 6.28); b.grp = g; b.perch = perch || null; b.lag = g.list.length * 0.4; b.ph = R(0, 6); b.yaw = 0; b.pitch = 0; b.up = 0; b.perched = false; b.g.rotation.order = 'YXZ'; g.list.push(b); scene.add(b.g); birds.push(b); return b; };
+  // al terminar de armar un grupo: dónde está su posadero respecto del recorrido, y si parte volando o posado
+  const ready = (g, perched) => {
+    const ps = g.list.map((b) => b.perch).filter(Boolean); if (!ps.length) return;
+    g.pc = { x: ps.reduce((s, p) => s + p.x, 0) / ps.length, z: ps.reduce((s, p) => s + p.z, 0) / ps.length }; g.maxLag = g.list[g.list.length - 1].lag;
+    let best = 1e9, bt = 0; for (let t = 0; t < 130; t += 0.5) { const [x, , z] = g.list[0].f(t, g.list[0]), d = Math.hypot(x - g.pc.x, z - g.pc.z); if (d < best) { best = d; bt = t; } }
+    g.landR = best + 9; g.ft = bt + (perched ? 0 : R(8, 30)); g.st = perched ? 'perch' : 'fly'; g.dur = perched ? R(g.rest[0], g.rest[1]) : R(4, 12);
+  };
+  const tall = trees.filter((t) => t.kind === 'pewen' && t.H > 14);
+  { // el traro: planea sobre el cerro y se posa en un pewen cerca de la cima
+    const t0 = closest(tall.length ? tall : trees, CERRO[0], CERRO[1], 1, 12)[0], g = group({ fly: [40, 60], rest: [45, 70], T: 5 });
+    bird('traro', (t) => [CERRO[0] + Math.cos(t * 0.16) * 46, 78 + Math.sin(t * 0.23) * 6, CERRO[1] + Math.sin(t * 0.16) * 46, 0.25, 1.6], g, t0 && percha(t0, t0.H * 0.56, Math.atan2(CERRO[1] - t0.z, CERRO[0] - t0.x), 1.5)); ready(g, true);
+  }
+  { // la bandada de choroyes: cruza el valle y baja a los pewenes del bosque del norte, donde están los piñones
+    const ps = closest(tall, 0, -100, 3), g = group({ fly: [45, 70], rest: [40, 60], T: 5 });
+    for (let i = 0; i < 9; i++) { const dx = R(-7, 7), dy = R(-2.5, 2.5), dz = R(-7, 7), t0 = ps[i % (ps.length || 1)];
+      bird('choroy', (t) => [Math.cos(t * 0.11) * 150 + dx, 38 + Math.sin(t * 0.3) * 6 + dy, Math.sin(t * 0.11) * 105 + dz, 0.7, 13], g, t0 && percha(t0, t0.H * (0.4 + 0.1 * Math.floor(i / ps.length)), i * 2.3 + 0.5, 1.3)); }
+    ready(g, false);
+  }
+  // los rayaditos: revolotean entre los árboles y se posan en ramas bajas; si te acercas corriendo, se van
+  for (const [cx, cz] of [[6, -30], [-34, 14], [30, 26], [-70, -40], [0, -80], [-90, 50], [60, -30]]) { const r = R(5, 11), sp = R(0.5, 0.9) * (rng() < 0.5 ? 1 : -1), hh = R(5, 11), t0 = closest(trees, cx, cz)[0], g = group({ fly: [12, 24], rest: [20, 36], T: 2.6, shy: true });
+    bird('small', (t, b) => [cx + Math.cos(t * sp + b.o) * r, height(cx, cz) + hh + Math.sin(t * 1.7 + b.o) * 1.5, cz + Math.sin(t * sp + b.o) * r * 0.7, 0.8, 16], g, t0 && percha(t0, R(2.1, 3.2), R(0, 6.28), 0.75)); ready(g, rng() < 0.6); }
 
   // ---------- partículas ----------
   const P = (fill, opts) => { const b = new ParticleBatch(); fill(b); const m = b.build(opts); scene.add(m); return m; };
@@ -311,11 +344,33 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
       q.neck.rotation.y += (look * 0.6 - q.neck.rotation.y) * Math.min(1, dt * 3); q.headPivot.rotation.y = q.neck.rotation.y * 0.7;
       const fine = dp < 26; if (fine !== q.fine) { q.fine = fine; for (const sh of q.shells) sh.visible = fine; } // el pelaje fino solo se dibuja de cerca
     }
+    // cada grupo: vuela → baja a su posadero → descansa → se levanta. El recorrido se detiene mientras está posado.
+    for (const g of groups) {
+      g.tm += dt; g.hold = Math.max(0, g.hold - dt);
+      if (!g.pc) { g.ft += dt; continue; }
+      if (g.st === 'fly') { g.ft += dt; if (g.tm > g.dur) { const [x, , z] = g.list[0].f(g.ft, g.list[0]); if (Math.hypot(x - g.pc.x, z - g.pc.z) < g.landR) { g.st = 'land'; g.tm = 0; } } }
+      else if (g.st === 'land') { g.ft += dt * Math.max(0.12, 1 - g.tm / g.T); if (g.tm > g.T + g.maxLag) { g.st = 'perch'; g.tm = 0; g.dur = R(g.rest[0], g.rest[1]); } }
+      else if (g.st === 'perch') { const scared = g.shy && speed > 4.2 && Math.hypot(pp.x - g.pc.x, pp.z - g.pc.z) < 6; if ((g.tm > g.dur && g.hold <= 0) || scared) { g.st = 'off'; g.tm = 0; } } // mientras la observas no se va
+      else { g.ft += dt * Math.min(1, 0.12 + g.tm / g.T); if (g.tm > g.T + g.maxLag) { g.st = 'fly'; g.tm = 0; g.dur = R(g.fly[0], g.fly[1]); } }
+    }
+    const sm = (a, b2, v) => { const q = Math.min(1, Math.max(0, (v - a) / (b2 - a))); return q * q * (3 - 2 * q); };
     for (const b of birds) {
-      const [x, y, z, amp, fq] = b.f(t, b), [x2, y2, z2] = b.f(t + 0.05, b);
-      const scare = b.type === 'small' && Math.hypot(pp.x - x, pp.z - z) < 9 && speed > 1; b.up = (b.up || 0) + ((scare ? 7 : 0) - (b.up || 0)) * Math.min(1, dt * (scare ? 2.5 : 0.25)); // los pajaritos suben cuando pasas debajo
-      b.g.position.set(x, y + b.up, z); b.g.rotation.y = Math.atan2(x2 - x, z2 - z); b.g.rotation.x = -(y2 - y) * 2;
-      const fl = Math.sin(t * fq + b.o) * amp; b.wl.rotation.z = fl; b.wr.rotation.z = -fl; b.wlo.rotation.z = fl * 0.7 + Math.cos(t * fq + b.o) * amp * 0.3; b.wro.rotation.z = -b.wlo.rotation.z;
+      const g = b.grp, p = b.perch, [fx, fy, fz, amp, fq] = b.f(g.ft, b); let k = 0; // k: 0 en vuelo … 1 posada
+      if (p && g.st !== 'fly') { const u = sm(0, 1, (g.tm - b.lag) / g.T); k = g.st === 'perch' ? 1 : g.st === 'land' ? u : 1 - u; }
+      const scare = b.type === 'small' && k === 0 && Math.hypot(pp.x - fx, pp.z - fz) < 9 && speed > 1; b.up += ((scare ? 7 : 0) - b.up) * Math.min(1, dt * (scare ? 2.5 : 0.25)); // los pajaritos suben cuando pasas debajo
+      const sit = p ? p.r + BIRDS[b.type].k * 0.15 : 0, x = p ? fx + (p.x - fx) * k : fx, y = p ? fy + b.up * (1 - k) + (p.y + sit - fy) * k + Math.sin(Math.PI * k) * 1.2 : fy + b.up, z = p ? fz + (p.z - fz) * k : fz; // llega a la rama un poco desde arriba
+      // rumbo y cabeceo según hacia dónde se mueve de verdad; al posarse queda atravesada en la rama, más erguida, y mira alrededor
+      const o = b.g.position, mx = x - o.x, my = y - o.y, mz = z - o.z, hs = Math.hypot(mx, mz), F = sm(0.82, 1, k); let yaw = b.yaw, pitch = b.pitch;
+      if (b.seen && dt > 0 && hs > dt * 0.3) { yaw = Math.atan2(mx, mz); pitch = Math.max(-0.7, Math.min(0.7, -Math.atan2(my, hs) * 0.7)); }
+      if (p && F > 0) { let d = p.yaw + Math.sin(t * 0.37 + b.o) * 0.35 * F - yaw; d = Math.atan2(Math.sin(d), Math.cos(d)); yaw += d * F; pitch += (-0.42 - pitch) * F; }
+      let dy = yaw - b.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); b.yaw += dy * Math.min(1, dt * 7); b.pitch += (pitch - b.pitch) * Math.min(1, dt * 6); if (!b.seen) { b.yaw = yaw; b.seen = true; }
+      o.set(x, y, z); b.g.rotation.y = b.yaw; b.g.rotation.x = b.pitch;
+      // alas: baten más fuerte al frenar y al despegar, y se pliegan contra el cuerpo al quedar posada
+      const brake = Math.sin(Math.PI * k) * (1 - F); b.ph += dt * fq * (1 + brake * 1.3);
+      const fl = Math.sin(b.ph) * (amp + brake * 0.55) * (1 - F);
+      b.wl.rotation.z = fl - F * 0.5; b.wr.rotation.z = -fl + F * 0.5; b.wlo.rotation.z = (fl * 0.7 + Math.cos(b.ph) * amp * 0.3) * (1 - F); b.wro.rotation.z = -b.wlo.rotation.z;
+      b.wl.rotation.y = F * 1.3; b.wr.rotation.y = -F * 1.3; b.wlo.rotation.y = F * 0.9; b.wro.rotation.y = -F * 0.9;
+      b.perched = k === 1;
     }
   }
   const api = { update, actors, quads, birds, markMats, shyR: 9 }; // shyR: a qué distancia huyen los animales tímidos
