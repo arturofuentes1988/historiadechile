@@ -34,6 +34,7 @@ addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); po
 const bar = (f, txt) => { if (!$('load-bar')) return; $('load-bar').style.width = `${Math.round(f * 100)}%`; $('load-text').textContent = txt; };
 bar(0.12, 'Levantando el bosque…'); await new Promise((r) => setTimeout(r, 60));
 const world = buildWorld(scene, RAPIER, physics);
+physics.step(); // una sola vez: deja indexados todos los obstáculos fijos para las consultas (chocar, apoyar los pies, la cámara)
 assets.onProgress = (l, t) => bar(0.3 + 0.7 * (l / t), `Cargando texturas… ${l} de ${t}`);
 bar(0.3 + 0.7 * (assets.total ? assets.loaded / assets.total : 0), 'Cargando texturas…');
 
@@ -42,8 +43,12 @@ const boy = buildPerson({ kind: 'boy', h: 1.38 }); scene.add(boy.g);
 const START = [-6, -1];
 
 const RAD = 0.3, HALF = 0.36, FEET = HALF + RAD;
-const pBody = physics.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(START[0], height(...START) + FEET + 0.05, START[1]));
-const pCol = physics.createCollider(RAPIER.ColliderDesc.capsule(HALF, RAD), pBody);
+// Leftraru es el único que se mueve entre los obstáculos fijos del mundo (terreno, árboles, rocas, rukas). Por eso
+// no hace falta simular la física en cada cuadro: su colisionador se mueve a mano y el controlador de personaje
+// calcula contra el mundo, que se indexa una sola vez (más abajo). Antes se reordenaban los miles de objetos fijos
+// en cada cuadro: costaba varios milisegundos y, tras un buen rato de juego, ese paso podía fallar y congelar todo.
+const pCol = physics.createCollider(RAPIER.ColliderDesc.capsule(HALF, RAD).setTranslation(START[0], height(...START) + FEET + 0.05, START[1]));
+const setPos = (x, y, z) => { if (Number.isFinite(x + y + z)) pCol.setTranslation({ x, y, z }); }; // nunca se le pasa una posición inválida a la física
 const ctrl = physics.createCharacterController(0.02);
 ctrl.enableAutostep(0.3, 0.2, true); ctrl.setMaxSlopeClimbAngle(0.95); ctrl.setMinSlopeSlideAngle(1.0);
 
@@ -53,7 +58,7 @@ const keys = {};
 let state = 'title', got = 0, time = 0;
 
 const cine = new Cinematic(camera);
-const pp = () => pBody.translation();
+const pp = () => pCol.translation();
 
 // De la portada al juego: «Entrar al mundo» lleva a elegir «Historia». El capítulo parte con un prólogo —una hoja
 // escrita que va pasando y cuenta dónde estamos— y dos planos que llevan del relato al juego. Si ya habías empezado, se entra directo.
@@ -119,7 +124,7 @@ function applyOpts() {
   localStorage.setItem('leftraru.opciones', JSON.stringify(opts));
 }
 function setMenu(on) {
-  if (on !== menuOpen) snd.play('ui-menu', 0.7);
+  if (on !== menuOpen) snd.play(on ? 'ui-menu' : 'ui-volver', 0.45);
   menuOpen = on; menuPage('opciones'); $('menu').classList.toggle('on', on); document.body.classList.toggle('en-portada', state === 'title');
   if (on) { ui.show(null); document.exitPointerLock?.(); for (const k in keys) keys[k] = false; } else if (state === 'play') lock();
 }
@@ -194,12 +199,12 @@ function interact() {
   if (!near || state !== 'play' || ui.open || focus) return;
   const c = near; near = null; $('prompt').classList.remove('on');
   if (c.person) {
-    const d = TALK[c.id], a = c.person; a.face = Math.atan2(pp().x - a.x, pp().z - a.z); player.facing = Math.atan2(a.x - pp().x, a.z - pp().z);
+    const d = TALK[c.id], a = c.person; if (a.mode !== 'cook') a.face = Math.atan2(pp().x - a.x, pp().z - a.z); player.facing = Math.atan2(a.x - pp().x, a.z - pp().z);
     // La primera vez, la persona se presenta (y queda en el cuaderno). Si la historia sigue con ella, se presenta con eso mismo.
     const q = acc.talk(c.id), first = !c.known, story = q && (c.known || q.main) ? q : null;
     const meet = first ? () => { ui.discover(c.id, photo(c.target, c.shot)); for (const id of d.da) ui.discover(id, VIEWS[id] ? viewPhoto(id) : ''); } : null;
     talk = { name: d.name, lines: story ? story.lines : first ? d.lines : [d.again], i: 0, done: () => { if (meet) meet(); if (story && story.done) story.done(); } }; say();
-  } else if (c.shot.view) ui.discover(c.id, viewPhoto(c.shot.view)); else startFocus(c);
+  } else { snd.play('hablar-sigue', 0.4, 0.96 + Math.random() * 0.08); if (c.shot.view) ui.discover(c.id, viewPhoto(c.shot.view)); else startFocus(c); } // el mismo toque que al pasar una línea de diálogo
 }
 $('dialogo').addEventListener('click', () => interact());
 
@@ -213,11 +218,14 @@ function playScene(shots, after) {
 // Al recoger el último piñón: Leftraru agradece al pewen y, en la aldea, su madre lo espera. (Se muestra cuando ya pisa el suelo.)
 let outroPend = false;
 function outro() {
-  const b = pp(), fx = Math.sin(player.facing), fz = Math.cos(player.facing), eye = V3(b.x, b.y - FEET + 1.0, b.z), G = (x, y, z) => V3(x, height(x, z) + y, z);
+  const b = pp(), fx = Math.sin(player.facing), fz = Math.cos(player.facing), eye = V3(b.x, b.y - FEET + 1.0, b.z);
   const front = (d, side, up) => V3(b.x + fx * d + fz * side, b.y - FEET + up, b.z + fz * d - fx * side);
+  // En la aldea, Millaray ya está junto al fogón revolviendo la olla, que humea. La cámara la mira de frente y se le acerca.
+  acc.madreCocina(true); const ma = world.life.actors.find((a) => a.name === 'Millaray'), ax = Math.sin(ma.face), az = Math.cos(ma.face), ox = ma.x + ax * 0.55, oz = ma.z + az * 0.55, oy = height(ox, oz);
+  const K = (ade, lado, up) => V3(ox + ax * ade + az * lado, oy + up, oz + az * ade - ax * lado); // medido desde la olla: hacia donde mira ella, hacia el lado del fuego y hacia arriba
   playScene([
     { dur: 7, from: front(2.7, -1.3, 0.95), to: front(2.1, 1.1, 1.2), lookFrom: eye, text: 'El último piñón. Leftraru le da las gracias al pewen: se llevó lo que el árbol dejó caer, y nada más.' },
-    { dur: 7, from: G(-7.2, 1.7, -2.4), to: G(-8.2, 1.45, -3.7), lookFrom: G(-9.9, 1.15, -5.1), text: 'En la aldea, su madre ya puso el agua al fuego. Es hora de volver.' },
+    { dur: 8, fov: 40, from: K(4.1, -1.4, 1.8), to: K(3.4, -0.9, 1.5), lookFrom: K(-0.1, 0.15, 0.7), text: 'En la aldea, su madre ya puso el agua al fuego. Es hora de volver.' },
   ]);
 }
 // Momentos de la historia que piden una escena. 'cima': lo que el padre le muestra desde el cerro Treng Treng.
@@ -227,33 +235,42 @@ function story(kind, after) {
   if (kind !== 'cima') return;
   const pa = world.life.actors.find((a) => a.name === 'Curiñancu'), sx = pa.x, sz = pa.z, sy = height(sx, sz), vol = world.volcano;
   const unit = (x, z) => { const l = Math.hypot(x, z) || 1; return [x / l, z / l]; }, dV = unit(vol.x - sx, vol.z - sz), dA = unit(-sx, -sz); // hacia el volcán y hacia la aldea
-  const turn = ([dx, dz]) => () => { // los dos, hombro con hombro, mirando hacia (dx, dz)
-    const bx = sx - dz * 0.95, bz = sz + dx * 0.95, f = Math.atan2(dx, dz);
-    pBody.setTranslation({ x: bx, y: height(bx, bz) + FEET + 0.05, z: bz }, true); player.vy = 0; player.speed = 0; player.facing = f; pa.face = f; pa.quieto = true;
-  };
-  const back = ([dx, dz], d, up) => V3(sx - dz * 0.45 - dx * d, sy + up, sz + dx * 0.45 - dz * d); // detrás de ellos, entre los dos
+  const lx = sx - dV[1] * 0.95, lz = sz + dV[0] * 0.95, mx = (sx + lx) / 2, mz = (sz + lz) / 2; // el lugar de Leftraru, hombro con hombro con su padre, y el punto medio entre los dos
+  const mira = ([dx, dz]) => () => { const f = Math.atan2(dx, dz); setPos(lx, height(lx, lz) + FEET + 0.05, lz); player.vy = 0; player.speed = 0; player.facing = f; pa.face = f; pa.quieto = true; }; // los dos miran hacia (dx, dz)
+  const back = ([dx, dz], d, up) => V3(mx - dx * d, sy + up, mz - dz * d); // detrás de ellos, entre los dos
   // el traro: que esté volando desde el comienzo, para que al mostrarlo ya vaya planeando sobre el cerro
   const tr = world.life.birds.find((b) => b.type === 'traro'), vuela = () => { const g = tr.grp; if (g.st !== 'fly') { g.st = 'fly'; g.tm = 0; } g.dur = 90; };
   // la cámara lo acompaña por fuera de su vuelta y desde arriba: se lo ve de cerca, con la cima y los dos allá abajo
   const conTraro = (camera) => { const o = tr.g.position, fx = Math.sin(tr.yaw), fz = Math.cos(tr.yaw); camera.position.set(o.x + fx * 1.3 + fz * 2.4, o.y + 1.8, o.z + fz * 1.3 - fx * 2.4); camera.lookAt(o.x + fx * 0.35, o.y - 0.05, o.z + fz * 0.35); };
-  playScene([
-    { dur: 8, on: () => { turn(dA)(); vuela(); }, from: back(dA, 4.4, 2.3), to: back(dA, 3.3, 2.0), lookFrom: V3(sx + dA[0] * 60, sy - 7, sz + dA[1] * 60), who: 'Curiñancu', text: 'Mira. Hacia donde se esconde el sol está el lafken, el mar. Y allá abajo, el humo de nuestras rukas.' },
-    { dur: 9, on: turn(dV), from: back(dV, 7.2, 2.75), to: back(dV, 5.6, 2.4), lookFrom: V3(vol.x, 140, vol.z), lookTo: V3(vol.x, 185, vol.z), who: 'Curiñancu', text: 'Hacia donde nace, el volcán, la casa del pillán. Todo lo que hay entre uno y otro es tu mundo.' },
+  const aldea = V3(0, 3, 0);
+  const escena = () => playScene([
+    // la aldea: la cámara parte detrás de los dos y se eleva por sobre el bosque, hasta que el claro, las rukas y su humo quedan a la vista
+    { dur: 11, fov: 38, on: () => { mira(dA)(); vuela(); }, from: V3(mx - dA[0] * 8, sy + 3.2, mz - dA[1] * 8), to: V3(mx + dA[0] * 46, sy + 58, mz + dA[1] * 46), lookFrom: aldea, who: 'Curiñancu', text: 'Mira. Hacia donde se esconde el sol está el lafken, el mar. Y allá abajo, el humo de nuestras rukas.' },
+    { dur: 9, on: mira(dV), from: back(dV, 7.2, 2.75), to: back(dV, 5.6, 2.4), lookFrom: V3(vol.x, 140, vol.z), lookTo: V3(vol.x, 185, vol.z), who: 'Curiñancu', text: 'Hacia donde nace, el volcán, la casa del pillán. Todo lo que hay entre uno y otro es tu mundo.' },
     { dur: 9, cam: conTraro, fov: 34, who: 'Curiñancu', text: '¿Ves al traro, dando vueltas sobre el cerro? Mira mucho antes de bajar, y cuando baja, no falla.' },
-    { dur: 7, from: back(dV, -3.0, 1.25), to: back(dV, -2.3, 1.2), lookFrom: V3(sx - dV[1] * 0.45, sy + 1.25, sz + dV[0] * 0.45), who: 'Curiñancu', text: 'Por él te llamas Leftraru: traro veloz.' },
+    { dur: 7, from: back(dV, -3.0, 1.25), to: back(dV, -2.3, 1.2), lookFrom: V3(mx, sy + 1.25, mz), who: 'Curiñancu', text: 'Por él te llamas Leftraru: traro veloz.' },
   ], after);
+  // Primero Leftraru camina solo hasta ponerse al lado de su padre, mirando hacia donde mira él; recién entonces empieza la escena.
+  pa.quieto = true; pa.face = Math.atan2(dV[0], dV[1]);
+  auto = { x: lx, z: lz, face: Math.atan2(dV[0], dV[1]), done: escena };
 }
 // Lo que alguien dice al pasar, sin detener el juego (el padre mientras suben al cerro): aparece abajo unos segundos.
 let subT = 0;
 function murmur(name, text, secs = 7) { $('sub-name').textContent = name; $('sub-text').textContent = text; const s = $('sub'); s.classList.remove('relato'); s.classList.add('on'); subT = secs; snd.play('hablar-sigue', 0.35, 0.9); }
-// Mensajes de arriba. hint lo muestra de inmediato; los avisos que llegan juntos (un hallazgo, una misión
-// cumplida, la misión que sigue) hacen fila para que cada uno alcance a leerse.
-let hintT = 0, toastGap = 0; const toasts = [];
-function showHint(txt, secs) { $('hint').textContent = txt; $('hint').classList.add('on'); hintT = secs; toastGap = Math.min(secs, 2.8); }
+// Mensajes. Arriba al centro van los de la historia (misiones y encargos, con letra grande) y las ayudas del momento;
+// los puntos de investigación que se van ganando aparecen aparte, chicos, a la izquierda, sobre el minimapa.
+// hint lo muestra de inmediato; los avisos que llegan juntos hacen fila para que cada uno alcance a leerse.
+let hintT = 0, toastGap = 0, apunteGap = 0; const toasts = [], apuntes = [], vistos = [], GRANDE = ['mision', 'encargo', 'logro'];
+function showHint(txt, secs, grande = false) { const h = $('hint'); h.textContent = txt; h.classList.toggle('grande', grande); h.classList.add('on'); hintT = secs; toastGap = Math.min(secs, 2.8); }
 function hint(txt, secs) { if (toasts.length) toasts.push([txt, secs]); else showHint(txt, secs); }
-function toast(txt, secs = 5, sound = null) { toasts.push([txt, secs, sound]); } // sound: qué toque lo acompaña
+function toast(txt, secs = 5, sound = null, grande = GRANDE.includes(sound)) { if (sound === 'hallazgo' || sound === 'foto') apuntes.push([txt, sound]); else toasts.push([txt, secs, sound, grande]); } // sound: qué toque lo acompaña
+function apunte(txt, sound) { // un renglón sobre el minimapa, que se va solo a los pocos segundos
+  const el = document.createElement('div'); el.className = 'ap'; el.textContent = txt; $('apuntes').appendChild(el); vistos.push({ el, t: 5.5 });
+  while (vistos.length > 4) vistos.shift().el.remove();
+  if (TOQUE[sound]) snd.play(...TOQUE[sound]);
+}
 // cada tipo de aviso suena distinto: algo nuevo en el cuaderno, un encargo o una misión por hacer, algo logrado
-const TOQUE = { hallazgo: ['ui-hallazgo', 0.5], encargo: ['ui-mision', 0.5], mision: ['ui-mision', 0.5], logro: ['ui-logro', 0.55], foto: ['ui-cuaderno', 0.5] };
+const TOQUE = { hallazgo: ['ui-hallazgo', 0.45], encargo: ['ui-mision', 0.5], mision: ['ui-mision', 0.5], logro: ['ui-logro', 0.5], foto: ['ui-cuaderno', 0.5] };
 const teclas = (s) => s.replace(/\{(\w+)\}/g, (_, a) => keyName(opts.keys[a] || a)); // {observar} → la tecla que tenga esa acción
 
 addEventListener('keydown', (e) => {
@@ -275,7 +292,12 @@ addEventListener('keydown', (e) => {
   if (['Space', 'Tab', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
 });
 addEventListener('keyup', (e) => { keys[e.code] = false; });
+// Si la ventana pierde el foco con una tecla apretada, el navegador nunca avisa que se soltó y Leftraru seguiría
+// caminando solo. Al salir de la ventana se sueltan todas, y también el arrastre de la cámara.
+const sueltaTodo = () => { for (const k in keys) keys[k] = false; dragging = false; document.body.classList.remove('girando'); };
+addEventListener('blur', sueltaTodo); document.addEventListener('visibilitychange', sueltaTodo);
 addEventListener('mousemove', (e) => {
+  if (dragging && !e.buttons) { dragging = false; document.body.classList.remove('girando'); } // el botón se soltó fuera de la ventana
   if (focus || (!locked() && !(dragging && state === 'play'))) return;
   document.body.classList.remove('sin-raton');
   cam.yaw -= e.movementX * 0.0042 * opts.sens; cam.pitch = Math.min(1.2, Math.max(-0.25, cam.pitch + e.movementY * 0.0032 * opts.sens * (opts.inv ? -1 : 1)));
@@ -284,21 +306,29 @@ addEventListener('mousemove', (e) => {
 let doable = null, actT = 0;
 const ripples = Array.from({ length: 10 }, () => { const m = new THREE.Mesh(new THREE.RingGeometry(0.8, 1, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xeaf4f4, transparent: true, opacity: 0, depthWrite: false })); m.visible = false; m.renderOrder = 4; scene.add(m); return m; });
 let ripT = 0, ripI = 0;
+// Cuando la historia lo pide, Leftraru camina solo hasta un punto: { x, z, face, done }. Al llegar se gira hacia face y se llama done.
+let auto = null;
 function updatePlayer(dt) {
-  let ix = 0, iz = 0;
-  if (state === 'play' && !ui.open && !talk && !focus && !acc.busy && desmayo <= 0) {
+  let ix = 0, iz = 0, andar = null;
+  if (auto && state === 'play') {
+    const q = pp(), ax = auto.x - q.x, az = auto.z - q.z, ad = Math.hypot(ax, az); auto.t = (auto.t || 0) + dt;
+    if (ad > 0.14 && auto.t < 6) andar = [ax / ad, az / ad, Math.min(2.3, 0.6 + ad * 2.5)]; // hacia allá, frenando al acercarse
+    else { if (ad > 0.14) setPos(auto.x, height(auto.x, auto.z) + FEET + 0.05, auto.z); // si algo le estorbó, igual queda en su lugar
+      let d = auto.face - player.facing; d = Math.atan2(Math.sin(d), Math.cos(d)); player.facing += d * Math.min(1, dt * 7);
+      if (Math.abs(d) < 0.06 || auto.t > 8) { const fin = auto.done; auto = null; fin(); } }
+  } else if (state === 'play' && !ui.open && !talk && !focus && !acc.busy && desmayo <= 0) {
     ix = (down('derecha') || keys.ArrowRight ? 1 : 0) - (down('izquierda') || keys.ArrowLeft ? 1 : 0);
     iz = (down('adelante') || keys.ArrowUp ? 1 : 0) - (down('atras') || keys.ArrowDown ? 1 : 0);
     cam.yaw += ((down('camIzq') ? 1 : 0) - (down('camDer') ? 1 : 0)) * dt * 1.8;
   }
   const wade = Math.min(1, Math.max(0, (WATER_Y - (pp().y - FEET)) / 0.8)); player.wade = wade; // con el agua a las rodillas se avanza más lento
-  const run = down('correr'), target = (ix || iz ? (run ? 6.2 * (ui.skill('ligero') ? 1.18 : 1) : 3.3) : 0) * (1 - wade * 0.5);
+  const run = down('correr'), target = andar ? andar[2] : (ix || iz ? (run ? 6.2 * (ui.skill('ligero') ? 1.18 : 1) : 3.3) : 0) * (1 - wade * 0.5);
   player.speed += (target - player.speed) * Math.min(1, dt * 10);
   const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw);
-  let dx = fx * iz + rx * ix, dz = fz * iz + rz * ix; const l = Math.hypot(dx, dz);
+  let dx = fx * iz + rx * ix, dz = fz * iz + rz * ix; if (andar) { dx = andar[0]; dz = andar[1]; } const l = Math.hypot(dx, dz);
   if (l > 0) { dx /= l; dz /= l; player.dirX = dx; player.dirZ = dz; let d = Math.atan2(dx, dz) - player.facing; d = Math.atan2(Math.sin(d), Math.cos(d)); player.facing += d * Math.min(1, dt * 12); }
   if (acc.sitting && (ix || iz || down('saltar'))) acc.stand(); // cualquier movimiento lo hace levantarse
-  if (player.grounded && state === 'play' && !ui.open && !talk && !focus && !acc.sitting && down('saltar')) { player.vy = 6.6 * (ui.skill('salto') ? 1.22 : 1); player.grounded = false; }
+  if (player.grounded && state === 'play' && !ui.open && !talk && !focus && !acc.sitting && !auto && down('saltar')) { player.vy = 6.6 * (ui.skill('salto') ? 1.22 : 1); player.grounded = false; }
   player.vy = Math.max(-25, player.vy - 18 * dt);
   if (player.vy > 0) ctrl.disableSnapToGround(); else ctrl.enableSnapToGround(0.3);
   const mvx = (player.dirX || 0) * player.speed * dt, mvz = (player.dirZ || 0) * player.speed * dt;
@@ -308,8 +338,12 @@ function updatePlayer(dt) {
   if (player.grounded && player.vy < 0) player.vy = -1;
   let nx = p.x + m.x, ny = p.y + m.y, nz = p.z + m.z; [nx, nz] = inBounds(nx, nz);
   if (ny < height(nx, nz) - 2) ny = height(nx, nz) + FEET + 0.2; // red de seguridad
-  pBody.setNextKinematicTranslation({ x: nx, y: ny, z: nz });
-  physics.timestep = dt; physics.step();
+  // La gente y los animales tienen cuerpo. Si Leftraru camina contra alguno, no pasa. Si él está quieto y es el otro
+  // el que viene caminando, es el otro el que lo rodea: nadie lo mueve de donde está parado.
+  for (const o of world.life.solids) { const ox = nx - o.x, oz = nz - o.z, r = RAD + o.rad, d2 = ox * ox + oz * oz; if (d2 < r * r && d2 > 1e-6 && Math.abs(ny - FEET - height(o.x, o.z)) < 1.3) { const d = Math.sqrt(d2), ux = ox / d, uz = oz / d;
+    if (player.speed < 0.5 && (o.speed || 0) > 0.05) { o.x = nx - ux * r; o.z = nz - uz * r; if (o.tx !== undefined && Math.hypot(o.tx - nx, o.tz - nz) < r + 0.3) { o.tx = o.x; o.tz = o.z; } } // un animal que venía justo hacia él se queda a su lado
+    else { nx = o.x + ux * r; nz = o.z + uz * r; } } }
+  setPos(nx, ny, nz);
 
   // animación procedural
   const t = pp(); boy.g.position.set(t.x, t.y - FEET, t.z); boy.g.rotation.y = player.facing;
@@ -324,8 +358,11 @@ function updatePlayer(dt) {
     // cuando la historia avanza un paso, se avisa qué sigue (después de los avisos de lo recién logrado)
     const av = m ? m.aviso : 'Hasta aquí llega la historia por ahora: pronto llegarán los invitados de la costa. Mientras tanto, explora el valle y termina tus encargos.';
     const list = (Array.isArray(av) ? av : [av]).map(teclas), key = list.join('|');
-    if (key !== lastAviso) { lastAviso = key; list.forEach((t, n) => toast(t, 10, n ? null : 'mision')); }
-    else if (m && m.fijo && hintT < 0.6 && !toasts.length) showHint(list[0], 8); // el paso del tutorial sigue a la vista hasta que lo haces
+    if (key !== lastAviso) { lastAviso = key; list.forEach((t, n) => toast(t, 10, n ? null : 'mision', true)); }
+    else if (m && m.fijo && hintT < 0.6 && !toasts.length) showHint(list[0], 8, true); // el paso del tutorial sigue a la vista hasta que lo haces
+    // La guía de la historia se pone sola: apunta a la misión principal abierta, salvo que el jugador haya marcado otra cosa o se la haya quitado.
+    if (m && !guia && guiaNo !== m.id) setGuia({ kind: 'mision', id: m.id, auto: true }, 'sola');
+    else if (guia && guia.auto && (!m || guia.id !== m.id)) setGuia(m && guiaNo !== m.id ? { kind: 'mision', id: m.id, auto: true } : null, 'sola');
     ui.marks = ui.skill('rastro') ? explorer.hints(t) : [];
   }
   // ¿hay algo cerca que observar o alguien con quien hablar?
@@ -372,7 +409,7 @@ function updateFocus(dt) {
   if (f.stage === 0) { f.t = Math.min(1, f.t + dt / 0.9); const k = ease(f.t); camera.position.lerpVectors(f.sp, f.pos, k); camera.fov = f.sf + (f.fov - f.sf) * k; camera.lookAt(f.look.clone().lerp(tv, k)); if (k > 0.4) boy.g.visible = false; if (f.t >= 1) f.stage = 1; }
   else if (f.stage === 1) {
     camera.position.copy(f.pos); camera.lookAt(tv); f.hold += dt;
-    if (f.hold > 0.45 && !f.done) { f.done = true; camera.updateProjectionMatrix(); world.update(0, time, camera.position, pp(), 0); draw(); const img = grab(); if (f.c.known) ui.retake(f.c.id, img); else ui.discover(f.c.id, img); }
+    if (f.hold > 0.45 && !f.done) { f.done = true; camera.updateProjectionMatrix(); world.update(0, time, camera.position, pp(), 0); draw(); const img = grab(); if (f.c.known) ui.retake(f.c.id, img); else ui.discover(f.c.id, img, T); }
     if (f.hold > 1.7) { f.stage = 2; f.t = 0; $('focus').classList.remove('on'); world.restoreView(); }
   } else { f.t = Math.min(1, f.t + dt / 0.7); const k = ease(f.t), [pos, look] = chase(); camera.position.lerpVectors(f.pos, pos, k); camera.fov = f.fov + (f.sf - f.fov) * k; camera.lookAt(tv.lerp(look, k)); if (k > 0.5) boy.g.visible = true; if (f.t >= 1) { camera.fov = f.sf; focus = null; document.body.classList.remove('talking'); } }
   lamp.position.copy(camera.position); lamp.intensity = lamp.userData.on && focus ? (f.stage === 1 ? 7 : f.stage === 0 ? 7 * f.t : 7 * (1 - f.t)) : 0;
@@ -386,7 +423,7 @@ function updateItems() {
     it.off = !on; it.mesh.visible = on && !it.taken; if (it.taken || !on) continue;
     it.mesh.position.y = it.base.y + Math.sin(time * 2 + it.base.x) * 0.15; it.mesh.rotation.y = time * 1.5;
     if (state === 'play' && Math.hypot(t.x - it.base.x, t.y - it.base.y + 0.3, t.z - it.base.z) < 1.25) {
-      if (!ui.has('pinon')) ui.discover('pinon', photo({ x: it.base.x, y: it.mesh.position.y, z: it.base.z }, { dist: 1.5, up: 0.25, fov: 34 }));
+      if (!ui.has('pinon')) ui.discover('pinon', photo({ x: it.base.x, y: it.mesh.position.y, z: it.base.z }, { dist: 1.5, up: 0.25, fov: 34 }), it.base);
       it.taken = true; it.mesh.visible = false; got++; ui.addItem('pinon'); acc.pin(i); snd.play('pinon', 0.6, 1 + (got - 1) * 0.06);
       if (got === world.items.length) outroPend = true;
       else if (got === world.items.length - 1) hint('Falta uno. Está sobre las rocas, al fondo del bosque: sube saltando.', 8);
@@ -394,10 +431,10 @@ function updateItems() {
   }
 }
 
-const ui = createUI({ world, onToast: (t, kind) => toast(t, 5, kind || 'hallazgo'), onClose: () => { if (state === 'play' && !menuOpen) lock(); }, onSkill: () => applySkills(), onGuide: (g) => setGuia(g) });
+const ui = createUI({ world, onToast: (t, kind) => toast(t, 5, kind || 'hallazgo'), onClose: () => { if (state === 'play' && !menuOpen) lock(); }, onSkill: () => applySkills(), onGuide: (g) => setGuia(g, 'jugador') });
 renderer.domElement.addEventListener('webglcontextrestored', () => ui.repaint()); // si el navegador pierde y recupera el contexto gráfico, el fondo del minimapa se vuelve a pintar
 const acc = createActions({ world, ui, snd, scene, hint, murmur, player, story, pinones: () => [got, world.items.length],
-  place: (x, z, facing) => { pBody.setTranslation({ x, y: height(x, z) + FEET + 0.05, z }, true); player.vy = 0; player.speed = 0; player.facing = facing; },
+  place: (x, z, facing) => { setPos(x, height(x, z) + FEET + 0.05, z); player.vy = 0; player.speed = 0; player.facing = facing; },
   speak: (name, lines, done) => { talk = { name, lines, i: 0, done: done || null }; say(); },
   ripple: (x, z) => { const r = ripples[ripI++ % ripples.length]; r.position.set(x, WATER_Y + 0.03, z); r.userData.t = 0; r.visible = true; } });
 const explorer = createExplorer({ world, ui }); explorer.urgent = (id) => acc.wants(id);
@@ -405,11 +442,12 @@ for (const i of acc.pins) { const it = world.items[i]; if (it && !it.taken) { it
 // ---------- línea de guía: de donde estás hasta un destino, por los senderos cuando conviene ----------
 // El destino puede ser un punto marcado en el mapa, una persona o una misión (entonces apunta a donde toque ir ahora).
 // La línea parte siempre de Leftraru: a medida que avanza, lo recorrido deja de dibujarse.
-let guia = null, guiaT = null, guiaVia = false;
-function setGuia(g) {
+let guia = null, guiaT = null, guiaVia = false, guiaNo = null; // guiaNo: la misión de la historia a la que el jugador le quitó la guía (no se le vuelve a poner sola)
+function setGuia(g, quien) { // quien: 'jugador' si la puso o la quitó él en el mapa o en la lista; 'sola' si la pone la historia
+  if (quien === 'jugador') guiaNo = !g && guia && guia.kind === 'mision' ? guia.id : null;
   guia = g; guiaT = null; ui.guide = null; ui.guideKey = g ? (g.kind === 'mision' ? 'm:' + g.id : 'p') : ''; misT = 0;
-  if (!g) return; snd.play('ui-mapa', 0.5); destinoGuia(pp());
-  if (!guiaT) { hint('Para esto no hay un solo lugar que marcar: explora y pregunta.', 6); guia = null; ui.guideKey = ''; }
+  if (!g) return; if (quien !== 'sola') snd.play('ui-mapa', 0.5); destinoGuia(pp());
+  if (!guiaT && quien !== 'sola') { hint('Para esto no hay un solo lugar que marcar: explora y pregunta.', 6); guia = null; ui.guideKey = ''; }
 }
 function destinoGuia(p) { // a dónde apunta ahora (se revisa un par de veces por segundo)
   if (!guia) return;
@@ -430,11 +468,11 @@ function updateVida(dt) {
   if (state !== 'play') return;
   if (desmayo > 0) { // se desmayó: la pantalla se oscurece y despierta junto al fogón
     const antes = desmayo; desmayo -= dt;
-    if (antes > 1.6 && desmayo <= 1.6) { pBody.setTranslation({ x: -2.3, y: height(-2.3, 1.5) + FEET + 0.05, z: 1.5 }, true); player.vy = 0; player.speed = 0; vida = 60; $('velo').classList.remove('on'); hint('Te desmayaste. Despiertas junto al fogón: alguien te trajo y te abrigó.', 9); }
+    if (antes > 1.6 && desmayo <= 1.6) { setPos(-2.3, height(-2.3, 1.5) + FEET + 0.05, 1.5); player.vy = 0; player.speed = 0; vida = 60; $('velo').classList.remove('on'); hint('Te desmayaste. Despiertas junto al fogón: alguien te trajo y te abrigó.', 9); }
     return;
   }
   if (!player.grounded) fallV = Math.min(fallV, player.vy);
-  else { if (!enSuelo && fallV < -13) { vida -= (-fallV - 13) * 5; hint('Caíste desde muy alto y te golpeaste.', 5); snd.play('ui-menu', 0.6, 0.7); } fallV = 0; }
+  else { if (!enSuelo && fallV < -13) { vida -= (-fallV - 13) * 5; hint('Caíste desde muy alto y te golpeaste.', 5); snd.play('paso-tierra-1', 1, 0.55); } fallV = 0; }
   enSuelo = player.grounded;
   const helada = player.wade > 0.85; // con el agua al pecho, en pleno invierno
   if (helada) { vida -= 5 * dt; if (!frio) hint('El agua está helada: no te quedes mucho rato adentro.', 6); } else vida = Math.min(100, vida + dt * (acc.sitting ? 5 : 1.2));
@@ -444,8 +482,8 @@ function updateVida(dt) {
 }
 drawKeys(); applySkills();
 await assets.whenLoaded(); bar(1, 'Listo'); assets.onProgress = null; $('loading').classList.add('hide'); setTimeout(() => $('loading').remove(), 700);
-window.__g = { snd, height, ui, explorer, acc, story, toasts, murmur, setGuia, renderer, get vida() { return vida; }, set vida(v) { vida = v; }, camera, abrirPrologo, cerrarPrologo, get prologo() { return prologo; }, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
-  tp(x, y, z) { pBody.setTranslation({ x, y, z }, true); player.vy = 0; },
+window.__g = { snd, height, ui, explorer, acc, story, toasts, murmur, setGuia, renderer, get vida() { return vida; }, set vida(v) { vida = v; }, camera, abrirPrologo, cerrarPrologo, get prologo() { return prologo; }, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, get guia() { return guia; }, get guiaT() { return guiaT; }, outro, apuntes, sueltaTodo, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
+  tp(x, y, z) { setPos(x, y, z); player.vy = 0; },
   view(x, y, z, lx, ly, lz) { camera.position.set(x, y, z); camera.lookAt(lx, ly, lz); world.update(0, time, camera.position, pp()); draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); },
   snap() { draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); } };
 
@@ -471,18 +509,23 @@ function tick(dt) {
   world.update(dt, time, camera.position, pp(), player.speed); lights.follow(state === 'title' || prologo ? { x: 0, y: 3, z: 0 } : cine.active ? camera.position : pp());
   if (state === 'play') { updateGuia(); ui.drawMap(pp(), player.facing); }
   if (hintT > 0 && (hintT -= dt) <= 0) $('hint').classList.remove('on');
-  toastGap -= dt; if (toasts.length && toastGap <= 0 && state === 'play' && !talk) { const [txt, secs, sound] = toasts.shift(); showHint(txt, secs); if (TOQUE[sound]) snd.play(...TOQUE[sound]); }
+  toastGap -= dt; if (toasts.length && toastGap <= 0 && state === 'play' && !talk) { const [txt, secs, sound, grande] = toasts.shift(); showHint(txt, secs, grande); if (TOQUE[sound]) { snd.play(...TOQUE[sound]); apunteGap = Math.max(apunteGap, 0.9); } }
+  apunteGap -= dt; if (apuntes.length && apunteGap <= 0 && state === 'play' && !talk) { apunte(...apuntes.shift()); apunteGap = 0.7; toastGap = Math.max(toastGap, 0.9); } // de a uno, para que sus toques no se pisen
+  for (let i = vistos.length - 1; i >= 0; i--) { const a = vistos[i]; a.t -= dt; if (a.t < 0.6) a.el.classList.add('fuera'); if (a.t <= 0) { a.el.remove(); vistos.splice(i, 1); } }
   if (subT > 0 && (subT -= dt) <= 0 && !cine.active) $('sub').classList.remove('on');
 }
-window.__g.advance = (secs) => { for (let t = 0; t < secs; t += 1 / 60) tick(1 / 60); }; // para pruebas automáticas
+window.__g.advance = (secs) => { for (let t = 0; t < secs; t += 1 / 60) tick(1 / 60); }; // para pruebas automáticas 
+window.__g.tick = tick; window.__g.physics = physics;
 // ---------- música: una melodía en la portada y otra al estar en la aldea; se cruzan suavemente ----------
 const tracks = {}; for (const k of ['portada', 'aldea', 'bosque']) { const a = new Audio(`assets/musica/${k}.mp3`); a.loop = true; a.volume = 0; a.preload = k === 'portada' ? 'auto' : 'none'; tracks[k] = a; }
-let audioOK = false; for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, () => { audioOK = true; }, { once: true }); // el navegador solo deja sonar después del primer gesto
+let audioOK = false; { const ok = (e) => { if (!e.isTrusted) return; audioOK = true; for (const ev of ['pointerdown', 'keydown']) removeEventListener(ev, ok); }; for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, ok); } // el navegador solo deja sonar después del primer gesto del jugador
 function updateMusic(dt) {
   const p = pp(), want = state === 'title' || prologo ? 'portada' : Math.hypot(p.x, p.z) < 50 ? 'aldea' : 'bosque';
-  for (const k in tracks) { const a = tracks[k], goal = k === want ? opts.musica : 0, v = a.volume + Math.sign(goal - a.volume) * Math.min(Math.abs(goal - a.volume), dt * 0.25);
+  for (const k in tracks) { const a = tracks[k], goal = k === want && document.hasFocus() ? opts.musica : 0, v = a.volume + Math.sign(goal - a.volume) * Math.min(Math.abs(goal - a.volume), dt * 0.25);
     a.volume = Math.min(1, Math.max(0, v)); if (goal > 0 && a.paused && audioOK) a.play().catch(() => {}); if (goal === 0 && a.volume === 0 && !a.paused) a.pause(); }
 }
+// con la pestaña oculta el navegador deja de avisar cada cuadro: la música se corta de inmediato en vez de quedar sonando
+document.addEventListener('visibilitychange', () => { if (document.hidden) for (const k in tracks) { tracks[k].volume = 0; tracks[k].pause(); } });
 // ---------- sonidos del mundo ----------
 const SUELO = { earth: 'tierra', path: 'tierra', pebble: 'tierra', rock: 'tierra', bed: 'tierra', alpine: 'tierra', forest: 'hojas', moss: 'hojas', needles: 'hojas', meadow: 'pasto', grassy: 'pasto', marsh: 'pasto' };
 const ROCE = ['fern', 'murtilla', 'michay', 'chilco', 'nalca', 'quila', 'reed'];
@@ -501,12 +544,20 @@ function updateSound(dt) {
   snd.loop('fuego', k * 0.6 * Math.max(0, 1 - d0 / 13) ** 2);
 }
 // toque al abrir el cuaderno, la bolsa, el mapa y al pulsar cualquier botón
-addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; const id = b.id || ''; snd.play(['btn-notas', 'btn-misiones', 'btn-saberes', 'btn-bolsa', 'btn-mapa'].includes(id) ? 'ui-cuaderno' : 'ui-clic', 0.6); }, true);
+addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; const id = b.id || ''; if (!b.closest('#menu, #panel, #title')) b.blur(); // que Espacio o Enter no vuelvan a apretar el último botón tocado
+  snd.play(['btn-notas', 'btn-misiones', 'btn-saberes', 'btn-bolsa', 'btn-mapa'].includes(id) ? 'ui-cuaderno' : 'ui-clic', 0.6); }, true);
+let fallos = 0; // cuadros seguidos con error
 function frame() {
   requestAnimationFrame(frame); updateMusic(1 / 60); updateSound(1 / 60);
   const dt = Math.min(0.05, clock.getDelta());
   if (window.__g.paused) return;
-  if (!menuOpen || state === 'title') tick(dt); // el juego se detiene con el menú abierto
+  if (!menuOpen || state === 'title') { // el juego se detiene con el menú abierto
+    try { tick(dt); fallos = 0; }
+    catch (e) { // un error en un cuadro no debe congelar el juego: se anota, se sigue, y si insiste se avisa
+      if (!fallos++) console.error('Leftraru: error en un cuadro', e);
+      if (fallos === 90) { $('aviso-error').classList.add('on'); console.error('Leftraru: el error se repite', e); }
+    }
+  }
   draw();
   // si el equipo va lento, baja la resolución de a poco
   fpsT += dt; fpsN++; if (fpsT > 3) { if (opts.calidad === 'auto' && !menuOpen && fpsN / fpsT < 27 && pr > 0.6) { pr = Math.max(0.6, pr - 0.25); renderer.setPixelRatio(pr); post.resize(); } fpsT = fpsN = 0; }

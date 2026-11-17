@@ -271,7 +271,9 @@ function markTexture(kind) {
 export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
   const R = (a, b) => a + (b - a) * rng(), actors = [], quads = [], birds = [];
   // personas y animales tienen cuerpo: ya no se los atraviesa
-  const solid = (o, r, hh, cy) => { o.rb = physics.createRigidBody(RAPIER.RigidBodyDesc.kinematicPositionBased().setTranslation(o.x, height(o.x, o.z) + cy, o.z)); physics.createCollider(RAPIER.ColliderDesc.capsule(hh, r), o.rb); o.cy = cy; };
+  // Tienen cuerpo, pero no dentro del motor de física: son círculos que el juego revisa a mano al mover a Leftraru.
+  // (Como cuerpos del motor obligaban a reordenar todo el mundo en cada cuadro.)
+  const solids = [], solid = (o, r) => { o.rad = r; solids.push(o); };
   const markMats = Object.fromEntries(['main', 'sec', 'nuevo'].map((k) => [k, new THREE.SpriteMaterial({ map: markTexture(k), fog: false, toneMapped: false, depthWrite: false })]));
 
   // ---------- gente de la aldea ----------
@@ -280,7 +282,9 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
     return p; };
   const man = { kind: 'man', h: 1.66, skin: 0x96603c, cloth: 0x2a2630 }, woman = { kind: 'woman', h: 1.56, skin: 0xa0683f, cloth: 0x1f1c26, trim: 0xb3262e, band: 0xc23a36 };
   person({ ...man, band: 0xe9dcb8, trim: 0xb3262e }, 2, -9, { name: 'Curiñancu', mode: 'idle', face: Math.PI });
-  person(woman, -9.6, -5.4, { name: 'Millaray', mode: 'work', face: 2.2 });
+  { const m = person(woman, -9.6, -5.4, { name: 'Millaray', mode: 'work', face: 2.2 }); // lleva un palo de revolver, que solo se ve cuando está junto a la olla
+    const mano = new THREE.Group(); mano.position.set(0, -0.175, 0.004); mano.rotation.x = 0.99; m.foreR.add(mano); // el palo cuelga derecho de la mano aunque el brazo vaya estirado
+    m.palo = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.011, 0.36, 6), new THREE.MeshStandardMaterial({ color: 0x7a5a38, roughness: 1 })); m.palo.position.y = -0.14; m.palo.castShadow = true; m.palo.visible = false; mano.add(m.palo); }
   person({ ...woman, h: 1.46, hair: 0xb9b4a4, cloth: 0x2e2a36, trim: 0x8a4a2c }, 2.6, 1.6, { name: 'la abuela', mode: 'idle', face: -2.2 });
   person({ kind: 'girl', h: 1.08, cloth: 0x4a2a2c, trim: 0xd99a1c }, -6, 4, { name: 'Ayelén', mode: 'walk', pts: [[-6, 4], [-11, 8], [-4, 11], [3, 7], [-2, -5]], pace: 2.2 });
   person({ kind: 'girl', h: 1.42, cloth: 0x26323a, trim: 0xd99a1c, band: 0xd99a1c }, POI.cancha.x, POI.cancha.z, { name: 'Rayen', mode: 'walk', pts: [[-48, -24], [-58, -27], [-40, -20], [-52, -21]], pace: 2.6 });
@@ -361,6 +365,8 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
   const P = (fill, opts) => { const b = new ParticleBatch(); fill(b); const m = b.build(opts); scene.add(m); return m; };
   const pick = (cols) => cols[(rng() * cols.length) | 0];
   P((b) => { for (const [x, y, z, k] of emit.smoke) for (let i = 0; i < 26 * k; i++) b.add(x + R(-0.2, 0.2), y, z + R(-0.2, 0.2), R(0.8, 1.3) * (0.6 + k * 0.4), R(0.7, 1.2), pick([0x8a8782, 0xa6a39c, 0x6c6a66])); }, { span: 14, speed: 1.0, drift: 0.8, wob: 0.6, s0: 0.5, s1: 3.4, opacity: 0.2, wind: [0.28, 0, 0.1] });
+  // el vapor de la olla: bocanadas blancas, chicas, que suben un poco y se deshacen
+  P((b) => { for (const [x, y, z] of emit.steam || []) for (let i = 0; i < 24; i++) b.add(x + R(-0.07, 0.07), y, z + R(-0.07, 0.07), R(0.18, 0.3), R(0.8, 1.3), pick([0xf4f2ec, 0xe6e8ea])); }, { span: 1.3, speed: 0.55, drift: 0.08, wob: 1.3, s0: 0.4, s1: 2.0, opacity: 0.2, wind: [0.1, 0, 0.04] });
   P((b) => { for (const [x, y, z] of emit.fire) for (let i = 0; i < 26; i++) b.add(x + R(-0.3, 0.3), y, z + R(-0.3, 0.3), R(0.45, 0.8), R(0.8, 1.4), pick([0xff5a18, 0xff9a2a, 0xffd060])); }, { span: 1.3, speed: 1.9, drift: 0.12, wob: 5, s0: 1, s1: 0.25, opacity: 0.35, aspect: 1.5, glow: true, boost: 2.2 });
   // chispas que suben del fogón
   P((b) => { for (const [x, y, z] of emit.fire) for (let i = 0; i < 30; i++) b.add(x + R(-0.25, 0.25), y + 0.4, z + R(-0.25, 0.25), R(0.025, 0.05), R(0.6, 1.6), pick([0xffb040, 0xff7a20, 0xffe090])); }, { span: 4.2, speed: 1.5, drift: 0.55, wob: 3, opacity: 1, glow: true, boost: 5, wind: [0.15, 0, 0.05] });
@@ -386,10 +392,14 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
         else { turn(p, tx, tz, dt); p.speed += (p.pace - p.speed) * Math.min(1, dt * 5); p.x += Math.sin(p.face) * p.speed * dt; p.z += Math.cos(p.face) * p.speed * dt; }
         p.phase += dt * (1.5 + p.speed * 3.4 / Math.sqrt(p.h)); animatePerson(p, p.phase, Math.min(1, p.speed / 2.4) * 0.75 + (p.speed > 0.1 ? 0.2 : 0), false, slopeOf(p, dt));
       } else if (p.mode === 'work') { p.phase += dt * 2.2; animatePerson(p, 0, 0); p.armL.rotation.x = -0.9 + Math.sin(p.phase) * 0.3; p.armR.rotation.x = -0.9 + Math.sin(p.phase + 2) * 0.3; p.foreL.rotation.x = -0.7 + Math.sin(p.phase + 1) * 0.3; p.foreR.rotation.x = -0.7 + Math.sin(p.phase + 3) * 0.3; p.head.rotation.x = 0.2; }
+      else if (p.mode === 'cook') { // junto a la olla: algo inclinada, mirándola, y con el palo en la mano derecha dando vueltas
+        p.phase += dt * 2.6; animatePerson(p, 0, 0); const s = Math.sin(p.phase), c = Math.cos(p.phase);
+        p.body.rotation.x = 0.13; p.head.rotation.x = 0.4; p.head.rotation.y = -0.12;
+        p.armR.rotation.x = -0.62 + c * 0.07; p.armR.rotation.z = -0.1 + s * 0.09; p.foreR.rotation.x = -0.5 + s * 0.05;
+        p.armL.rotation.x = -0.2; p.foreL.rotation.x = -1.2; }
       else if (p.mode === 'lead') { p.phase += dt * (1.5 + p.speed * 3.4 / Math.sqrt(p.h)); animatePerson(p, p.phase, Math.min(1, p.speed / 2.4) * 0.75 + (p.speed > 0.1 ? 0.2 : 0), false, slopeOf(p, dt)); p.head.rotation.y += ((p.mira || 0) - p.head.rotation.y) * Math.min(1, dt * 4); } // va guiando: su paso lo decide acciones.js
       else { p.phase += dt; animatePerson(p, 0, 0); p.armL.rotation.x = Math.sin(p.phase * 0.6) * 0.05; p.body.rotation.z = Math.sin(p.phase * 0.35) * 0.015; p.head.rotation.y = Math.sin(p.phase * 0.23) * 0.3; if (p.quieto) p.head.rotation.y *= 0.2; else if (Math.hypot(pp.x - p.x, pp.z - p.z) < 6) { turn(p, pp.x, pp.z, dt, 2.5); p.head.rotation.y *= 0.3; } }
       const gy = height(p.x, p.z); p.g.position.set(p.x, gy + Math.sin(p.phase * 0.8) * 0.008, p.z); p.g.rotation.y = p.face;
-      p.rb.setNextKinematicTranslation({ x: p.x, y: gy + p.cy, z: p.z });
       if (p.mark) { p.mark.position.set(p.x, gy + p.h + 0.36 + Math.sin(t * 2.2 + p.x) * 0.045, p.z); p.mark.material.rotation = Math.sin(t * 0.9) * 0.12; }
     }
     for (const q of quads) {
@@ -403,7 +413,6 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
       for (let i = 0; i < 4; i++) { q.legs[i].rotation.x = -Math.sin(q.phase + OFF[i]) * amp; q.knees[i].rotation.x = Math.max(0, Math.cos(q.phase + OFF[i])) * amp * 1.3; }
       q.g.rotation.z = Math.sin(q.phase) * amp * 0.04;
       const gy = height(q.x, q.z); q.g.position.set(q.x, gy + Math.abs(Math.sin(q.phase)) * Math.min(0.02, q.speed * 0.01), q.z); q.g.rotation.y = q.face;
-      q.rb.setNextKinematicTranslation({ x: q.x, y: gy + q.cy, z: q.z });
       // los weke levantan la cabeza y te siguen con la mirada cuando te acercas
       let look = 0; if (!q.shy && dp < 5) { look = Math.atan2(pp.x - q.x, pp.z - q.z) - q.face; look = Math.max(-1.2, Math.min(1.2, Math.atan2(Math.sin(look), Math.cos(look)))); if (dp < 3.2) q.graze = false; }
       q.neck.rotation.y += (look * 0.6 - q.neck.rotation.y) * Math.min(1, dt * 3); q.headPivot.rotation.y = q.neck.rotation.y * 0.7;
@@ -439,6 +448,6 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
       b.perched = k === 1;
     }
   }
-  const api = { update, actors, quads, birds, critters, markMats, shyR: 9 }; // shyR: a qué distancia huyen los animales tímidos
+  const api = { update, actors, quads, birds, critters, solids, markMats, shyR: 9 }; // shyR: a qué distancia huyen los animales tímidos
   return api;
 }

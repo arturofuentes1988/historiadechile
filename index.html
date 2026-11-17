@@ -63,13 +63,13 @@
   #end { position: fixed; left: 0; right: 0; top: 9vh; text-align: center; font-style: italic; font-size: clamp(16px, 2.4vw, 26px); text-shadow: 0 2px 8px #000; opacity: 0; pointer-events: none; transition: opacity 1s; } #end.on { opacity: 1; }
 
   /* juego: marcadores */
-  #hudbox { position: fixed; top: 14px; right: 16px; width: min(340px, 36vw); display: flex; flex-direction: column; gap: 10px; opacity: 0; transition: opacity .6s; pointer-events: none; z-index: 2; }
+  #hudbox { position: fixed; top: 14px; right: 16px; width: min(390px, 40vw); display: flex; flex-direction: column; gap: 10px; opacity: 0; transition: opacity .6s; pointer-events: none; z-index: 2; }
   body.playing #hudbox { opacity: 1; }
   #estado { display: flex; align-items: center; gap: 10px; filter: drop-shadow(0 6px 14px #000a); }
   #retrato { width: 76px; height: 76px; flex: none; border-radius: 50%; overflow: hidden; border: 3px solid var(--copper); box-shadow: 0 0 0 3px var(--ink); background: #2a231b; }
   #retrato img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; display: block; }
   #barras { flex: 1; min-width: 0; background: var(--panel); clip-path: var(--step); padding: 10px 16px 9px 15px; display: flex; flex-direction: column; gap: 6px; }
-  .fila { display: grid; grid-template-columns: 62px 1fr 36px; align-items: center; gap: 8px; font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+  .fila { display: grid; grid-template-columns: 96px 1fr 44px; align-items: center; gap: 8px; font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
   .fila b { color: var(--cream); font-size: 15px; text-align: right; letter-spacing: 0; }
   .medida { height: 10px; background: #ffffff1c; overflow: hidden; } .medida i { display: block; height: 100%; width: 0; transition: width .35s; }
   #vida-bar { background: linear-gradient(90deg, #8a2620, #d0523f); } #pts-bar { background: linear-gradient(90deg, #9a6a2e, #e9b03a); }
@@ -86,8 +86,14 @@
   .ml[data-guia] { pointer-events: auto; cursor: pointer; } .ml[data-guia]:hover { background: #ffffff1c; }
   .ml.guiada span::after { content: ' ➤'; color: #ffe9a8; } .ml.guiada i { background: #ffe9a8; box-shadow: 0 0 8px #ffe9a8; }
   #bigmap { cursor: crosshair; } .guiabar { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 10px 0 2px; min-height: 40px; font-size: 16px; } .guiabar .btn { padding: 8px 16px; font-size: 14px; }
-  #hint { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); max-width: max(300px, min(44vw, calc(100vw - 760px))); background: var(--panel); clip-path: var(--step); padding: 10px 24px; font-size: 16px; text-align: center; opacity: 0; transition: opacity .5s; pointer-events: none; z-index: 3; box-shadow: inset 0 -2px 0 var(--copper); }
+  #hint { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); max-width: max(300px, min(44vw, calc(100vw - 860px))); background: var(--panel); clip-path: var(--step); padding: 10px 24px; font-size: 16px; text-align: center; opacity: 0; transition: opacity .5s; pointer-events: none; z-index: 3; box-shadow: inset 0 -2px 0 var(--copper); }
   #hint.on { opacity: 1; }
+  #hint.grande { font-size: 21px; line-height: 1.3; padding: 13px 30px; box-shadow: inset 0 -3px 0 #e9b03a; } /* los avisos de misión se leen de lejos */
+  /* los puntos de investigación que se van ganando: renglones chicos, a la izquierda, sobre el minimapa */
+  #apuntes { position: fixed; left: 16px; bottom: 198px; max-width: min(320px, 42vw); display: flex; flex-direction: column; align-items: flex-start; gap: 5px; opacity: 0; transition: opacity .4s; pointer-events: none; z-index: 2; }
+  body.playing #apuntes { opacity: 1; } body.talking #apuntes { opacity: 0; } body.nomini #apuntes { bottom: 16px; }
+  .ap { background: var(--panel); border-left: 3px solid #e9b03a; padding: 5px 12px 5px 10px; font-size: 12.5px; color: var(--cream); transition: opacity .5s; animation: ap-in .35s; } .ap.fuera { opacity: 0; }
+  @keyframes ap-in { from { opacity: 0; transform: translateX(-12px); } }
   #minimap { position: fixed; left: 16px; bottom: 16px; width: 170px; height: 170px; border-radius: 50%; opacity: 0; transition: opacity .6s; pointer-events: none; cursor: pointer; filter: drop-shadow(0 6px 14px #000a); }
   body.playing #minimap { opacity: 1; pointer-events: auto; } body.nomini #minimap { display: none; }
   #btns { position: fixed; right: 16px; bottom: 16px; display: flex; gap: 8px; opacity: 0; transition: opacity .6s; pointer-events: none; }
@@ -108,6 +114,7 @@
   #mousehint { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); font-size: 13px; font-style: italic; color: var(--cream); text-shadow: 0 1px 4px #000, 0 0 2px #000; opacity: 0; pointer-events: none; transition: opacity .4s; }
   body.playing.sin-raton #mousehint { opacity: .9; }
   body.playing canvas { cursor: grab; } body.playing.girando canvas { cursor: grabbing; }
+  #aviso-error { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); max-width: min(520px, 84vw); background: var(--panel); clip-path: var(--stepL); padding: 22px 30px; font-size: 18px; line-height: 1.5; text-align: center; box-shadow: inset 0 3px 0 var(--red); z-index: 9; display: none; } #aviso-error.on { display: block; }
   #velo { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 1s; z-index: 5; } #velo.on { opacity: 1; }
   #dialogo { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); width: min(720px, 88vw); background: var(--panel); clip-path: var(--stepL); padding: 20px 30px 18px; display: none; cursor: pointer; z-index: 3; box-shadow: inset 0 3px 0 var(--copper); }
   #dialogo.on { display: block; }
@@ -200,7 +207,7 @@
   .lbox { width: min(460px, 80vw); text-align: center; } .lbox h1 { font-size: clamp(34px, 6vw, 64px); margin-bottom: 26px; text-shadow: none; }
   .ltrack { height: 8px; background: #ffffff14; clip-path: var(--step); } #load-bar { display: block; height: 100%; width: 4%; background: linear-gradient(90deg, var(--red), var(--copper)); transition: width .35s ease; }
   #load-text { margin: 14px 0 0; font-style: italic; color: var(--dim); font-size: 15px; }
-  @media (max-width: 760px) { .dex { grid-template-columns: 1fr; } #minimap { width: 120px; height: 120px; } .tool { min-width: 58px; } }
+  @media (max-width: 760px) { .dex { grid-template-columns: 1fr; } #minimap { width: 120px; height: 120px; } #apuntes { bottom: 148px; } .tool { min-width: 58px; } }
 </style>
 </head>
 <body>
@@ -215,13 +222,15 @@
 <div id="hudbox">
   <div id="estado"><div id="barras">
     <div class="fila"><span>Vida</span><div class="medida"><i id="vida-bar"></i></div><b id="vida-n">100</b></div>
-    <div class="fila"><span>Saberes</span><div class="medida"><i id="pts-bar"></i></div><b id="score-n">0</b></div>
+    <div class="fila"><span>Investigación</span><div class="medida"><i id="pts-bar"></i></div><b id="score-n">0</b></div>
     <div id="pts-txt"></div>
   </div><div id="retrato"><img src="assets/cuaderno/leftraru.webp" alt="Leftraru"></div></div>
   <div id="hud"><div id="mis-lista"></div></div>
 </div>
 <div id="velo"></div>
+<div id="aviso-error">El juego tuvo un problema y no puede seguir. Recarga la página (F5): tu avance está guardado.</div>
 <div id="hint"></div>
+<div id="apuntes"></div>
 <div id="sub"><b id="sub-name"></b><span id="sub-text"></span></div>
 <div id="prologo"><div class="hoja"><div class="papel">
   <small>Capítulo I</small><h2>El mundo de Leftraru</h2>

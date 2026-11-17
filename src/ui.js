@@ -1,7 +1,8 @@
 // Interfaz: minimapa, cuaderno de investigación (notas con foto y puntos), bolsa y mapa.
 import { B, POI, PATHS, height, zone, WATER_Y } from './terrain.js';
-import { RUKAS, CORRAL } from './village.js';
-import { NOTES, CATS, LEVELS, SKILLS, MISSIONS, FOTOS } from './notes.js';
+import { RUKAS, CORRAL, FOGON } from './village.js';
+import { PERSON } from './explore.js';
+import { NOTES, CATS, LEVELS, SKILLS, MISSIONS, FOTOS, POR_SABER } from './notes.js';
 const $ = (id) => document.getElementById(id);
 const BY = Object.fromEntries(NOTES.map((n) => [n.id, n]));
 const SAVE = 'leftraru.cuaderno';
@@ -10,22 +11,26 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
   // lo descubierto se guarda en este navegador: id -> foto
   let data = {}; try { data = JSON.parse(localStorage.getItem(SAVE) || '{}'); } catch { data = {}; }
   if (!data.found) data = { found: data }; // formato antiguo: solo las fotos
-  let found = data.found, skills = data.skills || [], done = data.done || {}, extra = data.extra || 0, seen = data.seen || {}, mctx = null; // seen: encargos secundarios que ya te dieron
+  let found = data.found, skills = data.skills || [], done = data.done || {}, extra = data.extra || 0, seen = data.seen || {}, where = data.where || {}, mctx = null; // seen: encargos secundarios que ya te dieron
   for (const id in found) if (!BY[id]) delete found[id];
   const SK = Object.fromEntries(SKILLS.map((k) => [k.id, k]));
   const recien = {}; let lista = '';
   const bag = {}; let open = null, cat = 'flora', sel = null, selM = null, selK = null;
-  const save = () => { try { localStorage.setItem(SAVE, JSON.stringify({ found, skills, done, extra, seen })); } catch { /* sin espacio: se pierde al recargar */ } };
-  // puntos ganados (cuaderno + misiones + extras) y puntos disponibles (ganados menos lo gastado en saberes)
+  const save = () => { try { localStorage.setItem(SAVE, JSON.stringify({ found, skills, done, extra, seen, where })); } catch { /* sin espacio: se pierde al recargar */ } };
+  // Puntos de investigación: todo lo ganado (cuaderno + misiones + extras). No se gastan: se van sumando, y cada
+  // POR_SABER puntos dan un punto de saber, que es lo que se usa para aprender un saber.
   const earned = () => points() + extra + MISSIONS.reduce((t, m) => t + (done[m.id] ? m.pts : 0), 0);
-  const avail = () => earned() - skills.reduce((t, id) => t + SK[id].cost, 0);
+  const avail = () => Math.max(0, Math.floor(earned() / POR_SABER) - skills.length); // puntos de saber sin usar
   const points = (c) => NOTES.reduce((s, n) => s + (found[n.id] !== undefined && (!c || n.cat === c) ? CATS[n.cat].pts : 0), 0);
   const total = NOTES.reduce((s, n) => s + CATS[n.cat].pts, 0);
   const level = () => { const p = points(); let l = LEVELS[0]; for (const x of LEVELS) if (p >= x[0]) l = x; const nx = LEVELS[LEVELS.indexOf(l) + 1]; return { name: l[1], next: nx ? nx[0] : null }; };
-  const refreshScore = () => {
-    const a = avail(), next = SKILLS.filter((k) => !skills.includes(k.id)).sort((x, y) => x.cost - y.cost)[0], txt = $('pts-txt');
-    $('score-n').textContent = a; $('pts-bar').style.width = `${next ? Math.min(100, (a / next.cost) * 100) : 100}%`;
-    txt.textContent = !next ? 'Ya aprendiste todos los saberes' : a >= next.cost ? `Puedes aprender «${next.name}»` : `${next.cost - a} puntos más para «${next.name}»`; txt.classList.toggle('listo', !!next && a >= next.cost);
+  let sabidos = -1; // cuántos puntos de saber se llevaban ganados la última vez que se miró
+  const refreshScore = () => { // la barra de arriba: la suma de puntos de investigación y cuánto falta para el próximo punto de saber
+    const e = earned(), a = avail(), ganados = Math.floor(e / POR_SABER), quedan = SKILLS.some((k) => !skills.includes(k.id)), txt = $('pts-txt');
+    $('score-n').textContent = e; $('pts-bar').style.width = `${((e % POR_SABER) / POR_SABER) * 100}%`;
+    txt.textContent = a > 0 && quedan ? `Tienes ${a} ${a === 1 ? 'punto' : 'puntos'} de saber para usar` : `Faltan ${POR_SABER - (e % POR_SABER)} para un punto de saber`; txt.classList.toggle('listo', a > 0 && quedan);
+    if (sabidos >= 0 && ganados > sabidos) onToast('Ganaste un punto de saber: úsalo en Saberes para aprender algo nuevo', 'logro');
+    sabidos = ganados;
   };
 
   // ---------- minimapa: se pinta a partir del terreno real ----------
@@ -75,33 +80,37 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
   }
   // hoja verde: aquí hay algo que te pidieron ir a buscar
   function hoja(g, x, y, k = 1) { g.save(); g.translate(x, y); g.rotate(-0.6); g.fillStyle = '#9fd66a'; g.strokeStyle = '#14110f'; g.lineWidth = 2.5 * k; g.beginPath(); g.moveTo(0, -11 * k); g.quadraticCurveTo(9 * k, -2 * k, 0, 11 * k); g.quadraticCurveTo(-9 * k, -2 * k, 0, -11 * k); g.fill(); g.stroke(); g.beginPath(); g.moveTo(0, -7 * k); g.lineTo(0, 8 * k); g.lineWidth = 1.2 * k; g.stroke(); g.restore(); }
+  const FIJOS = { kutral: [FOGON.x, FOGON.z], rewe: [20, 19], witral: [-10.6, -4.2], ruka: [RUKAS[0].x, RUKAS[0].z], chemamull: [POI.antiguos.x, POI.antiguos.z], gigante: [POI.viejo.x, POI.viejo.z], weke: [CORRAL.x, CORRAL.z], palin: [POI.cancha.x, POI.cancha.z] };
+  let rot = null, rotT = 0; // cuánto está girado el minimapa
   function drawMap(pos, facing) {
     last = { x: pos.x, z: pos.z, f: facing };
-    const [px, py] = P(pos.x, pos.z), R = S / 2 - 3;
+    const [px, py] = P(pos.x, pos.z), R = S / 2 - 3, now = performance.now();
+    // El mapa gira para que lo que Leftraru tiene delante quede siempre arriba. Gira suave, para que una media vuelta no maree.
+    { const want = facing + Math.PI; if (rot === null) rot = want; let d = want - rot; d = Math.atan2(Math.sin(d), Math.cos(d)); rot += d * (1 - Math.exp(-Math.min(200, now - rotT) / 170)); rotT = now; }
+    const cr = Math.cos(rot), sr = Math.sin(rot);
+    const off = (x, z) => { const [a, c] = P(x, z), dx = (a - px) * ZOOM, dy = (c - py) * ZOOM; return [dx * cr - dy * sr, dx * sr + dy * cr]; }; // de un punto del mundo a su lugar en el minimapa, medido desde el centro
+    const edge = (dx, dy, m) => { const d = Math.hypot(dx, dy), far = d > R - m; return far ? [dx * (R - m) / d, dy * (R - m) / d, true] : [dx, dy, false]; }; // lo que queda fuera se dibuja en el borde, en su dirección
     ctx.clearRect(0, 0, S, S); ctx.save();
     ctx.beginPath(); ctx.arc(S / 2, S / 2, R, 0, 7); ctx.clip();
     ctx.fillStyle = '#8f7d52'; ctx.fillRect(0, 0, S, S);
-    ctx.save(); ctx.translate(S / 2, S / 2); ctx.scale(ZOOM, ZOOM); ctx.translate(-px, -py); ctx.drawImage(base, 0, 0); ctx.restore();
-    if (api.guide) { const q = (x, z) => { const [a, c] = P(x, z); return [S / 2 + (a - px) * ZOOM, S / 2 + (c - py) * ZOOM]; }; trazo(ctx, api.guide.pts, q, 1.15); const [mx, my] = q(api.guide.x, api.guide.z); if (Math.hypot(mx - S / 2, my - S / 2) < R - 8) meta(ctx, mx, my, 1.1); }
+    ctx.save(); ctx.translate(S / 2, S / 2); ctx.rotate(rot); ctx.scale(ZOOM, ZOOM); ctx.translate(-px, -py); ctx.drawImage(base, 0, 0); ctx.restore();
+    if (api.guide) { const q = (x, z) => { const [dx, dy] = off(x, z); return [S / 2 + dx, S / 2 + dy]; }; trazo(ctx, api.guide.pts, q, 1.15); const [mx, my] = q(api.guide.x, api.guide.z); if (Math.hypot(mx - S / 2, my - S / 2) < R - 8) meta(ctx, mx, my, 1.1); }
     if (open === 'mapa') drawBig(); // con el mapa abierto, se va actualizando
     ctx.strokeStyle = '#3a2408'; ctx.lineWidth = 2.5;
-    for (const it of world.items) if (!it.taken && !it.off) {
-      const [x, y] = P(it.base.x, it.base.z); let dx = (x - px) * ZOOM, dy = (y - py) * ZOOM; const d = Math.hypot(dx, dy), far = d > R - 20;
-      if (far) { dx *= (R - 20) / d; dy *= (R - 20) / d; } // fuera de vista: se marca en el borde, indicando la dirección
-      ctx.fillStyle = far ? '#ffe9a8' : '#f2b441'; ctx.beginPath(); ctx.arc(S / 2 + dx, S / 2 + dy, far ? 7 : 10, 0, 7); ctx.fill(); ctx.stroke();
-    }
-    // la aldea y la gente con algo pendiente: si quedan fuera de la vista, se dibujan en el borde, en su dirección
-    for (const mk of [{ x: 0, z: 0, kind: 'aldea' }, ...api.people]) { const [x, y] = P(mk.x, mk.z); let dx = (x - px) * ZOOM, dy = (y - py) * ZOOM; const d = Math.hypot(dx, dy), far = d > R - 18; if (far && mk.kind === 'nuevo') continue; if (far) { dx *= (R - 18) / d; dy *= (R - 18) / d; } sym(ctx, S / 2 + dx, S / 2 + dy, mk.kind, far ? 0.75 : 1); }
-    for (const gl of api.goals) { const [x, y] = P(gl.x, gl.z); let dx = (x - px) * ZOOM, dy = (y - py) * ZOOM; const d = Math.hypot(dx, dy), far = d > R - 20; if (far) { dx *= (R - 20) / d; dy *= (R - 20) / d; } hoja(ctx, S / 2 + dx, S / 2 + dy, far ? 0.8 : 1.15); }
-    for (const mk of api.marks) { const [x, y] = P(mk.x, mk.z), dx = (x - px) * ZOOM, dy = (y - py) * ZOOM; if (Math.hypot(dx, dy) < R - 14) { ctx.fillStyle = '#14110f'; ctx.beginPath(); ctx.arc(S / 2 + dx, S / 2 + dy, 9, 0, 7); ctx.fill(); ctx.fillStyle = '#e9dfc6'; ctx.font = 'bold 14px Georgia'; ctx.textAlign = 'center'; ctx.fillText('?', S / 2 + dx, S / 2 + dy + 5); } }
-    ctx.translate(S / 2, S / 2); ctx.rotate(-facing); // la flecha apunta hacia donde camina
-    ctx.fillStyle = '#fff'; ctx.strokeStyle = '#14110f'; ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(0, 20); ctx.lineTo(12, -13); ctx.lineTo(0, -6); ctx.lineTo(-12, -13); ctx.closePath(); ctx.fill(); ctx.stroke();
+    for (const it of world.items) if (!it.taken && !it.off) { const [dx, dy, far] = edge(...off(it.base.x, it.base.z), 20); ctx.fillStyle = far ? '#ffe9a8' : '#f2b441'; ctx.beginPath(); ctx.arc(S / 2 + dx, S / 2 + dy, far ? 7 : 10, 0, 7); ctx.fill(); ctx.stroke(); }
+    // la aldea y la gente con algo pendiente
+    for (const mk of [{ x: 0, z: 0, kind: 'aldea' }, ...api.people]) { const [dx, dy, far] = edge(...off(mk.x, mk.z), 18); if (far && mk.kind === 'nuevo') continue; sym(ctx, S / 2 + dx, S / 2 + dy, mk.kind, far ? 0.75 : 1); }
+    for (const gl of api.goals) { const [dx, dy, far] = edge(...off(gl.x, gl.z), 20); hoja(ctx, S / 2 + dx, S / 2 + dy, far ? 0.8 : 1.15); }
+    for (const mk of api.marks) { const [dx, dy] = off(mk.x, mk.z); if (Math.hypot(dx, dy) < R - 14) { ctx.fillStyle = '#14110f'; ctx.beginPath(); ctx.arc(S / 2 + dx, S / 2 + dy, 9, 0, 7); ctx.fill(); ctx.fillStyle = '#e9dfc6'; ctx.font = 'bold 14px Georgia'; ctx.textAlign = 'center'; ctx.fillText('?', S / 2 + dx, S / 2 + dy + 5); } }
+    // Leftraru: siempre al centro y con la flecha hacia arriba
+    ctx.translate(S / 2, S / 2); ctx.fillStyle = '#fff'; ctx.strokeStyle = '#14110f'; ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(12, 13); ctx.lineTo(0, 6); ctx.lineTo(-12, 13); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.restore();
-    // aro: una línea de cobre con cuatro marcas escalonadas en los puntos cardinales
+    // aro: una línea de cobre con cuatro marcas en los puntos cardinales, que giran con el mapa; la clara, con la N, es el norte
     ctx.strokeStyle = '#14110f'; ctx.lineWidth = 9; ctx.beginPath(); ctx.arc(S / 2, S / 2, R - 2, 0, 7); ctx.stroke();
     ctx.strokeStyle = '#c98a4a'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.arc(S / 2, S / 2, R - 2, 0, 7); ctx.stroke();
-    for (let i = 0; i < 4; i++) { ctx.save(); ctx.translate(S / 2, S / 2); ctx.rotate(i * Math.PI / 2); ctx.fillStyle = '#14110f'; ctx.fillRect(-13, -R - 2, 26, 10); ctx.fillRect(-8, -R + 8, 16, 6); ctx.fillStyle = i ? '#c98a4a' : '#e9dfc6'; ctx.fillRect(-4, -R + 1, 8, 8); ctx.restore(); }
+    for (let i = 0; i < 4; i++) { ctx.save(); ctx.translate(S / 2, S / 2); ctx.rotate(rot + i * Math.PI / 2); ctx.fillStyle = '#14110f'; ctx.fillRect(-13, -R - 2, 26, 10); ctx.fillRect(-8, -R + 8, 16, 6); ctx.fillStyle = i ? '#c98a4a' : '#e9dfc6'; ctx.fillRect(-4, -R + 1, 8, 8);
+      if (!i) { ctx.translate(0, -R + 27); ctx.rotate(-rot); ctx.font = 'bold 17px Georgia'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.lineWidth = 4; ctx.strokeStyle = '#14110f'; ctx.strokeText('N', 0, 0); ctx.fillStyle = '#e9dfc6'; ctx.fillText('N', 0, 0); } ctx.restore(); }
   }
 
   // ---------- paneles ----------
@@ -114,6 +123,21 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
     const g = c.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(base, 0, 0);
     g.textAlign = 'center'; g.font = 'italic bold 19px Georgia'; g.lineWidth = 5; g.strokeStyle = '#efe6cf'; g.fillStyle = '#2a2018';
     for (const key in POI) { const [x, y] = P(POI[key].x, POI[key].z), t = places.has(key) ? POI[key].name : '?'; g.strokeText(t, x, y - 14); g.fillText(t, x, y - 14); }
+    // Los nombres de lo descubierto: cada cosa queda anotada donde la encontraste (la gente, donde está ahora).
+    // Si dos nombres se pisarían, se deja el punto y se omite el segundo nombre.
+    { const boxes = Object.keys(POI).map((key) => { const [x, y] = P(POI[key].x, POI[key].z); return [x - 80, y - 32, 160, 24]; }), COL = { cultura: '#8a3a22', personas: '#2a2018', fauna: '#6a3a14', flora: '#2a4a18' }, list = [];
+      for (const a of world.life.actors) { const id = PERSON[a.name]; if (id && found[id] !== undefined) list.push([a.x, a.z, BY[id].title, 'personas']); }
+      for (const n of NOTES) { if (found[n.id] === undefined || !COL[n.cat] || n.cat === 'personas') continue; const w = where[n.id] || FIJOS[n.id]; if (w) list.push([w[0], w[1], n.title, n.cat]); }
+      const ORD = ['cultura', 'personas', 'fauna', 'flora']; list.sort((a, b) => ORD.indexOf(a[3]) - ORD.indexOf(b[3]));
+      g.font = 'italic bold 14px Georgia'; g.lineWidth = 4;
+      const libre = (bx) => !boxes.some((o) => bx[0] < o[0] + o[2] && bx[0] + bx[2] > o[0] && bx[1] < o[1] + o[3] && bx[1] + bx[3] > o[1]);
+      for (const [wx, wz, name, cat] of list) { const [x, y] = P(wx, wz), tw = g.measureText(name).width;
+        g.fillStyle = COL[cat]; g.strokeStyle = '#efe6cf'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 4, 0, 7); g.fill(); g.stroke();
+        // el nombre busca un lugar libre alrededor de su punto: abajo, arriba, a la derecha, a la izquierda, y un poco más lejos
+        const cand = [[x, y + 19], [x, y - 9], [x + tw / 2 + 9, y + 5], [x - tw / 2 - 9, y + 5], [x, y + 35], [x, y - 25], [x + tw / 2 + 9, y + 21], [x - tw / 2 - 9, y + 21], [x + tw / 2 + 9, y - 11], [x - tw / 2 - 9, y - 11]];
+        const at = cand.find(([cx, cy]) => libre([cx - tw / 2 - 3, cy - 13, tw + 6, 17])); if (!at) continue;
+        boxes.push([at[0] - tw / 2 - 3, at[1] - 13, tw + 6, 17]); g.lineWidth = 4; g.strokeText(name, at[0], at[1]); g.fillText(name, at[0], at[1]); }
+      g.font = 'italic bold 19px Georgia'; g.lineWidth = 5; g.strokeStyle = '#efe6cf'; g.fillStyle = '#2a2018'; }
     if (api.guide) trazo(g, api.guide.pts, P, 1.5);
     for (const it of world.items) if (!it.taken && !it.off) { const [x, y] = P(it.base.x, it.base.z); g.fillStyle = '#f2b441'; g.strokeStyle = '#3a2408'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 6, 0, 7); g.fill(); g.stroke(); }
     { const [x, y] = P(0, 0); sym(g, x, y + 6, 'aldea', 1.2); } for (const mk of api.people) { const [x, y] = P(mk.x, mk.z); sym(g, x, y, mk.kind, 1.1); }
@@ -140,7 +164,7 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
     panel.dataset.kind = open;
     if (open === 'mapa') {
       $('panel-title').textContent = 'Mapa del territorio';
-      body.innerHTML = '<canvas id="bigmap"></canvas><div class="guiabar"><span id="guia-txt"></span><button id="guia-off" class="btn" hidden>Quitar la guía</button></div><p class="muted">Haz clic en el mapa para marcar un destino: una línea de trazos te muestra el camino y se va acortando a medida que avanzas. También puedes hacer clic en una estrella, un rombo o una hoja. Los lugares muestran su nombre cuando los visitas. Los puntos dorados son piñones; la estrella, la historia; el rombo, un encargo; el círculo, alguien que aún no conoces; la hoja verde, algo que te pidieron ir a buscar.</p>';
+      body.innerHTML = '<canvas id="bigmap"></canvas><div class="guiabar"><span id="guia-txt"></span><button id="guia-off" class="btn" hidden>Quitar la guía</button></div><p class="muted">Haz clic en el mapa para marcar un destino: una línea de trazos te muestra el camino y se va acortando a medida que avanzas. También puedes hacer clic en una estrella, un rombo o una hoja. Los lugares muestran su nombre cuando los visitas, y todo lo que descubres queda anotado con su nombre donde lo encontraste. Los puntos dorados son piñones; la estrella, la historia; el rombo, un encargo; el círculo, alguien que aún no conoces; la hoja verde, algo que te pidieron ir a buscar.</p>';
       drawBig();
     } else if (open === 'misiones') {
       // Principales: todas a la vista y en orden; cada una se abre al terminar la anterior.
@@ -163,16 +187,16 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
       // árbol: Leftraru arriba, y de él bajan las ramas; cada nudo es un saber
       $('panel-title').textContent = 'Saberes';
       const POS = { raiz: [50, 8], vista: [12, 46], rastro: [12, 84], pudu: [37, 46], ligero: [63, 46], salto: [63, 84], memoria: [88, 46] };
-      const info = (k) => { const have = skills.includes(k.id), teacher = BY[k.de], met = found[k.de] !== undefined, pre = !k.pide || skills.includes(k.pide), can = !have && met && pre && avail() >= k.cost;
-        return { have, can, teacher, why: have ? 'Ya lo aprendiste.' : !met ? `Habla primero con ${teacher.title}.` : !pre ? `Antes debes aprender ${SK[k.pide].name}.` : avail() < k.cost ? `Te faltan ${k.cost - avail()} puntos.` : '' }; };
+      const info = (k) => { const have = skills.includes(k.id), teacher = BY[k.de], met = found[k.de] !== undefined, pre = !k.pide || skills.includes(k.pide), can = !have && met && pre && avail() >= 1;
+        return { have, can, teacher, why: have ? 'Ya lo aprendiste.' : !met ? `Habla primero con ${teacher.title}.` : !pre ? `Antes debes aprender ${SK[k.pide].name}.` : avail() < 1 ? `Te falta un punto de saber: se gana uno cada ${POR_SABER} puntos de investigación.` : '' }; };
       const line = (a, b, on) => `<line x1="${POS[a][0]}" y1="${POS[a][1]}" x2="${POS[b][0]}" y2="${POS[b][1]}" class="${on ? 'on' : ''}"/>`;
       const k = SK[selK] || SKILLS[0], d = info(k);
-      body.innerHTML = `<div class="score"><div><b>${avail()}</b> puntos para gastar</div><div class="lvl">has ganado ${earned()} en total</div></div>` +
+      body.innerHTML = `<div class="score"><div><b>${avail()}</b> ${avail() === 1 ? 'punto' : 'puntos'} de saber para usar</div><div class="lvl">${earned()} puntos de investigación · cada ${POR_SABER} dan un punto de saber · faltan ${POR_SABER - (earned() % POR_SABER)} para el próximo</div><div class="bar"><i style="width:${(((earned() % POR_SABER) / POR_SABER) * 100).toFixed(1)}%"></i></div></div>` +
         '<div class="tree2"><div class="canvas"><svg viewBox="0 0 100 100" preserveAspectRatio="none">' + SKILLS.map((x) => line(x.pide || 'raiz', x.id, skills.includes(x.id))).join('') + '</svg>' +
         `<div class="node root" style="left:${POS.raiz[0]}%;top:${POS.raiz[1]}%"><i></i><span>Leftraru<small>Observar</small></span></div>` +
         ['El bosque|24', 'El cuerpo|63', 'La palabra|88'].map((x) => { const [n, l] = x.split('|'); return `<div class="branch" style="left:${l}%">${n}</div>`; }).join('') +
-        SKILLS.map((x) => { const q = info(x); return `<button class="node${q.have ? ' have' : q.can ? ' can' : ''}${x.id === k.id ? ' on' : ''}" data-node="${x.id}" style="left:${POS[x.id][0]}%;top:${POS[x.id][1]}%"><i></i><span>${x.name}<small>${q.have ? 'aprendido' : x.cost + ' puntos'}</small></span></button>`; }).join('') + '</div>' +
-        `<aside><small>${k.rama}</small><h3>${k.name}</h3><p>${k.text}</p><p class="muted">Lo enseña ${d.teacher.title}. Cuesta ${k.cost} puntos.</p>${d.can ? `<button class="btn main" data-skill="${k.id}">Aprender</button>` : `<em>${d.why}</em>`}</aside></div>`;
+        SKILLS.map((x) => { const q = info(x); return `<button class="node${q.have ? ' have' : q.can ? ' can' : ''}${x.id === k.id ? ' on' : ''}" data-node="${x.id}" style="left:${POS[x.id][0]}%;top:${POS[x.id][1]}%"><i></i><span>${x.name}<small>${q.have ? 'aprendido' : '1 punto de saber'}</small></span></button>`; }).join('') + '</div>' +
+        `<aside><small>${k.rama}</small><h3>${k.name}</h3><p>${k.text}</p><p class="muted">Lo enseña ${d.teacher.title}. Cuesta 1 punto de saber.</p>${d.can ? `<button class="btn main" data-skill="${k.id}">Aprender</button>` : `<em>${d.why}</em>`}</aside></div>`;
     } else if (open === 'bolsa') {
       const ids = Object.keys(bag);
       $('panel-title').textContent = 'Bolsa';
@@ -202,7 +226,7 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
     const c = e.target.closest('[data-cat]'), n = e.target.closest('[data-note]'), k = e.target.closest('[data-skill]'), mi = e.target.closest('[data-mis]'), nd = e.target.closest('[data-node]');
     if (mi) { selM = mi.dataset.mis; return render(); } if (nd) { selK = nd.dataset.node; return render(); }
     if (c) { cat = c.dataset.cat; sel = null; render(); } else if (n) { sel = n.dataset.note; render(); }
-    else if (k && avail() >= SK[k.dataset.skill].cost) { skills.push(k.dataset.skill); save(); refreshScore(); onToast(`Aprendiste: ${SK[k.dataset.skill].name}`, 'logro'); onSkill?.(); render(); }
+    else if (k && avail() >= 1) { skills.push(k.dataset.skill); save(); refreshScore(); onToast(`Aprendiste: ${SK[k.dataset.skill].name}`, 'logro'); onSkill?.(); render(); }
   });
   $('btn-notas').addEventListener('click', () => show('notas'));
   $('btn-bolsa').addEventListener('click', () => show('bolsa'));
@@ -220,8 +244,9 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
     get open() { return open; },
     has: (id) => found[id] !== undefined,
     // registra un descubrimiento con su foto; devuelve true si era nuevo
-    discover(id, img = '') {
+    discover(id, img = '', at = null) { // at: dónde estaba lo descubierto, para anotar su nombre en el mapa
       const n = BY[id]; if (!n || found[id] !== undefined) return false;
+      if (at && Number.isFinite(at.x + at.z)) where[id] = [Math.round(at.x), Math.round(at.z)];
       const bonus = skills.includes('memoria') ? 5 : 0; extra += bonus;
       found[id] = img; save(); cat = n.cat; sel = id; refreshScore();
       onToast(`${n.title} · +${CATS[n.cat].pts + bonus} puntos de investigación`, 'hallazgo'); $('btn-notas').classList.add('new'); if (open) render(); return true;
@@ -230,7 +255,7 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
     place(key) { places.add(key); },
     addItem(id) { bag[id] = (bag[id] || 0) + 1; if (open) render(); },
     takeItem(id, n = 1) { bag[id] = (bag[id] || 0) - n; if (bag[id] <= 0) delete bag[id]; if (open) render(); },
-    reset() { found = {}; skills = []; done = {}; extra = 0; seen = {}; save(); refreshScore(); },
+    reset() { found = {}; skills = []; done = {}; extra = 0; seen = {}; where = {}; save(); refreshScore(); },
     skill: (id) => skills.includes(id), avail, earned,
     // Revisa las misiones con el estado actual: anota los encargos que te acaban de dar, entrega recompensas
     // y devuelve la misión de la historia que está abierta, con el aviso de lo que toca hacer.
@@ -254,7 +279,7 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
       const enc = MISSIONS.filter((m) => !m.main && seen[m.id] && (!done[m.id] || now - (recien[m.id] || 0) < 15000)); // un encargo recién cumplido se ve tachado un momento
       if (enc.length) h += '<h5>Encargos</h5>' + enc.slice(0, 5).map((m) => row(m, done[m.id] ? 'hecha' : '')).join('') + (enc.length > 5 ? `<div class="paso">y ${enc.length - 5} más</div>` : '');
       if (h !== lista) { lista = h; $('mis-lista').innerHTML = h; }
-      return act ? { title: act.title, prog: act.check(mctx), aviso: typeof act.aviso === 'function' ? act.aviso(mctx) : act.aviso, fijo: !!(act.fijo && act.fijo(mctx)) } : null;
+      return act ? { id: act.id, title: act.title, prog: act.check(mctx), aviso: typeof act.aviso === 'function' ? act.aviso(mctx) : act.aviso, fijo: !!(act.fijo && act.fijo(mctx)) } : null;
     },
     marks: [], people: [], goals: [],
     guide: null, guideKey: '', // la línea de guía ({ pts, x, z, label, len }) y a qué apunta ('m:id' si es una misión)

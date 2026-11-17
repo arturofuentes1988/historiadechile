@@ -10,6 +10,7 @@ export const RUKAS = [
 ];
 export const CORRAL = { x: -25, z: 14, r: 6.5 };
 export const FOGON = { x: 0, z: 0 };
+export const OLLA = { x: FOGON.x + 1.5, z: FOGON.z + 0.9 }; // la olla del caldo, junto al fogón
 
 export function buildVillage({ scene, rng, bag, flora, physics, RAPIER, fixed }) {
   const R = (a, b) => a + (b - a) * rng(), PI = Math.PI, UP = new THREE.Vector3(0, 1, 0);
@@ -103,6 +104,10 @@ export function buildVillage({ scene, rng, bag, flora, physics, RAPIER, fixed })
     for (let i = 0; i < 5; i++) { const e = add(new THREE.CylinderGeometry(0.06, 0.06, R(0.5, 0.9), 6), ember, x + R(-0.25, 0.25), y + 0.1, z + R(-0.25, 0.25)); e.rotation.set(PI / 2, 0, R(0, 3)); e.castShadow = false; }
     for (let i = 0; i < 3; i++) { const a = i * 2.1 + 0.4; flora.rock(x + 1.5 + Math.cos(a) * 0.22, y - 0.02, z + 0.9 + Math.sin(a) * 0.22, 0.16, { squash: 0.9, color: 0x6e6a62 }); }
     vasija('olla', x + 1.5, y + 0.17, z + 0.9, 0.27, 0.7, greda.hollin); // la olla del caldo, tiznada por el fuego
+    // la olla está al fuego: brasas y unas llamas chicas entre sus piedras, y el vapor del agua que hierve
+    for (let i = 0; i < 2; i++) { const f = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.5), fm); f.position.set(x + 1.5, y + 0.28, z + 0.9); f.rotation.y = 0.5 + i * PI / 2; f.renderOrder = 3; scene.add(f); }
+    for (let i = 0; i < 3; i++) { const a = i * 2.1 + 1.45, e = add(new THREE.CylinderGeometry(0.035, 0.035, 0.38, 6), ember, x + 1.5 + Math.cos(a) * 0.05, y + 0.07, z + 0.9 + Math.sin(a) * 0.05); e.rotation.set(PI / 2, 0, a); e.castShadow = false; }
+    emit.steam = [[x + 1.5, y + 0.17 + 1.7 * 0.27, z + 0.9]];
     const glow = new THREE.PointLight(0xff8a3a, 14, 14, 1.6); glow.position.set(x, y + 0.9, z); scene.add(glow); emit.glow = glow;
   }
 

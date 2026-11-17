@@ -134,13 +134,15 @@ export const TALK = {
 
 // ---------- saberes: habilidades que se aprenden gastando puntos de investigación ----------
 // Cada saber lo enseña alguien de la aldea: hay que haber conversado con esa persona.
+// Los saberes se aprenden con puntos de saber: se gana uno cada POR_SABER puntos de investigación, y cada saber cuesta uno.
+export const POR_SABER = 1000;
 export const SKILLS = [
-  { id: 'vista', name: 'Vista de traro', cost: 40, rama: 'El bosque', de: 'curinancu', col: 0, row: 0, text: 'Reconoces las cosas desde más lejos: puedes observar árboles, animales y objetos sin tener que acercarte tanto.' },
-  { id: 'rastro', name: 'Rastreador', cost: 80, rama: 'El bosque', de: 'curinancu', pide: 'vista', col: 0, row: 1, text: 'El minimapa marca con un signo lo que todavía no has descubierto cerca de ti.' },
-  { id: 'pudu', name: 'Paso de pudú', cost: 50, rama: 'El bosque', de: 'machi', col: 1, row: 0, text: 'Te mueves sin espantar: los animales del bosque te dejan acercarte mucho más antes de huir.' },
-  { id: 'ligero', name: 'Paso ligero', cost: 40, rama: 'El cuerpo', de: 'rayen', col: 2, row: 0, text: 'Corres más rápido.' },
-  { id: 'salto', name: 'Salto firme', cost: 60, rama: 'El cuerpo', de: 'rayen', pide: 'ligero', col: 2, row: 1, text: 'Saltas más alto: alcanzas rocas y troncos que antes no.' },
-  { id: 'memoria', name: 'Buena memoria', cost: 60, rama: 'La palabra', de: 'abuela', col: 3, row: 0, text: 'Recuerdas mejor lo que ves y lo que te cuentan: cada descubrimiento nuevo da 5 puntos más.' },
+  { id: 'vista', name: 'Vista de traro', rama: 'El bosque', de: 'curinancu', col: 0, row: 0, text: 'Reconoces las cosas desde más lejos: puedes observar árboles, animales y objetos sin tener que acercarte tanto.' },
+  { id: 'rastro', name: 'Rastreador', rama: 'El bosque', de: 'curinancu', pide: 'vista', col: 0, row: 1, text: 'El minimapa marca con un signo lo que todavía no has descubierto cerca de ti.' },
+  { id: 'pudu', name: 'Paso de pudú', rama: 'El bosque', de: 'machi', col: 1, row: 0, text: 'Te mueves sin espantar: los animales del bosque te dejan acercarte mucho más antes de huir.' },
+  { id: 'ligero', name: 'Paso ligero', rama: 'El cuerpo', de: 'rayen', col: 2, row: 0, text: 'Corres más rápido.' },
+  { id: 'salto', name: 'Salto firme', rama: 'El cuerpo', de: 'rayen', pide: 'ligero', col: 2, row: 1, text: 'Saltas más alto: alcanzas rocas y troncos que antes no.' },
+  { id: 'memoria', name: 'Buena memoria', rama: 'La palabra', de: 'abuela', col: 3, row: 0, text: 'Recuerdas mejor lo que ves y lo que te cuentan: cada descubrimiento nuevo da 5 puntos más.' },
 ];
 
 // ---------- misiones ----------
@@ -154,10 +156,10 @@ export const MISSIONS = [
   // m1 parte con un tutorial dentro de la historia: f.tu 1 = mirar el telar, 2 = alcanzar la lana; después viene el encargo.
   // Los avisos pueden nombrar teclas entre llaves ({observar}); "fijo" deja el aviso a la vista mientras dure ese paso.
   { id: 'm1', main: true, n: 1, title: 'Los piñones del pewen', who: 'Millaray, tu madre', pts: 40,
-    text: (c) => (c.f.m1 ? (c.got < c.total ? 'Tu madre te mandó a reunir los últimos piñones para la celebración. Están en el bosque de pewenes, siguiendo el sendero hacia el norte. Uno quedó sobre unas rocas: hay que correr y saltar.' : 'Ya tienes todos los piñones. Llévaselos a tu madre, en el telar.')
+    text: (c) => (c.f.m1 ? (c.got < c.total ? 'Tu madre te mandó a reunir los últimos piñones para la celebración. Están en el bosque de pewenes, siguiendo el sendero hacia el norte. Uno quedó sobre unas rocas: hay que correr y saltar.' : 'Ya tienes todos los piñones. Llévaselos a tu madre: te espera junto al fogón, con el agua al fuego.')
       : !c.f.tu ? 'Faltan pocos días para el We Tripantu y toda la aldea se prepara. Tu madre, Millaray, te está llamando: teje en el telar, junto a la ruka de la familia.'
         : c.f.tu === 1 ? 'Tu madre quiere que mires bien su telar antes de mandarte al bosque. Obsérvalo y vuelve a hablar con ella.' : 'Tu madre necesita que le alcances la lana roja, junto al telar.'),
-    aviso: (c) => (c.f.m1 ? (c.got < c.total ? ['Nueva misión: Los piñones del pewen. Arriba a la izquierda ves tu misión y cuánto llevas; {misiones} abre la lista y {mapa}, el mapa.', 'Sigue el sendero del norte hasta el bosque de pewenes. {correr} para correr, {saltar} para saltar.'] : 'Ya tienes todos los piñones. Llévaselos a tu madre, en el telar.')
+    aviso: (c) => (c.f.m1 ? (c.got < c.total ? ['Nueva misión: Los piñones del pewen. Arriba a la derecha ves tu misión y cuánto llevas; la línea de trazos del minimapa te muestra el camino.', 'Sigue el sendero del norte hasta el bosque de pewenes. {correr} para correr, {saltar} para saltar. {misiones} abre la lista de misiones y {mapa}, el mapa.'] : 'Ya tienes todos los piñones. Llévaselos a tu madre: te espera junto al fogón, con el agua al fuego.')
       : !c.f.tu ? 'Camina con {adelante} {izquierda} {atras} {derecha}; para girar la cámara, arrastra con el ratón. Tu madre te llama: ve hacia la estrella dorada y pulsa {observar} para hablarle.'
         : c.f.tu === 1 ? (c.has('witral') ? 'Lo que observas queda en tu cuaderno ({cuaderno}). Ahora vuelve a hablar con tu madre.' : 'Acércate al telar y pulsa {observar} para observarlo.')
           : c.f.lana ? 'Vuelve a hablar con tu madre.' : 'Junto al telar, pulsa {accion} para alcanzarle la lana. Con {accion} recoges cosas y ayudas.'),

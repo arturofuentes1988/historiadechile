@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import { height, POI, CERRO, riverZ, WATER_Y } from './terrain.js';
 import { animatePerson } from './life.js';
-import { FOGON, CORRAL } from './village.js';
+import { FOGON, CORRAL, OLLA } from './village.js';
 
 const KEY = 'leftraru.tareas';
 // qué se recoge, cómo se llama en la mano y de dónde sale
@@ -63,6 +63,17 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
     }
   }
   if (padre && f.m2 === 1) ponPadre(true); // si se cierra el juego a medio camino, al volver te espera arriba
+
+  // ---------- Millaray: teje en el telar; cuando ya juntaste todos los piñones te espera junto al fogón, revolviendo la olla ----------
+  const mama = actor('Millaray'), TELAR_M = mama && [mama.x, mama.z, mama.face];
+  function madreCocina(si) {
+    if (!mama || (mama.mode === 'cook') === si) return;
+    if (si) { const fc = 2.6, sn = Math.sin(fc), cs = Math.cos(fc), lado = 0.122 * mama.h, ade = 0.332 * mama.h; // se para de modo que su mano derecha, estirada, quede justo sobre la olla
+      mama.mode = 'cook'; mama.face = fc; mama.x = OLLA.x + lado * cs - ade * sn; mama.z = OLLA.z - lado * sn - ade * cs; }
+    else { [mama.x, mama.z, mama.face] = TELAR_M; mama.mode = 'work'; mama.head.rotation.y = 0; }
+    if (mama.palo) mama.palo.visible = si;
+  }
+  if (f.m1 === 1 && S.pin.length >= world.items.length) madreCocina(true); // si se cerró el juego con los piñones ya juntos
 
   // ---------- lo que hace falta ahora, según los encargos abiertos ----------
   function needs() {
@@ -215,7 +226,7 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
     if (!f.agua && !have('agua') && dr < 5 && p.y < WATER_Y + 1.6) add(2, 'Llenar la vasija con agua', () => { inv.agua = 1; save(); snd.play('paso-agua-1', 0.5); hint('Llenaste la vasija. Llévala a la olla del fogón.', 5); });
     if (!f.agua && have('agua') && df < 4.2) add(0.5, 'Echar el agua a la olla', () => { inv.agua = 0; set('agua', 1); snd.play('paso-agua-2', 0.5); speak('La abuela', ['¡Agua fresca! Con esto alcanza para el caldo. Así da gusto.']); });
     const dc = d2(p, CORRAL.x, CORRAL.z);
-    if (!f.weke && !have('pasto') && dc > 9 && world.nearPlant('grass', p.x, p.z, 1.2)) add(6, 'Cortar pasto para los weke', () => { inv.pasto = 1; save(); snd.play('arbusto-2', 0.35); hint('Cortaste un atado de pasto. Llévalo al corral.', 5); });
+    if (!f.weke && !have('pasto') && ui.has('millaray') && dc > 9 && dc < 75 && world.nearPlant('grass', p.x, p.z, 1.2)) add(6, 'Cortar pasto para los weke', () => { inv.pasto = 1; save(); snd.play('arbusto-2', 0.35); hint('Cortaste un atado de pasto. Llévalo al corral.', 5); });
     if (!f.weke && have('pasto') && dc < CORRAL.r + 2.5) add(1, 'Dar pasto a los weke', () => { inv.pasto = 0; set('weke', 1); for (const q of world.life.quads) if (q.kind === 'weke') { q.tx = p.x; q.tz = p.z; q.wait = 0; } hint('Los weke se acercan a comer de tu mano.', 5); });
     // saludar al entrar a los lugares con dueño
     for (const k in LUGARES) if (!f['s-' + k] && d2(p, POI[k].x, POI[k].z) < 30) add(4, `Saludar a ${LUGARES[k]}`, () => { set('s-' + k, 1); luzT = 8; snd.play('hablar', 0.4, 0.8); hint('«Mari mari. Soy Leftraru, hijo de Curiñancu. Vengo de paso y no tomaré más de lo que necesito.»', 7); });
@@ -232,6 +243,7 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
   function update(dt, t, p) {
     here = p; if (palin) updatePalin(dt, p);
     if (sit) updateSit(dt);
+    if (mama && mama.mode === 'cook' && f.m1 !== 1 && d2(p, mama.x, mama.z) > 45) madreCocina(false); // entregados los piñones, cuando ya no la ves vuelve al telar
     if (padre) {
       if (padre.yendo) guia(dt, p);
       else if (f.m2 === 2 && d2(padre, CIMA[0], CIMA[1]) < 3 && d2(p, padre.x, padre.z) > 70) ponPadre(false); // hecha la misión, cuando ya no lo ves vuelve a la aldea
@@ -259,7 +271,7 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
     boy.head.rotation.x = w * (0.16 - (lean - 0.1) * 0.7); boy.head.rotation.y = Math.sin(on * 0.31) * 0.2 * w;
   }
 
-  return { scan, talk, wants, update, pose, stand, f, pins: S.pin, pin(i) { if (!S.pin.includes(i)) { S.pin.push(i); save(); } },
+  return { scan, talk, wants, update, pose, stand, madreCocina, f, pins: S.pin, pin(i) { if (!S.pin.includes(i)) { S.pin.push(i); save(); } },
     get sitting() { return !!sit; }, get busy() { return !!sit && sit.st !== 'on'; }, // busy: está sentándose o levantándose
     ctx: () => ({ f, hierbas: Math.min(2, have('canelo')) + Math.min(1, have('quillay')) + Math.min(2, have('maqui')), llevo: { canelo: Math.min(2, have('canelo')), quillay: Math.min(1, have('quillay')), maqui: Math.min(2, have('maqui')) } }),
     // Dónde ir a buscar lo que falta para las misiones abiertas: los árboles más cercanos de cada especie y el claro del maqui.

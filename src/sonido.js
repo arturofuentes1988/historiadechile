@@ -20,7 +20,7 @@ export function createSound() {
   // kaskawilla: cascabeles. Muchos golpecitos agudos, cada uno con su propia afinación
   const bells = (d, sr, t0, dur, count, amp) => { for (let k = 0; k < count; k++) { const f = R(3000, 6200), i0 = Math.floor((t0 + R(0, dur)) * sr), n = Math.floor(0.14 * sr), a = R(0.3, 1) * amp; let ph = 0; for (let i = 0; i < n && i0 + i < d.length; i++) { const t = i / sr; ph += 6.283 * f / sr; d[i0 + i] += (Math.sin(ph) + 0.5 * Math.sin(ph * 1.47)) * a * Math.min(1, t / 0.002) * Math.exp(-t * 50); } } };
   // un "toc" corto y afinado: madera contra madera, o una semilla que cae en la bolsa
-  const tock = (d, sr, t0, f, amp, dec = 60) => { let ph = 0; const i0 = Math.floor(t0 * sr), n = Math.floor(0.18 * sr); for (let i = 0; i < n && i0 + i < d.length; i++) { const t = i / sr; ph += 6.283 * f / sr; d[i0 + i] += ((Math.sin(ph) + 0.4 * Math.sin(ph * 2.76)) * Math.exp(-t * dec) + (rnd() * 2 - 1) * 0.55 * Math.exp(-t * 420)) * amp; } };
+  const tock = (d, sr, t0, f, amp, dec = 60, len = 0.18) => { let ph = 0; const i0 = Math.floor(t0 * sr), n = Math.floor(len * sr); for (let i = 0; i < n && i0 + i < d.length; i++) { const t = i / sr; ph += 6.283 * f / sr; d[i0 + i] += ((Math.sin(ph) + 0.4 * Math.sin(ph * 2.76)) * Math.exp(-t * dec) + (rnd() * 2 - 1) * 0.55 * Math.exp(-t * 420)) * amp; } };
   // el aire del bosque: tres ecos cortos que se van apagando, para que nada suene pegado al oído
   const air = (d, sr, mix = 0.25) => { for (const [ms, g] of [[83, 0.5], [137, 0.36], [211, 0.26]]) { const k = Math.floor(ms / 1000 * sr); for (let i = k; i < d.length; i++) d[i] += d[i - k] * g * mix; } };
   const grains = (d, sr, count, len, amp) => { for (let k = 0; k < count; k++) { const i0 = Math.floor(rnd() * (d.length - len * sr)), n = Math.floor(R(0.3, 1) * len * sr), a = R(0.3, 1) * amp; for (let i = 0; i < n; i++) d[i0 + i] += (rnd() * 2 - 1) * a * Math.exp(-i / (n * 0.3)); } };
@@ -47,17 +47,18 @@ export function createSound() {
       seamless(d, sr, 0.3); });
     // interfaz y conversación
     buf['ui-clic'] = make(0.09, (d, sr) => { tone(d, sr, 0, 0.06, 1100, 800, 1); grains(d, sr, 3, 0.004, 0.5); env(d, sr, 0.001, 0.02); });                 // dos palitos
-    buf['ui-menu'] = make(0.45, (d, sr) => { tone(d, sr, 0, 0.4, 150, 95, 1); grains(d, sr, 2, 0.01, 0.4); env(d, sr, 0.002, 0.12); });                    // un toque de tambor
+    buf['ui-menu'] = make(0.32, (d, sr) => { tock(d, sr, 0, 392, 0.7, 42); tock(d, sr, 0.075, 294, 0.5, 36, 0.22); lp(d, sr, 3200); });   // abrir el menú: dos golpes de madera que bajan
+    buf['ui-volver'] = make(0.32, (d, sr) => { tock(d, sr, 0, 294, 0.6, 42); tock(d, sr, 0.075, 392, 0.6, 36, 0.22); lp(d, sr, 3200); }); // volver al juego: los mismos, subiendo
     buf['ui-cuaderno'] = make(0.4, (d, sr) => { noise(d); hp(d, sr, 1500); lp(d, sr, 5000); for (let i = 0; i < d.length; i++) { const t = i / sr / 0.4; d[i] *= Math.sin(Math.PI * t) ** 2 * (0.5 + 0.5 * Math.sin(t * 50)); } }); // una hoja que se da vuelta
     buf['ui-bolsa'] = make(0.35, (d, sr) => { grains(d, sr, 30, 0.03, 1); lp(d, sr, 1800); hp(d, sr, 300); env(d, sr, 0.03, 0.12); });                    // cuero
     buf['ui-mapa'] = make(0.5, (d, sr) => { grains(d, sr, 50, 0.02, 1); hp(d, sr, 1200); for (let i = 0; i < d.length; i++) d[i] *= Math.sin(Math.PI * i / d.length) ** 1.5; });
     // Cada cosa que pasa tiene su propio toque, para reconocerla sin mirar:
-    // hallazgo: cascabeles y dos notas de pifilka que suben (algo nuevo en el cuaderno)
-    buf['ui-hallazgo'] = make(1.5, (d, sr) => { bells(d, sr, 0, 0.45, 14, 0.2); flute(d, sr, 0.02, 0.3, 587, 0.5); flute(d, sr, 0.3, 0.62, 880, 0.55); lp(d, sr, 6500); air(d, sr, 0.3); });
-    // misión o encargo nuevo: dos golpes de kultrún y una nota que queda en el aire (hay algo por hacer)
-    buf['ui-mision'] = make(1.5, (d, sr) => { drum(d, sr, 0, 118, 0.9); drum(d, sr, 0.23, 150, 0.7); flute(d, sr, 0.44, 0.6, 659, 0.42); lp(d, sr, 4500); air(d, sr, 0.3); });
-    // misión cumplida: redoble de kultrún, tres notas que suben y terminan largas, y cascabeles
-    buf['ui-logro'] = make(2.3, (d, sr) => { drum(d, sr, 0, 118, 0.75); drum(d, sr, 0.14, 118, 0.55); drum(d, sr, 0.28, 158, 0.9); [[0.3, 587, 0.22], [0.5, 740, 0.22], [0.7, 880, 0.8]].forEach(([t, f, l]) => flute(d, sr, t, l, f, 0.5)); bells(d, sr, 0.7, 0.8, 24, 0.18); lp(d, sr, 6500); air(d, sr, 0.35); });
+    // hallazgo (ganar puntos por descubrir algo): tres golpecitos de madera que suben, cortos y secos
+    buf['ui-hallazgo'] = make(0.6, (d, sr) => { tock(d, sr, 0, 660, 0.6, 60); tock(d, sr, 0.075, 880, 0.6, 55); tock(d, sr, 0.15, 1175, 0.7, 26, 0.4); lp(d, sr, 5200); air(d, sr, 0.16); });
+    // misión o encargo nuevo: dos golpes de madera más graves y pausados, como quien toca a la puerta
+    buf['ui-mision'] = make(0.75, (d, sr) => { tock(d, sr, 0, 392, 0.8, 28, 0.3); tock(d, sr, 0.18, 523, 0.7, 22, 0.45); lp(d, sr, 3600); air(d, sr, 0.18); });
+    // misión cumplida: cinco golpes de madera que suben seguidos, y el último queda sonando
+    buf['ui-logro'] = make(1.05, (d, sr) => { [392, 523, 659, 784, 1047].forEach((f, i) => tock(d, sr, i * 0.085, f, 0.6 + i * 0.05, i === 4 ? 14 : 45, i === 4 ? 0.6 : 0.18)); lp(d, sr, 5200); air(d, sr, 0.22); });
     // un piñón a la bolsa: dos "toc" de semilla y una nota clara y corta (cada piñón suena un poco más agudo que el anterior)
     buf.pinon = make(0.75, (d, sr) => { tock(d, sr, 0, 520, 0.8, 45); tock(d, sr, 0.07, 780, 0.5, 60); flute(d, sr, 0.09, 0.3, 1047, 0.32, 0); bells(d, sr, 0.1, 0.18, 5, 0.1); lp(d, sr, 6000); air(d, sr, 0.25); });
     // conversación: al empezar, un toque suave de kultrún y dos notas de pifilka, como quien llama; al seguir, dos palitos
@@ -66,13 +67,20 @@ export function createSound() {
     buf['hablar-fin'] = make(0.5, (d, sr) => { flute(d, sr, 0, 0.3, 587, 0.4); lp(d, sr, 3800); air(d, sr, 0.3); });                                       // una nota que baja el telón
     for (const n of ['rio', 'viento', 'pajaros', 'fuego']) { const s = ctx.createBufferSource(), g = ctx.createGain(); s.buffer = buf[n]; s.loop = true; g.gain.value = 0; s.connect(g).connect(master); s.start(); loops[n] = g; }
   }
-  function start() { if (ctx) return; ctx = new (window.AudioContext || window.webkitAudioContext)(); master = ctx.createGain(); master.gain.value = vol; master.connect(ctx.destination); build(); }
-  for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, start, { once: true });
+  // Solo suena mientras la ventana del juego es la que se está usando. Una copia abierta en segundo plano (otra pestaña,
+  // o las pruebas automáticas) no debe meter sus sonidos encima de la partida.
+  const oye = () => document.hasFocus();
+  const ajusta = () => { if (master) master.gain.setTargetAtTime(oye() ? vol : 0, ctx.currentTime, 0.12); };
+  function start() { if (ctx) return; ctx = new (window.AudioContext || window.webkitAudioContext)(); master = ctx.createGain(); master.gain.value = oye() ? vol : 0; master.connect(ctx.destination); build(); }
+  // arranca con el primer gesto de verdad del jugador: un clic o una tecla (no con los que fabrica un programa)
+  const gesto = (e) => { if (!e.isTrusted) return; for (const ev of ['pointerdown', 'keydown']) removeEventListener(ev, gesto); start(); };
+  for (const ev of ['pointerdown', 'keydown']) addEventListener(ev, gesto);
+  addEventListener('focus', ajusta); addEventListener('blur', ajusta);
   return {
     start, get ready() { return !!ctx; }, get names() { return Object.keys(buf); }, buffer: (name) => buf[name] || null, // buffer: para revisar un sonido en las pruebas
-    set volume(v) { vol = v; if (master) master.gain.value = v; },
+    set volume(v) { vol = v; ajusta(); },
     // un sonido suelto; "rate" cambia un poco el tono para que no suene siempre igual
-    play(name, v = 1, rate = 1) { if (!ctx || !buf[name]) return; const s = ctx.createBufferSource(), g = ctx.createGain(); s.buffer = buf[name]; s.playbackRate.value = rate; g.gain.value = v; s.connect(g).connect(master); s.start(); },
+    play(name, v = 1, rate = 1) { if (!ctx || !buf[name] || !oye()) return; const s = ctx.createBufferSource(), g = ctx.createGain(); s.buffer = buf[name]; s.playbackRate.value = rate; g.gain.value = v; s.connect(g).connect(master); s.start(); },
     // volumen de un sonido continuo; se acerca de a poco al valor pedido
     loop(name, v) { const g = loops[name]; if (g) g.gain.setTargetAtTime(v, ctx.currentTime, 0.4); },
   };
