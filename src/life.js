@@ -67,15 +67,22 @@ export function buildPerson({ h = 1.38, kind = 'boy', skin = 0xa9714b, cloth = 0
   g.scale.setScalar(h); shadows(g);
   return { g, body, head, legL, legR, shinL, shinR, armL, armR, foreL, foreR, h, woman };
 }
-// phase: fase del paso; amp: 0 quieto, 1 corriendo; air: en el aire
-export function animatePerson(p, phase, amp, air = false) {
-  if (air) { p.legL.rotation.x = -0.7; p.shinL.rotation.x = 1.0; p.legR.rotation.x = 0.35; p.shinR.rotation.x = 0.5; p.armL.rotation.x = p.armR.rotation.x = -0.5; p.armL.rotation.z = 0.8; p.armR.rotation.z = -0.8; p.foreL.rotation.x = p.foreR.rotation.x = -0.5; p.body.rotation.x = 0.1; return; }
-  const s = Math.sin(phase), c = Math.cos(phase), k = p.woman ? 0.55 : 1; // el vestido acorta el paso
-  p.legL.rotation.x = -s * amp * 0.75 * k; p.legR.rotation.x = s * amp * 0.75 * k;
-  p.shinL.rotation.x = Math.max(0, c) * amp * 1.1 * k + amp * 0.08; p.shinR.rotation.x = Math.max(0, -c) * amp * 1.1 * k + amp * 0.08; // la rodilla se dobla al adelantar la pierna
-  p.armL.rotation.x = s * amp * 0.6; p.armR.rotation.x = -s * amp * 0.6; p.armL.rotation.z = 0.1; p.armR.rotation.z = -0.1;
+// Cuánto sube (+) o baja (−) el terreno hacia donde mira alguien parado en (x, z): metros de alto por metro de avance.
+export const slopeAhead = (x, z, face) => { const fx = Math.sin(face), fz = Math.cos(face); return (height(x + fx * 0.8, z + fz * 0.8) - height(x - fx * 0.3, z - fz * 0.3)) / 1.1; };
+// phase: fase del paso; amp: 0 quieto, 1 corriendo; air: en el aire; slope: pendiente hacia donde camina.
+// La pierna que avanza dobla la rodilla y levanta el talón; la que apoya cede un poco. Cuesta arriba el paso se acorta,
+// el muslo sube más, las rodillas trabajan más y el cuerpo se echa hacia adelante; cuesta abajo se frena con las rodillas.
+export function animatePerson(p, phase, amp, air = false, slope = 0) {
+  if (air) { p.legL.rotation.x = -0.7; p.shinL.rotation.x = 1.0; p.legR.rotation.x = 0.35; p.shinR.rotation.x = 0.5; p.armL.rotation.x = p.armR.rotation.x = -0.5; p.armL.rotation.z = 0.8; p.armR.rotation.z = -0.8; p.foreL.rotation.x = p.foreR.rotation.x = -0.5; p.body.rotation.x = 0.1; p.body.rotation.z = 0; return; }
+  const s = Math.sin(phase), c = Math.cos(phase), k = p.woman ? 0.6 : 1; // el vestido acorta el paso
+  const up = Math.min(1, Math.max(0, slope * 2.2)), dn = Math.min(1, Math.max(0, -slope * 2.2)), sw = [Math.max(0, c), Math.max(0, -c)]; // sw: cuánto va en el aire cada pierna
+  const stride = amp * (0.78 - up * 0.2) * k, lift = amp * up * 0.5, bend = amp * (1.45 + up * 0.7) * k, give = amp * (0.14 + up * 0.32 + dn * 0.28);
+  p.legL.rotation.x = -s * stride - sw[0] * lift - up * amp * 0.1; p.legR.rotation.x = s * stride - sw[1] * lift - up * amp * 0.1;
+  p.shinL.rotation.x = sw[0] ** 0.8 * bend + (1 - sw[0]) * give; p.shinR.rotation.x = sw[1] ** 0.8 * bend + (1 - sw[1]) * give;
+  p.armL.rotation.x = s * amp * (0.6 + up * 0.15); p.armR.rotation.x = -s * amp * (0.6 + up * 0.15); p.armL.rotation.z = 0.1; p.armR.rotation.z = -0.1;
   p.foreL.rotation.x = -0.15 - amp * 0.35 - Math.max(0, -s) * amp * 0.4; p.foreR.rotation.x = -0.15 - amp * 0.35 - Math.max(0, s) * amp * 0.4;
-  p.body.rotation.x = amp * 0.09; p.body.rotation.y = s * amp * 0.07; p.body.position.y = Math.abs(c) * amp * 0.012;
+  p.body.rotation.x = amp * 0.09 + Math.min(1, amp * 2) * (up * 0.3 - dn * 0.07); p.body.rotation.y = s * amp * 0.07; p.body.rotation.z = c * amp * 0.025; // la cadera se balancea con cada paso
+  p.body.position.y = Math.abs(c) * amp * 0.014 - amp * (up + dn) * 0.012;
 }
 
 // ---------- animales con piel continua ----------
@@ -129,12 +136,21 @@ const ANIMAL = {
     hipY: 0.265, hipX: 0.055, hipZ: [0.15, -0.2], thigh: [[0, 0, 0.035, 0.05], [-0.07, 0, 0.024, 0.03], [-0.13, 0, 0.014, 0.016]], shin: [[0, 0, 0.014, 0.016], [-0.07, 0, 0.011, 0.012], [-0.12, 0, 0.01, 0.011], [-0.13, 0.004, 0.014, 0.016], [-0.135, 0.004, 0.004, 0.004]],
     tailAt: [0.42, -0.28], tail: [[0, 0, 0.012, 0.012], [0.005, -0.03, 0.018, 0.018], [0, -0.05, 0.006, 0.006]], ear: 0.05, earAt: [0.03, 0.055, -0.005], eyeAt: [0.036, 0.03, 0.04, 0.007], rough: 0.02, fur: 0.013,
   },
+  // Zorro culpeo: 40 cm a la cruz, cuerpo largo y bajo, hocico fino, orejas grandes en punta y cola larga y tupida de punta negra.
+  zorro: {
+    torso: [[0.4, -0.37, 0.01, 0.01], [0.42, -0.3, 0.075, 0.085], [0.42, -0.12, 0.095, 0.11], [0.41, 0.06, 0.095, 0.115], [0.41, 0.2, 0.08, 0.1], [0.42, 0.29, 0.045, 0.055], [0.42, 0.32, 0.01, 0.01]],
+    neckAt: [0.44, 0.24], neck: [[-0.05, -0.04, 0.065, 0.075], [0.03, 0.03, 0.05, 0.055], [0.1, 0.08, 0.045, 0.048], [0.13, 0.1, 0.02, 0.02]],
+    headAt: [0.11, 0.085], head: [[0, -0.05, 0.012, 0.012], [0.015, -0.02, 0.048, 0.05], [0.016, 0.03, 0.046, 0.046], [0.004, 0.08, 0.026, 0.024], [-0.004, 0.125, 0.016, 0.014], [-0.006, 0.14, 0.006, 0.006]],
+    hipY: 0.335, hipX: 0.06, hipZ: [0.2, -0.24], thigh: [[0, 0, 0.04, 0.055], [-0.09, 0, 0.026, 0.032], [-0.17, 0, 0.016, 0.018]], shin: [[0, 0, 0.016, 0.018], [-0.08, 0, 0.012, 0.013], [-0.15, 0, 0.011, 0.012], [-0.16, 0.006, 0.016, 0.018], [-0.165, 0.006, 0.004, 0.004]],
+    tailAt: [0.4, -0.33], tail: [[0, 0, 0.025, 0.025], [-0.04, -0.12, 0.055, 0.055], [-0.1, -0.28, 0.062, 0.062], [-0.14, -0.4, 0.032, 0.032], [-0.15, -0.44, 0.008, 0.008]], tip: 0x1c1612,
+    ear: 0.085, earAt: [0.03, 0.05, -0.005], eyeAt: [0.036, 0.028, 0.045, 0.007], rough: 0.03, fur: 0.02,
+  },
 };
 function buildQuad({ s = 1, kind = 'weke', body = 0xb07a4a, belly = 0xf0e8d8, legs = 0x7a6a5e, horns = false }) {
   const A = ANIMAL[kind], g = new THREE.Group(), dark = 0x18130f, weke = kind === 'weke';
   const coat = (t, sa) => mixHex(body, belly, (-sa - 0.25) * 2.2);                          // lomo de un color, vientre más claro
   const F = A.fur; g.add(skin(A.torso, coat, { rings: 22, rough: A.rough, fur: F }));
-  const tail = new THREE.Group(); tail.position.set(0, A.tailAt[0], A.tailAt[1]); tail.add(skin(A.tail, () => body, { rings: 6, radial: 8, fur: F * 0.8 })); g.add(tail);
+  const tail = new THREE.Group(); tail.position.set(0, A.tailAt[0], A.tailAt[1]); tail.add(skin(A.tail, (t) => (A.tip && t > 0.74 ? A.tip : body), { rings: A.tip ? 14 : 6, radial: 8, fur: F * 0.8 })); g.add(tail); // el zorro lleva la punta de la cola negra
   const neck = new THREE.Group(); neck.position.set(0, A.neckAt[0], A.neckAt[1]); g.add(neck);
   neck.add(skin(A.neck, (t, sa) => mixHex(body, belly, (-sa - 0.1) * 2.5 * (weke ? 1 : 0.5)), { rings: 12, rough: A.rough * 0.6, fur: F * 0.75 })); // garganta clara
   const hd = new THREE.Group(); hd.position.set(0, A.headAt[0], A.headAt[1]); neck.add(hd);
@@ -174,7 +190,34 @@ const BIRDS = {
   small: { k: 0.15, span: 0.2, chord: 0.06, tailLen: 0.075, tailFan: 0.25, beak: 0x2a2622, cere: 0x2a2622,
     coat: (t, sa) => (t > 0.72 ? (sa > 0.65 ? 0x1c1612 : sa > 0.25 ? 0xe2c890 : 0x1c1612) : sa < -0.2 ? 0xe8dcc0 : 0xa86a38),
     wing: (f, u) => (u > 0.5 && f > 0.4 ? 0x2a2018 : (u > 0.3 && u < 0.5 ? 0xd8a860 : 0x6a4428)), tail: (u) => (u > 0.6 ? 0x2a2018 : 0xa86a38) },
+  // chucao: rechoncho, lomo pardo, garganta y pecho rojizos, vientre barrado de blanco y negro, cola corta y parada
+  chucao: { k: 0.2, span: 0.24, chord: 0.085, tailLen: 0.075, tailFan: 0.2, beak: 0x2a2622, cere: 0x2a2622,
+    coat: (t, sa) => (t > 0.8 ? (sa > 0.1 ? 0x3a2c22 : 0xb8502a) : sa < -0.15 ? (t > 0.5 ? 0xb8502a : Math.sin(t * 70) > 0 ? 0xe8e0d0 : 0x3a322c) : 0x4a3826),
+    wing: () => 0x3e2e20, tail: () => 0x33261c },
+  // carpintero negro: todo negro, con la cabeza roja y una mancha blanca en las alas; pico largo y recto, color hueso
+  carpintero: { k: 0.42, span: 0.62, chord: 0.17, tailLen: 0.17, tailFan: 0.1, beak: 0xd8d2c4, cere: 0x15120f, long: true,
+    coat: (t) => (t > 0.74 ? 0xb81e1a : 0x15120f), wing: (f, u) => (f < 0.45 && u < 0.45 ? 0xf0ece0 : 0x15120f), tail: () => 0x15120f },
+  // picaflor: diminuto, verde, de vientre claro y corona rojiza; pico fino y largo
+  picaflor: { k: 0.1, span: 0.14, chord: 0.04, tailLen: 0.04, tailFan: 0.25, beak: 0x1a1614, cere: 0x1a1614, long: true,
+    coat: (t, sa) => (t > 0.86 && sa > 0.2 ? 0xd8642a : sa < -0.2 ? 0xd8d4c4 : 0x3f8a4a), wing: () => 0x3a3a40, tail: () => 0x2a5a36 },
+  // chuncho: búho pequeño y cabezón, pardo con rayas claras en el pecho y la cara más clara
+  chuncho: { k: 0.3, span: 0.38, chord: 0.13, tailLen: 0.09, tailFan: 0.2, beak: 0xd8c890, cere: 0xd8c890, hook: true,
+    coat: (t, sa) => (t > 0.7 ? (sa < 0.1 ? 0xd8ccb0 : 0x6a4a30) : sa < -0.15 ? (Math.sin(t * 50) > 0.2 ? 0xe8e0cc : 0x6a4a30) : 0x6a4a30),
+    wing: (f, u) => (Math.sin(u * 20 + f * 9) > 0.6 ? 0xd8c8a0 : 0x5a3e28), tail: (u) => (Math.sin(u * 16) > 0 ? 0x5a3e28 : 0x8a6a48) },
 };
+// Monito del monte: un marsupial que cabe en una mano. Cuerpo redondo, ojos grandes con antifaz oscuro, orejas redondas
+// y una cola gruesa en la base (ahí guarda su grasa) con la que se afirma de las ramas. Va al doble de su porte para que se distinga.
+function buildMonito() {
+  const g = new THREE.Group(), fur = 0x8c7c68, belly = 0xe6dccb, dark = 0x2a2018;
+  g.add(skin([[0.03, -0.055, 0.005, 0.005], [0.036, -0.035, 0.027, 0.027], [0.04, 0, 0.034, 0.037], [0.044, 0.035, 0.03, 0.031], [0.048, 0.058, 0.014, 0.014]], (t, sa) => mixHex(fur, belly, (-sa - 0.2) * 2.2), { rings: 12, radial: 12, fur: 0.006 }));
+  const hd = new THREE.Group(); hd.position.set(0, 0.052, 0.06); g.add(hd);
+  hd.add(skin([[0, -0.022, 0.008, 0.008], [0.004, -0.006, 0.026, 0.025], [0.003, 0.018, 0.024, 0.022], [-0.002, 0.038, 0.012, 0.011], [-0.004, 0.048, 0.004, 0.004]], (t, sa) => (t > 0.9 ? 0xc89a8a : mixHex(fur, belly, (-sa - 0.1) * 2 + (t - 0.6))), { rings: 10, radial: 12, fur: 0.004 }));
+  for (const sx of [-1, 1]) { ball(0.0105, dark, hd, sx * 0.016, 0.008, 0.02, 1, 1, 0.5); ball(0.0068, dark, hd, sx * 0.0165, 0.0085, 0.0235).material = eyeMat; ball(0.012, 0xc8a090, hd, sx * 0.022, 0.024, -0.004, 1, 1, 0.3).rotation.y = sx * 0.5; }
+  g.add(skin([[0.032, -0.05, 0.012, 0.012], [0.012, -0.085, 0.013, 0.013], [-0.022, -0.1, 0.012, 0.012], [-0.055, -0.085, 0.01, 0.01], [-0.066, -0.055, 0.008, 0.008], [-0.05, -0.036, 0.005, 0.005]], () => 0x7a6a58, { rings: 16, radial: 8, fur: 0.003 }));
+  for (const [x, z] of [[0.02, 0.035], [-0.02, 0.035], [0.022, -0.03], [-0.022, -0.03]]) ball(0.008, 0xd8b0a0, g, x, 0.008, z, 1, 0.6, 1.4);
+  g.scale.setScalar(2); shadows(g); g.traverse((o) => { if (o.userData.shell) o.castShadow = false; });
+  return { g, hd };
+}
 const featherMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: furTex, roughness: 0.9, side: THREE.DoubleSide });
 // Pluma: una lámina angosta de punta redondeada, con su color a lo largo (u de 0 en la base a 1 en la punta)
 function feathers(list) {
@@ -252,8 +295,11 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
   // weke: la mayoría con el pelaje del guanaco; el blanco era el más apreciado
   for (const [body, belly, legs, s] of [[0xb07a4a, 0xf0e8d8, 0x7a6a5e, 1], [0xa87044, 0xece2d0, 0x74645a, 1.04], [0xeee6d8, 0xf8f2e6, 0x9a9088, 0.98], [0x6e4c36, 0xbfa88c, 0x3e322c, 1], [0xb8824e, 0xf0e8d8, 0x7a6a5e, 0.66]])
     quad({ body, belly, legs, s }, CORRAL.x + R(-3, 3), CORRAL.z + R(-3, 3), { hx: CORRAL.x, hz: CORRAL.z, hr: CORRAL.r - 1.9, pace: 0.8 });
-  for (const [x, z] of [[POI.viejo.x + 16, POI.viejo.z + 12], [-70, -70], [40, -52], [-60, 66], [70, 40], [-140, 20]])
+  for (const [x, z] of [[POI.viejo.x + 16, POI.viejo.z + 12], [-70, -70], [40, -52], [-60, 66], [70, 40], [-140, 20], [22, -62], [-30, -48], [58, -20], [-22, 52], [36, 58], [-96, -20]]) // pudúes: también cerca de los senderos, para que se dejen ver
     quad({ kind: 'pudu', body: 0x8a5230, belly: 0xa9764c, legs: 0x5a3420, horns: rng() < 0.5 }, x, z, { hx: x, hz: z, hr: 16, pace: 0.6, shy: true });
+  for (const [x, z] of [[-73, -67], [38, 61]]) quad({ kind: 'pudu', s: 0.62, body: 0x94603a, belly: 0xb88a5c, legs: 0x5a3420 }, x, z, { hx: x, hz: z, hr: 9, pace: 0.6, shy: true }); // dos crías, cerca de sus madres
+  // zorros culpeo: rondan los bordes del bosque; son menos asustadizos que el pudú, pero no se dejan acercar corriendo
+  for (const [x, z] of [[52, 34], [-84, -52], [-30, 68], [118, -34]]) quad({ kind: 'zorro', body: 0xa8683e, belly: 0xe8dcc8, legs: 0x8a4a2a }, x, z, { hx: x, hz: z, hr: 24, pace: 0.95, shy: true });
 
   // ---------- aves ----------
   // Cada ave (o bandada) alterna entre volar por su recorrido y posarse en una rama seca de un árbol.
@@ -293,6 +339,23 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
   // los rayaditos: revolotean entre los árboles y se posan en ramas bajas; si te acercas corriendo, se van
   for (const [cx, cz] of [[6, -30], [-34, 14], [30, 26], [-70, -40], [0, -80], [-90, 50], [60, -30]]) { const r = R(5, 11), sp = R(0.5, 0.9) * (rng() < 0.5 ? 1 : -1), hh = R(5, 11), t0 = closest(trees, cx, cz)[0], g = group({ fly: [12, 24], rest: [20, 36], T: 2.6, shy: true });
     bird('small', (t, b) => [cx + Math.cos(t * sp + b.o) * r, height(cx, cz) + hh + Math.sin(t * 1.7 + b.o) * 1.5, cz + Math.sin(t * sp + b.o) * r * 0.7, 0.8, 16], g, t0 && percha(t0, R(2.1, 3.2), R(0, 6.28), 0.75)); ready(g, rng() < 0.6); }
+  // el chucao: casi no vuela; anda cerca del suelo en lo más espeso y se posa bajo
+  for (const [qx, qz] of [[-18, -58], [-92, -62], [-44, 62]]) { const t0 = closest(trees, qx, qz)[0], cx = t0.x + 2.5, cz = t0.z + 1.5, r = R(3, 5), sp = R(0.5, 0.8), g = group({ fly: [8, 16], rest: [24, 42], T: 2.2, shy: true });
+    bird('chucao', (t, b) => [cx + Math.cos(t * sp + b.o) * r, height(cx, cz) + 1.3 + Math.sin(t * 1.3 + b.o) * 0.5, cz + Math.sin(t * sp + b.o) * r * 0.8, 0.9, 20], g, percha(t0, R(0.6, 1.0), R(0, 6.28), 0.6)); ready(g, true); }
+  // el carpintero negro: en los árboles grandes y viejos
+  { const big = trees.filter((t) => t.H > 16 && t.kind !== 'pewen');
+    for (const [qx, qz] of [[32, -50], [-112, -84]]) { const t0 = closest(big.length ? big : trees, qx, qz)[0], cx = t0.x, cz = t0.z, r = R(10, 15), sp = R(0.3, 0.45), g = group({ fly: [14, 26], rest: [30, 50], T: 3.2 });
+      bird('carpintero', (t, b) => [cx + Math.cos(t * sp + b.o) * r, height(cx, cz) + 11 + Math.sin(t * 0.9 + b.o) * 2, cz + Math.sin(t * sp + b.o) * r, 0.7, 9], g, percha(t0, R(4.5, 6.5), R(0, 6.28), 0.9)); ready(g, true); } }
+  // el picaflor: se queda suspendido en el aire, va y viene, y descansa en una ramita
+  for (const [qx, qz] of [[-62, 40], [10, 58], [-100, 52]]) { const t0 = closest(trees, qx, qz)[0], cx = t0.x + 2.4, cz = t0.z + 1.2, g = group({ fly: [10, 18], rest: [12, 20], T: 1.6, shy: true });
+    bird('picaflor', (t, b) => [cx + Math.sin(t * 0.9 + b.o) * 2.2, height(cx, cz) + 1.7 + Math.sin(t * 2.3 + b.o) * 0.35, cz + Math.sin(t * 1.8 + b.o * 2) * 1.4, 1.0, 55], g, percha(t0, R(1.4, 1.9), R(0, 6.28), 0.6)); ready(g, false); }
+  // el chuncho: quieto en su rama, mirando; no se va
+  for (const [qx, qz] of [[POI.viejo.x + 6, POI.viejo.z - 8], [POI.antiguos.x - 16, POI.antiguos.z + 6]]) { const t0 = closest(trees, qx, qz)[0], g = group({ fly: [1, 1], rest: [1e9, 1e9], T: 3 });
+    bird('chuncho', () => [t0.x + 3, t0.y + 6, t0.z + 3, 0.6, 8], g, percha(t0, R(3, 4.2), R(0, 6.28), 0.8)); ready(g, true); }
+  // monitos del monte: en ramas bajas de lo más húmedo del bosque
+  const critters = [];
+  for (const [qx, qz] of [[POI.viejo.x + 12, POI.viejo.z + 4], [-104, -60], [-66, -36]]) { const t0 = closest(trees, qx, qz)[0], p = percha(t0, R(1.5, 2.1), R(0, 6.28), 0.75), m = buildMonito();
+    m.g.position.set(p.x, p.y + p.r - 0.01, p.z); m.g.rotation.y = Math.atan2(p.x - t0.x, p.z - t0.z); scene.add(m.g); critters.push({ id: 'monito', ...m, x: p.x, y: p.y + p.r + 0.07, z: p.z, cam: p.cam, tree: t0, o: R(0, 6) }); }
 
   // ---------- partículas ----------
   const P = (fill, opts) => { const b = new ParticleBatch(); fill(b); const m = b.build(opts); scene.add(m); return m; };
@@ -310,6 +373,7 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
     for (let i = 0; i < 60; i++) { const x = R(-190, 170); b.add(x, WATER_Y + R(0.5, 1.6), riverZ(x) + R(-7, 7), R(8, 13), R(0.6, 1.2), 0xe6eef0); }
   }, { dir: [0, 0, 0], span: 30, speed: 0.9, drift: 0.8, wob: 0.25, s0: 0.8, s1: 1.3, opacity: 0.1, wind: [1, 0, 0.1], aspect: 0.35 });
 
+  const slopeOf = (o, dt) => { o.slope = (o.slope || 0) + ((o.speed > 0.2 ? slopeAhead(o.x, o.z, o.face) : 0) - (o.slope || 0)) * Math.min(1, dt * 4); return o.slope; };
   const turn = (o, tx, tz, dt, k = 6) => { let d = Math.atan2(tx - o.x, tz - o.z) - o.face; d = Math.atan2(Math.sin(d), Math.cos(d)); o.face += d * Math.min(1, dt * k); };
 
   function update(dt, t, pp, speed = 0) {
@@ -320,9 +384,9 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
         if (p.wait > 0) { p.wait -= dt; p.speed += (0 - p.speed) * Math.min(1, dt * 8); }
         else if (d < 0.5) { p.i = (p.i + 1) % p.pts.length; p.wait = R(1.5, 5); }
         else { turn(p, tx, tz, dt); p.speed += (p.pace - p.speed) * Math.min(1, dt * 5); p.x += Math.sin(p.face) * p.speed * dt; p.z += Math.cos(p.face) * p.speed * dt; }
-        p.phase += dt * (1.5 + p.speed * 3.4 / Math.sqrt(p.h)); animatePerson(p, p.phase, Math.min(1, p.speed / 2.4) * 0.75 + (p.speed > 0.1 ? 0.2 : 0));
+        p.phase += dt * (1.5 + p.speed * 3.4 / Math.sqrt(p.h)); animatePerson(p, p.phase, Math.min(1, p.speed / 2.4) * 0.75 + (p.speed > 0.1 ? 0.2 : 0), false, slopeOf(p, dt));
       } else if (p.mode === 'work') { p.phase += dt * 2.2; animatePerson(p, 0, 0); p.armL.rotation.x = -0.9 + Math.sin(p.phase) * 0.3; p.armR.rotation.x = -0.9 + Math.sin(p.phase + 2) * 0.3; p.foreL.rotation.x = -0.7 + Math.sin(p.phase + 1) * 0.3; p.foreR.rotation.x = -0.7 + Math.sin(p.phase + 3) * 0.3; p.head.rotation.x = 0.2; }
-      else if (p.mode === 'lead') { p.phase += dt * (1.5 + p.speed * 3.4 / Math.sqrt(p.h)); animatePerson(p, p.phase, Math.min(1, p.speed / 2.4) * 0.75 + (p.speed > 0.1 ? 0.2 : 0)); p.head.rotation.y *= 0.9; } // va guiando: su paso lo decide acciones.js
+      else if (p.mode === 'lead') { p.phase += dt * (1.5 + p.speed * 3.4 / Math.sqrt(p.h)); animatePerson(p, p.phase, Math.min(1, p.speed / 2.4) * 0.75 + (p.speed > 0.1 ? 0.2 : 0), false, slopeOf(p, dt)); p.head.rotation.y += ((p.mira || 0) - p.head.rotation.y) * Math.min(1, dt * 4); } // va guiando: su paso lo decide acciones.js
       else { p.phase += dt; animatePerson(p, 0, 0); p.armL.rotation.x = Math.sin(p.phase * 0.6) * 0.05; p.body.rotation.z = Math.sin(p.phase * 0.35) * 0.015; p.head.rotation.y = Math.sin(p.phase * 0.23) * 0.3; if (p.quieto) p.head.rotation.y *= 0.2; else if (Math.hypot(pp.x - p.x, pp.z - p.z) < 6) { turn(p, pp.x, pp.z, dt, 2.5); p.head.rotation.y *= 0.3; } }
       const gy = height(p.x, p.z); p.g.position.set(p.x, gy + Math.sin(p.phase * 0.8) * 0.008, p.z); p.g.rotation.y = p.face;
       p.rb.setNextKinematicTranslation({ x: p.x, y: gy + p.cy, z: p.z });
@@ -355,10 +419,11 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
       else { g.ft += dt * Math.min(1, 0.12 + g.tm / g.T); if (g.tm > g.T + g.maxLag) { g.st = 'fly'; g.tm = 0; g.dur = R(g.fly[0], g.fly[1]); } }
     }
     const sm = (a, b2, v) => { const q = Math.min(1, Math.max(0, (v - a) / (b2 - a))); return q * q * (3 - 2 * q); };
+    for (const c of critters) { c.hd.rotation.y = Math.sin(t * 0.5 + c.o) * 0.55; c.hd.rotation.x = Math.sin(t * 0.33 + c.o * 2) * 0.15; c.g.scale.y = 2 * (1 + Math.sin(t * 2.2 + c.o) * 0.02); } // el monito mira alrededor y respira
     for (const b of birds) {
       const g = b.grp, p = b.perch, [fx, fy, fz, amp, fq] = b.f(g.ft, b); let k = 0; // k: 0 en vuelo … 1 posada
       if (p && g.st !== 'fly') { const u = sm(0, 1, (g.tm - b.lag) / g.T); k = g.st === 'perch' ? 1 : g.st === 'land' ? u : 1 - u; }
-      const scare = b.type === 'small' && k === 0 && Math.hypot(pp.x - fx, pp.z - fz) < 9 && speed > 1; b.up += ((scare ? 7 : 0) - b.up) * Math.min(1, dt * (scare ? 2.5 : 0.25)); // los pajaritos suben cuando pasas debajo
+      const scare = g.shy && k === 0 && Math.hypot(pp.x - fx, pp.z - fz) < 9 && speed > 1; b.up += ((scare ? 7 : 0) - b.up) * Math.min(1, dt * (scare ? 2.5 : 0.25)); // los pajaritos suben cuando pasas debajo
       const sit = p ? p.r + BIRDS[b.type].k * 0.15 : 0, x = p ? fx + (p.x - fx) * k : fx, y = p ? fy + b.up * (1 - k) + (p.y + sit - fy) * k + Math.sin(Math.PI * k) * 1.2 : fy + b.up, z = p ? fz + (p.z - fz) * k : fz; // llega a la rama un poco desde arriba
       // rumbo y cabeceo según hacia dónde se mueve de verdad; al posarse queda atravesada en la rama, más erguida, y mira alrededor
       const o = b.g.position, mx = x - o.x, my = y - o.y, mz = z - o.z, hs = Math.hypot(mx, mz), F = sm(0.82, 1, k); let yaw = b.yaw, pitch = b.pitch;
@@ -374,6 +439,6 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
       b.perched = k === 1;
     }
   }
-  const api = { update, actors, quads, birds, markMats, shyR: 9 }; // shyR: a qué distancia huyen los animales tímidos
+  const api = { update, actors, quads, birds, critters, markMats, shyR: 9 }; // shyR: a qué distancia huyen los animales tímidos
   return api;
 }

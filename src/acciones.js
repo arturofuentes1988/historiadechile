@@ -21,6 +21,7 @@ const FUEGO = [
 ];
 const LUGARES = { viejo: 'el bosque viejo', menoko: 'el menoko', antiguos: 'el lugar de los antiguos' };
 const HUELLAS = [[-70, -70], [40, -52], [-60, 66]];
+const NOMBRE = { curinancu: 'Curiñancu', millaray: 'Millaray', abuela: 'la abuela', ayelen: 'Ayelén', rayen: 'Rayen', machi: 'la machi', namku: 'Ñamku' }; // cómo se llama en el mundo cada persona del cuaderno
 
 export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripple, player, place, pinones, story }) {
   const TRONCOS = [0, 1, 2, 3, 4].map((i) => { const a = 0.6 + i * 1.2; return { x: FOGON.x + Math.cos(a) * 2.9, z: FOGON.z + Math.sin(a) * 2.9, a }; }); // los troncos alrededor del fogón
@@ -47,6 +48,9 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
   function guia(dt, p) {
     const a = padre, [tx, tz] = RUTA[a.ri], d = d2(a, tx, tz), lejos = d2(p, a.x, a.z), vaAdelante = d2(p, CIMA[0], CIMA[1]) < d2(a, CIMA[0], CIMA[1]) - 1;
     const espera = lejos > 13 && !vaAdelante; a.aviso -= dt;
+    // cada tanto vuelve la cabeza para ver si lo sigues
+    a.reloj = (a.reloj || 0) + dt; const atras = Math.atan2(p.x - a.x, p.z - a.z) - a.face, giro = Math.atan2(Math.sin(atras), Math.cos(atras));
+    a.mira = !espera && !vaAdelante && a.reloj % 6 > 4.5 ? Math.max(-1.3, Math.min(1.3, giro)) : 0;
     // a tu paso: más lento si vienes rezagado, más vivo si te adelantaste; detenido y mirándote si te quedaste lejos
     const want = espera ? 0 : vaAdelante ? 3.9 : lejos < 5 ? 3.2 : 2.5, to = espera ? Math.atan2(p.x - a.x, p.z - a.z) : Math.atan2(tx - a.x, tz - a.z);
     let df = to - a.face; df = Math.atan2(Math.sin(df), Math.cos(df)); a.face += df * Math.min(1, dt * (espera ? 2.5 : 5));
@@ -265,6 +269,41 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
         if (it.tree) world.trees.filter((t) => t.kind === it.tree && !t.rec.picked).map((t) => [d2(p, t.x, t.z), t]).sort((a, b) => a[0] - b[0]).slice(0, Math.max(2, n[id])).forEach(([, t]) => out.push({ x: t.x, z: t.z, id, label: it.uno }));
         else if (it.bush) out.push({ x: POI.maqui.x, z: POI.maqui.z, id, label: it.uno }); }
       return out;
+    },
+    // A dónde hay que ir ahora para avanzar en una misión (para la línea de guía). Devuelve { x, z, label } o nada si no hay un lugar que marcar.
+    objetivo(id, p) {
+      const [got, total] = pinones(), has = ui.has, TELAR = { x: -10.6, z: -4.2, label: 'el telar' };
+      const quien = (k) => { const a = actor(NOMBRE[k]); return a ? { x: a.x, z: a.z, label: NOMBRE[k] } : null; };
+      const cerca = (list) => list.filter(Boolean).sort((a, b) => d2(p, a.x, a.z) - d2(p, b.x, b.z))[0] || null; // de varios, el más cercano
+      const arbol = (kind, label) => { const t = cerca(world.trees.filter((q) => q.kind === kind)); return t && { x: t.x, z: t.z, label }; };
+      const planta = (kind, label) => { const t = world.findPlant(kind, p.x, p.z); return t && { ...t, label }; };
+      const lugar = (k, label) => ({ x: POI[k].x, z: POI[k].z, label: label || POI[k].name });
+      const falta = (pairs) => cerca(pairs.filter(([nota]) => !has(nota)).map(([, fn]) => fn())); // de lo que aún no descubres, lo que quede más a mano
+      const ave = (type, label) => { const b = cerca(world.life.birds.filter((q) => q.type === type && q.perch).map((q) => q.perch)); return b && { x: b.x, z: b.z, label }; };
+      const pudu = () => { const q = cerca(world.life.quads.filter((a) => a.kind === 'pudu')); return q && { x: q.x, z: q.z, label: 'un pudú' }; };
+      switch (id) {
+        case 'm1': if (!f.m1) return (f.tu === 1 && !has('witral')) || (f.tu === 2 && !f.lana) ? TELAR : quien('millaray');
+          return f.m1 === 1 && got < total ? cerca(world.items.filter((it) => !it.taken).map((it) => ({ x: it.base.x, z: it.base.z, label: 'un piñón' }))) : quien('millaray');
+        case 'm2': return quien('curinancu');
+        case 'm3': return !f.m3 ? quien('machi') : f.m3 === 1 ? (listo(['canelo', 'quillay', 'maqui']) ? quien('machi') : cerca(this.goals(p))) : quien('namku');
+        case 's1': return cerca(Object.keys(NOMBRE).filter((k) => !has(k)).map(quien));
+        case 's2': return falta([['pewen', () => arbol('pewen', 'un pewen')], ['coigue', () => arbol('coigue', 'un coigüe')], ['roble', () => arbol('roble', 'un roble')], ['canelo', () => arbol('canelo', 'un canelo')], ['gigante', () => lugar('viejo', 'el árbol abuelo')]]);
+        case 's8': return falta([['peumo', () => arbol('peumo', 'un peumo')], ['boldo', () => arbol('boldo', 'un boldo')], ['quillay', () => arbol('quillay', 'un quillay')], ['litre', () => arbol('litre', 'un litre')]]);
+        case 's3': return falta([['weke', () => ({ x: CORRAL.x, z: CORRAL.z, label: 'el corral de los weke' })], ['pudu', pudu], ['traro', () => ave('traro', 'donde se posa el traro')], ['choroy', () => ave('choroy', 'donde se posan los choroyes')], ['rayadito', () => ave('small', 'donde se posa un rayadito')]]);
+        case 's4': return cerca(Object.keys(POI).filter((k) => !has('l-' + k)).map((k) => lugar(k, 'un lugar que aún no conoces')));
+        case 's5': return falta([['ruka', () => ({ x: -12, z: -6, label: 'la ruka' })], ['kutral', () => ({ x: FOGON.x + 2.5, z: FOGON.z + 2.5, label: 'el fogón' })], ['rewe', () => ({ x: 20, z: 19, label: 'el rewe' })], ['witral', () => TELAR], ['chemamull', () => lugar('antiguos', 'las figuras de madera')]]);
+        case 's6': return falta([['ngen', () => quien('machi')], ['pewma', () => quien('machi')], ['pewen-sagrado', () => quien('curinancu')], ['trengtreng', () => quien('abuela')], ['wetripantu', () => quien('millaray')], ['pillan', () => lugar('cerro', 'la cima del cerro')], ['lafken', () => lugar('cerro', 'la cima del cerro')]]);
+        case 's7': return falta([['helecho', () => planta('fern', 'un helecho')], ['junco', () => planta('reed', 'unos juncos')], ['flores', () => planta('flower', 'unas flores')], ['maqui', () => lugar('maqui', 'el maqui')], ['quila', () => planta('quila', 'una quila')], ['copihue', () => planta('copihue', 'un copihue')]]);
+        case 's9': return f.ab === 1 && !listo(['murtilla']) ? planta('murtilla', 'una mata de murtilla') : quien('abuela');
+        case 's10': return f.mi === 1 && !listo(['michay']) ? planta('michay', 'un michay') : quien('millaray');
+        case 's11': return f.na === 1 && !listo(['nalca']) ? planta('nalca', 'una nalca') : quien('curinancu');
+        case 's12': return !f.lana ? TELAR : !f.agua ? (have('agua') ? { x: FOGON.x + 1.5, z: FOGON.z + 0.9, label: 'la olla del fogón' } : lugar('poza', 'el río')) : !f.weke ? (have('pasto') ? { x: CORRAL.x, z: CORRAL.z, label: 'el corral' } : planta('grass', 'pasto para cortar')) : null;
+        case 's13': return cerca(Object.keys(LUGARES).filter((k) => !f['s-' + k]).map((k) => lugar(k, LUGARES[k])));
+        case 's14': return !f.huella ? cerca(HUELLAS.map(([x, z]) => ({ x, z, label: 'unas huellas' }))) : pudu();
+        case 's15': return quien('rayen');
+        case 's16': return { x: FOGON.x - 2.9, z: FOGON.z + 0.4, label: 'los troncos del fogón' };
+        default: return null;
+      }
     },
     get vida() { return S.vida ?? 100; }, set vida(v) { S.vida = v; save(); },
     reset() { localStorage.removeItem(KEY); } };

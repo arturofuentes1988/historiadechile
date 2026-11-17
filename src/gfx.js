@@ -24,7 +24,8 @@ export function mulberry32(a) {
 
 // ---------- texturas generadas ----------
 const rnd = mulberry32(77), R = (a, b) => a + (b - a) * rnd();
-const canvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d')]; };
+// willReadFrequently: el dibujo queda en la memoria común y no en la de la tarjeta gráfica; si el navegador pierde el contexto gráfico, no se borra
+const canvas = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return [c, c.getContext('2d', { willReadFrequently: true })]; };
 function tex(c, { repeat, srgb = true, wrap = true } = {}) {
   const t = new THREE.CanvasTexture(c); if (srgb) t.colorSpace = THREE.SRGBColorSpace;
   if (!wrap) { t.generateMipmaps = false; t.minFilter = THREE.LinearFilter; } // las hojas no deben adelgazar a lo lejos

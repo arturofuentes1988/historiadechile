@@ -3,7 +3,7 @@ import RAPIER from '@dimforge/rapier3d-compat';
 import { uTime, uPlayer, buildLights, createPost, assets } from './gfx.js';
 import { buildWorld } from './world.js';
 import { height, inBounds, POI, CERRO } from './terrain.js';
-import { buildPerson, animatePerson } from './life.js';
+import { buildPerson, animatePerson, slopeAhead } from './life.js';
 import { Cinematic } from './cinematic.js';
 import { createUI } from './ui.js';
 import { createExplorer, PERSON } from './explore.js';
@@ -11,6 +11,7 @@ import { TALK } from './notes.js';
 import { riverZ, WATER_Y, zone, normalAt } from './terrain.js';
 import { createSound } from './sonido.js';
 import { createActions } from './acciones.js';
+import { route } from './guia.js';
 
 const V3 = (x, y, z) => new THREE.Vector3(x, y, z);
 const $ = (id) => document.getElementById(id);
@@ -313,11 +314,13 @@ function updatePlayer(dt) {
   // animación procedural
   const t = pp(); boy.g.position.set(t.x, t.y - FEET, t.z); boy.g.rotation.y = player.facing;
   player.phase += dt * (2.5 + player.speed * 1.9);
-  animatePerson(boy, player.phase, Math.min(1, player.speed / 6.2) * 0.9 + (player.speed > 0.2 ? 0.25 : 0), !player.grounded);
+  player.slope = (player.slope || 0) + ((player.speed > 0.3 ? slopeAhead(t.x, t.z, player.facing) : 0) - (player.slope || 0)) * Math.min(1, dt * 5); // pendiente hacia donde camina, suavizada
+  animatePerson(boy, player.phase, Math.min(1, player.speed / 6.2) * 0.9 + (player.speed > 0.2 ? 0.25 : 0), !player.grounded, player.slope);
   for (const k in POI) if (state === 'play' && Math.hypot(t.x - POI[k].x, t.z - POI[k].z) < 20) { ui.place(k); if (!ui.has('l-' + k) && !talk && player.grounded) ui.discover('l-' + k, herePhoto()); }
   if ((misT -= dt) <= 0 && state === 'play' && !talk) { // misiones y ayudas de los saberes
     misT = 0.5; const m = ui.missions({ got, total: world.items.length, ...acc.ctx() });
     ui.goals = acc.goals(t); // dónde buscar lo que falta: se marca en el minimapa y en el mapa
+    destinoGuia(t);
     // cuando la historia avanza un paso, se avisa qué sigue (después de los avisos de lo recién logrado)
     const av = m ? m.aviso : 'Hasta aquí llega la historia por ahora: pronto llegarán los invitados de la costa. Mientras tanto, explora el valle y termina tus encargos.';
     const list = (Array.isArray(av) ? av : [av]).map(teclas), key = list.join('|');
@@ -391,13 +394,36 @@ function updateItems() {
   }
 }
 
-const ui = createUI({ world, onToast: (t, kind) => toast(t, 5, kind || 'hallazgo'), onClose: () => { if (state === 'play' && !menuOpen) lock(); }, onSkill: () => applySkills() });
+const ui = createUI({ world, onToast: (t, kind) => toast(t, 5, kind || 'hallazgo'), onClose: () => { if (state === 'play' && !menuOpen) lock(); }, onSkill: () => applySkills(), onGuide: (g) => setGuia(g) });
+renderer.domElement.addEventListener('webglcontextrestored', () => ui.repaint()); // si el navegador pierde y recupera el contexto gráfico, el fondo del minimapa se vuelve a pintar
 const acc = createActions({ world, ui, snd, scene, hint, murmur, player, story, pinones: () => [got, world.items.length],
   place: (x, z, facing) => { pBody.setTranslation({ x, y: height(x, z) + FEET + 0.05, z }, true); player.vy = 0; player.speed = 0; player.facing = facing; },
   speak: (name, lines, done) => { talk = { name, lines, i: 0, done: done || null }; say(); },
   ripple: (x, z) => { const r = ripples[ripI++ % ripples.length]; r.position.set(x, WATER_Y + 0.03, z); r.userData.t = 0; r.visible = true; } });
 const explorer = createExplorer({ world, ui }); explorer.urgent = (id) => acc.wants(id);
 for (const i of acc.pins) { const it = world.items[i]; if (it && !it.taken) { it.taken = true; it.mesh.visible = false; got++; if (acc.f.m1 === 1) ui.addItem('pinon'); } } // piñones recogidos en una sesión anterior
+// ---------- línea de guía: de donde estás hasta un destino, por los senderos cuando conviene ----------
+// El destino puede ser un punto marcado en el mapa, una persona o una misión (entonces apunta a donde toque ir ahora).
+// La línea parte siempre de Leftraru: a medida que avanza, lo recorrido deja de dibujarse.
+let guia = null, guiaT = null, guiaVia = false;
+function setGuia(g) {
+  guia = g; guiaT = null; ui.guide = null; ui.guideKey = g ? (g.kind === 'mision' ? 'm:' + g.id : 'p') : ''; misT = 0;
+  if (!g) return; snd.play('ui-mapa', 0.5); destinoGuia(pp());
+  if (!guiaT) { hint('Para esto no hay un solo lugar que marcar: explora y pregunta.', 6); guia = null; ui.guideKey = ''; }
+}
+function destinoGuia(p) { // a dónde apunta ahora (se revisa un par de veces por segundo)
+  if (!guia) return;
+  if (guia.kind === 'punto') guiaT = guia;
+  else if (guia.kind === 'persona') { const a = world.life.actors.find((q) => PERSON[q.name] === guia.id); guiaT = a ? { x: a.x, z: a.z, label: TALK[guia.id].name } : null; }
+  else if (ui.done(guia.id)) { setGuia(null); return; } // misión cumplida: la guía se retira sola
+  else guiaT = acc.objetivo(guia.id, p);
+  if (guiaT && guia.kind === 'punto' && Math.hypot(guiaT.x - p.x, guiaT.z - p.z) < 4) { hint(`Llegaste a ${guiaT.label}.`, 5); snd.play('ui-hallazgo', 0.4); setGuia(null); }
+}
+function updateGuia() { // el trazo, cada cuadro, desde donde está ahora
+  if (!guia || !guiaT) { ui.guide = null; return; }
+  const p = pp(), r = route(p.x, p.z, guiaT.x, guiaT.z, guiaVia); guiaVia = r.via;
+  ui.guide = { pts: r.pts, x: guiaT.x, z: guiaT.z, label: guiaT.label, len: r.len };
+}
 // ---------- vida: baja con las caídas grandes y con el agua helada del río; vuelve sola, y más rápido sentado junto al fuego ----------
 let vida = acc.vida, fallV = 0, enSuelo = true, frio = false, desmayo = 0, vidaVista = -1;
 function updateVida(dt) {
@@ -418,7 +444,7 @@ function updateVida(dt) {
 }
 drawKeys(); applySkills();
 await assets.whenLoaded(); bar(1, 'Listo'); assets.onProgress = null; $('loading').classList.add('hide'); setTimeout(() => $('loading').remove(), 700);
-window.__g = { snd, height, ui, explorer, acc, story, toasts, murmur, get vida() { return vida; }, set vida(v) { vida = v; }, camera, abrirPrologo, cerrarPrologo, get prologo() { return prologo; }, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
+window.__g = { snd, height, ui, explorer, acc, story, toasts, murmur, setGuia, renderer, get vida() { return vida; }, set vida(v) { vida = v; }, camera, abrirPrologo, cerrarPrologo, get prologo() { return prologo; }, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
   tp(x, y, z) { pBody.setTranslation({ x, y, z }, true); player.vy = 0; },
   view(x, y, z, lx, ly, lz) { camera.position.set(x, y, z); camera.lookAt(lx, ly, lz); world.update(0, time, camera.position, pp()); draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); },
   snap() { draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); } };
@@ -436,14 +462,14 @@ function tick(dt) {
   { const p = pp(); uPlayer.value.set(p.x, p.y - FEET, p.z); // las plantas se apartan al paso
     ui.people.length = 0;
     for (const a of world.life.actors) if (a.mark) { const id = PERSON[a.name], w = acc.wants(id), kind = w === 'main' ? 'main' : ui.has(id) ? w : 'nuevo'; // estrella: con esta persona sigue la historia; rombo: encargo; círculo: aún no la conoces
-      a.mark.visible = state === 'play' && !!kind; if (kind) { a.mark.material = world.life.markMats[kind]; ui.people.push({ x: a.x, z: a.z, kind }); } }
+      a.mark.visible = state === 'play' && !!kind; if (kind) { a.mark.material = world.life.markMats[kind]; ui.people.push({ x: a.x, z: a.z, kind, id }); } }
     acc.update(dt, time, p); acc.pose(boy);
     if ((actT -= dt) <= 0) { actT = 0.2; doable = state === 'play' && !talk && !ui.open && !focus ? acc.scan(p) : null; $('prompt2').classList.toggle('on', !!doable); if (doable) $('prompt2-text').textContent = doable.label; } // estrella sobre quien aún tiene algo que contarte
     // ondas en el agua al vadear
     ripT -= dt; if (player.wade > 0.05 && player.speed > 0.5 && ripT <= 0) { ripT = 0.22; const r = ripples[ripI++ % ripples.length]; r.position.set(p.x, WATER_Y + 0.03, p.z); r.userData.t = 0; r.visible = true; }
     for (const r of ripples) if (r.visible) { const k = (r.userData.t += dt) / 1.6; r.scale.setScalar(0.4 + k * 2.6); r.material.opacity = 0.5 * (1 - k); if (k >= 1) r.visible = false; } }
   world.update(dt, time, camera.position, pp(), player.speed); lights.follow(state === 'title' || prologo ? { x: 0, y: 3, z: 0 } : cine.active ? camera.position : pp());
-  if (state === 'play') ui.drawMap(pp(), player.facing);
+  if (state === 'play') { updateGuia(); ui.drawMap(pp(), player.facing); }
   if (hintT > 0 && (hintT -= dt) <= 0) $('hint').classList.remove('on');
   toastGap -= dt; if (toasts.length && toastGap <= 0 && state === 'play' && !talk) { const [txt, secs, sound] = toasts.shift(); showHint(txt, secs); if (TOQUE[sound]) snd.play(...TOQUE[sound]); }
   if (subT > 0 && (subT -= dt) <= 0 && !cine.active) $('sub').classList.remove('on');

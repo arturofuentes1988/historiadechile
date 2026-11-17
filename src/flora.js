@@ -236,7 +236,9 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
     for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const l = SCATTER[kind].cells.get(ci + i + ',' + (cj + j)); if (l) for (const t of l) { const d = Math.hypot(t.x - x, t.z - z); if (d < r && (!best || d < best.d)) best = { x: t.x, y: t.y, z: t.z, d, s: t.s, rec: t }; } }
     return best;
   }
+  // la planta de este tipo más cercana en todo el mapa (para poder marcar dónde ir a buscarla)
+  function findScatter(kind, x, z) { let best = null, bd = Infinity; for (const l of SCATTER[kind].cells.values()) for (const t of l) { if (t.picked) continue; const d = Math.hypot(t.x - x, t.z - z); if (d < bd) { bd = d; best = t; } } return best && { x: best.x, z: best.z }; }
   function nearBush(x, z, r) { let best = null; for (const l of SPEC.bush.inst) for (const t of l) { const d = Math.hypot(t.x - x, t.z - z); if (d < r && (!best || d < best.d)) best = { x: t.x, y: t.y, z: t.z, d, s: t.s, rec: t }; } return best; }
 
-  return { tree, scatter, rock, log, build, update, nearScatter, nearBush, blockers, clearView, restoreView };
+  return { tree, scatter, rock, log, build, update, nearScatter, findScatter, nearBush, blockers, clearView, restoreView };
 }

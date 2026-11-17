@@ -15,6 +15,7 @@ Guion de trabajo (borrador 3). Un acto de **inmersión**: Leftraru es un niño q
 - **La historia es lineal.** Las misiones principales (1 a 6) siguen la preparación del We Tripantu y van en orden: cada una se abre al terminar la anterior, y la persona con quien sigue la historia lleva una estrella dorada sobre la cabeza.
 - **Los encargos son libres.** Las misiones secundarias son opcionales y no tienen orden. No están a la vista desde el comienzo: se consiguen conversando con la gente de la aldea, y cada persona encarga las suyas.
 - **Cómo empieza:** en la portada, «Entrar al mundo» lleva a «Historia». El capítulo 1 parte con un prólogo: una hoja escrita que va pasando y se aleja, y que cuenta dónde estamos, quién es Leftraru y qué se está preparando. Termina con su madre llamándolo.
+- **Línea de guía:** se puede marcar un destino haciendo clic en el mapa, o elegir una misión (en el panel de misiones o en la lista de arriba) para que el mapa muestre el camino con una línea de trazos. La línea sigue los senderos cuando conviene y se acorta a medida que se avanza.
 - **Se aprende jugando:** la primera conversación con Millaray enseña a moverse, hablar, observar (el telar), ayudar con las manos (la lana) y leer una misión. Cada paso queda escrito arriba hasta que se cumple.
 - **Sin presión:** nada tiene tiempo límite ni se puede fallar. Lo que mueve al jugador es la curiosidad.
 - **El mapa se va pintando:** al inicio es un pergamino casi vacío. Cada lugar visitado aparece dibujado, y los puntos de interés se marcan cuando alguien los menciona en una conversación.
@@ -157,7 +158,7 @@ Son opcionales y se pueden hacer en cualquier orden. **Aparecen en la lista cuan
 Como su pueblo no usaba escritura, lo aprendido se guarda como imágenes pintadas:
 
 - **Historias** (7): Treng Treng y Kai Kai, el regalo del pewen, el Shumpall, el epew del zorro, la memoria de los incas, el chucao, las luces.
-- **Animales** (6): traro, pudú, zorro, chucao, puma, weke.
+- **Animales:** weke, pudú, zorro culpeo, monito del monte, traro, choroy, rayadito, chucao, carpintero negro, picaflor y chuncho ya están en el juego (las aves se observan posadas). Falta el puma.
 - **Plantas** (6): pewen, canelo, maqui, y tres medicinales.
 - **Personas:** cada personaje se completa al terminar su historia.
 

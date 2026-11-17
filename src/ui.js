@@ -6,7 +6,7 @@ const $ = (id) => document.getElementById(id);
 const BY = Object.fromEntries(NOTES.map((n) => [n.id, n]));
 const SAVE = 'leftraru.cuaderno';
 
-export function createUI({ world, onToast, onClose, onSkill }) {
+export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
   // lo descubierto se guarda en este navegador: id -> foto
   let data = {}; try { data = JSON.parse(localStorage.getItem(SAVE) || '{}'); } catch { data = {}; }
   if (!data.found) data = { found: data }; // formato antiguo: solo las fotos
@@ -31,22 +31,35 @@ export function createUI({ world, onToast, onClose, onSkill }) {
   // ---------- minimapa: se pinta a partir del terreno real ----------
   const cv = $('minimap'), S = cv.width, ctx = cv.getContext('2d'), k = 2; // 2 píxeles por metro
   const base = document.createElement('canvas'); base.width = (B.x1 - B.x0) * k; base.height = (B.z1 - B.z0) * k;
-  const b = base.getContext('2d'), P = (x, z) => [(x - B.x0) * k, (z - B.z0) * k];
+  // El fondo se guarda en la memoria común (willReadFrequently) y no en la de la tarjeta gráfica: si el navegador pierde
+  // el contexto gráfico y lo recupera, el dibujo sigue ahí. Por si acaso, además se puede volver a pintar (paintBase).
+  const b = base.getContext('2d', { willReadFrequently: true }), P = (x, z) => [(x - B.x0) * k, (z - B.z0) * k];
   const MC = { forest: [150, 140, 96], grassy: [156, 162, 98], needles: [168, 132, 92], moss: [112, 138, 92], meadow: [186, 190, 110], marsh: [128, 160, 128], earth: [206, 178, 124], path: [226, 204, 158], pebble: [190, 186, 166], bed: [110, 160, 186], rock: [150, 148, 142], alpine: [176, 172, 118] };
-  { const img = b.createImageData(base.width, base.height), d = img.data;
+  function paintBase() {
+    const img = b.createImageData(base.width, base.height), d = img.data;
     for (let py = 0, o = 0; py < base.height; py++) for (let px = 0; px < base.width; px++, o += 4) {
       const x = B.x0 + px / k, z = B.z0 + py / k, h = height(x, z), c = h < WATER_Y ? [104, 156, 186] : MC[zone(x, z, h, 1)], sh = 0.9 + Math.min(0.2, h * 0.004) + ((px * 7 + py * 13) % 5) * 0.012;
       d[o] = c[0] * sh; d[o + 1] = c[1] * sh; d[o + 2] = c[2] * sh; d[o + 3] = 255;
     }
     b.putImageData(img, 0, 0);
+    b.strokeStyle = '#7a5a34'; b.lineWidth = 2; b.setLineDash([5, 5]);
+    for (const path of PATHS) { b.beginPath(); path.forEach(([x, z], n) => { const [a, c] = P(x, z); n ? b.lineTo(a, c) : b.moveTo(a, c); }); b.stroke(); }
+    b.setLineDash([]);
+    for (const t of world.trees) { const [x, y] = P(t.x, t.z); b.fillStyle = t.kind === 'roble' ? '#b98a2e' : t.kind === 'pewen' ? '#2c4f30' : '#3f6b3a'; b.beginPath(); b.arc(x, y, t.kind === 'giant' ? 5 : 3, 0, 7); b.fill(); }
+    b.fillStyle = '#6a4a2a'; b.strokeStyle = '#2a1c10'; b.lineWidth = 1.5;
+    for (const r of RUKAS) { const [x, y] = P(r.x, r.z); b.beginPath(); b.ellipse(x, y, 7 * r.s, 6 * r.s, 0, 0, 7); b.fill(); b.stroke(); }
+    { const [x, y] = P(CORRAL.x, CORRAL.z); b.beginPath(); b.arc(x, y, CORRAL.r * k, 0, 7); b.stroke(); }
   }
-  b.strokeStyle = '#7a5a34'; b.lineWidth = 2; b.setLineDash([5, 5]);
-  for (const path of PATHS) { b.beginPath(); path.forEach(([x, z], n) => { const [a, c] = P(x, z); n ? b.lineTo(a, c) : b.moveTo(a, c); }); b.stroke(); }
-  b.setLineDash([]);
-  for (const t of world.trees) { const [x, y] = P(t.x, t.z); b.fillStyle = t.kind === 'roble' ? '#b98a2e' : t.kind === 'pewen' ? '#2c4f30' : '#3f6b3a'; b.beginPath(); b.arc(x, y, t.kind === 'giant' ? 5 : 3, 0, 7); b.fill(); }
-  b.fillStyle = '#6a4a2a'; b.strokeStyle = '#2a1c10'; b.lineWidth = 1.5;
-  for (const r of RUKAS) { const [x, y] = P(r.x, r.z); b.beginPath(); b.ellipse(x, y, 7 * r.s, 6 * r.s, 0, 0, 7); b.fill(); b.stroke(); }
-  { const [x, y] = P(CORRAL.x, CORRAL.z); b.beginPath(); b.arc(x, y, CORRAL.r * k, 0, 7); b.stroke(); }
+  paintBase(); base.addEventListener('contextrestored', paintBase);
+  // La línea de guía: trazos claros con borde oscuro, que avanzan hacia el destino. pts son puntos [x, z] del mundo.
+  function trazo(g, pts, toXY, w = 1) {
+    if (!pts || pts.length < 2) return;
+    g.save(); g.lineCap = 'round'; g.lineJoin = 'round'; g.beginPath(); pts.forEach((q, n) => { const [x, y] = toXY(q[0], q[1]); n ? g.lineTo(x, y) : g.moveTo(x, y); });
+    g.setLineDash([10 * w, 9 * w]); g.lineDashOffset = -((performance.now() / 55) % (19 * w));
+    g.strokeStyle = '#14110f'; g.lineWidth = 7 * w; g.stroke(); g.strokeStyle = '#ffe9a8'; g.lineWidth = 3.4 * w; g.stroke(); g.restore();
+  }
+  // el destino: un banderín rojo
+  function meta(g, x, y, k = 1) { g.save(); g.translate(x, y); g.lineWidth = 2.4 * k; g.strokeStyle = '#14110f'; g.fillStyle = '#d0483a'; g.beginPath(); g.moveTo(0, 0); g.lineTo(0, -22 * k); g.stroke(); g.beginPath(); g.moveTo(0, -22 * k); g.lineTo(15 * k, -16 * k); g.lineTo(0, -10 * k); g.closePath(); g.fill(); g.stroke(); g.fillStyle = '#14110f'; g.beginPath(); g.arc(0, 0, 3.2 * k, 0, 7); g.fill(); g.restore(); }
 
   const places = new Set(); let last = { x: 0, z: 0, f: 0 };
   const ZOOM = 1.5; // el mapa sigue al jugador, que queda siempre al centro
@@ -69,6 +82,8 @@ export function createUI({ world, onToast, onClose, onSkill }) {
     ctx.beginPath(); ctx.arc(S / 2, S / 2, R, 0, 7); ctx.clip();
     ctx.fillStyle = '#8f7d52'; ctx.fillRect(0, 0, S, S);
     ctx.save(); ctx.translate(S / 2, S / 2); ctx.scale(ZOOM, ZOOM); ctx.translate(-px, -py); ctx.drawImage(base, 0, 0); ctx.restore();
+    if (api.guide) { const q = (x, z) => { const [a, c] = P(x, z); return [S / 2 + (a - px) * ZOOM, S / 2 + (c - py) * ZOOM]; }; trazo(ctx, api.guide.pts, q, 1.15); const [mx, my] = q(api.guide.x, api.guide.z); if (Math.hypot(mx - S / 2, my - S / 2) < R - 8) meta(ctx, mx, my, 1.1); }
+    if (open === 'mapa') drawBig(); // con el mapa abierto, se va actualizando
     ctx.strokeStyle = '#3a2408'; ctx.lineWidth = 2.5;
     for (const it of world.items) if (!it.taken && !it.off) {
       const [x, y] = P(it.base.x, it.base.z); let dx = (x - px) * ZOOM, dy = (y - py) * ZOOM; const d = Math.hypot(dx, dy), far = d > R - 20;
@@ -93,19 +108,40 @@ export function createUI({ world, onToast, onClose, onSkill }) {
   const panel = $('panel'), body = $('panel-body');
   const pic = (id) => (found[id] === undefined ? '' : FOTOS.has(id) ? `assets/cuaderno/${id}.webp` : found[id]); // foto fija y detallada; los lugares, la que tomaste
   const thumb = (n) => pic(n.id) ? `<img src="${pic(n.id)}" alt="" loading="lazy">` : '<span class="q">?</span>';
+  // El mapa grande. Se vuelve a dibujar mientras está abierto, para que la guía y la gente se vean al día.
+  function drawBig() {
+    const c = $('bigmap'); if (!c) return; if (c.width !== base.width) { c.width = base.width; c.height = base.height; }
+    const g = c.getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.drawImage(base, 0, 0);
+    g.textAlign = 'center'; g.font = 'italic bold 19px Georgia'; g.lineWidth = 5; g.strokeStyle = '#efe6cf'; g.fillStyle = '#2a2018';
+    for (const key in POI) { const [x, y] = P(POI[key].x, POI[key].z), t = places.has(key) ? POI[key].name : '?'; g.strokeText(t, x, y - 14); g.fillText(t, x, y - 14); }
+    if (api.guide) trazo(g, api.guide.pts, P, 1.5);
+    for (const it of world.items) if (!it.taken && !it.off) { const [x, y] = P(it.base.x, it.base.z); g.fillStyle = '#f2b441'; g.strokeStyle = '#3a2408'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 6, 0, 7); g.fill(); g.stroke(); }
+    { const [x, y] = P(0, 0); sym(g, x, y + 6, 'aldea', 1.2); } for (const mk of api.people) { const [x, y] = P(mk.x, mk.z); sym(g, x, y, mk.kind, 1.1); }
+    g.font = 'italic bold 15px Georgia'; for (const gl of api.goals) { const [x, y] = P(gl.x, gl.z); hoja(g, x, y, 1.3); g.lineWidth = 4; g.strokeStyle = '#efe6cf'; g.fillStyle = '#2a4a18'; g.strokeText(gl.label, x, y + 28); g.fillText(gl.label, x, y + 28); }
+    if (api.guide) { const [x, y] = P(api.guide.x, api.guide.z); meta(g, x, y, 1.7); }
+    const [px, py] = P(last.x, last.z); g.translate(px, py); g.rotate(-last.f); g.fillStyle = '#fff'; g.strokeStyle = '#14110f'; g.lineWidth = 3;
+    g.beginPath(); g.moveTo(0, 18); g.lineTo(11, -12); g.lineTo(0, -5); g.lineTo(-11, -12); g.closePath(); g.fill(); g.stroke();
+    const txt = api.guide ? `Guía hacia ${api.guide.label} · ${Math.round(api.guide.len)} pasos` : 'Sin guía. Haz clic en el mapa para marcar a dónde quieres ir.';
+    if ($('guia-txt').textContent !== txt) { $('guia-txt').textContent = txt; $('guia-off').hidden = !api.guide; }
+  }
+  // Un clic en el mapa marca el destino de la guía: una persona con algo pendiente, algo que hay que ir a buscar, un lugar o un punto cualquiera.
+  function pickOnMap(x, z) {
+    const near = (list, r) => list.map((o) => [Math.hypot(o.x - x, o.z - z), o]).filter((q) => q[0] < r).sort((a, b) => a[0] - b[0])[0]?.[1];
+    if (api.guide && Math.hypot(api.guide.x - x, api.guide.z - z) < 9) return onGuide(null); // clic en el destino: se quita
+    const who = near(api.people, 9), gl = near(api.goals, 9), it = near(world.items.filter((i) => !i.taken && !i.off).map((i) => ({ x: i.base.x, z: i.base.z })), 8), key = Object.keys(POI).find((q) => Math.hypot(POI[q].x - x, POI[q].z - z) < 12);
+    if (who) return onGuide(who.kind === 'main' && actId ? { kind: 'mision', id: actId } : { kind: 'persona', id: who.id });
+    if (gl) return onGuide({ kind: 'punto', x: gl.x, z: gl.z, label: gl.label });
+    if (it) return onGuide({ kind: 'punto', x: it.x, z: it.z, label: 'un piñón' });
+    if (key) return onGuide({ kind: 'punto', x: POI[key].x, z: POI[key].z, label: places.has(key) ? POI[key].name : 'un lugar que aún no conoces' });
+    onGuide({ kind: 'punto', x, z, label: 'el punto que marcaste' });
+  }
+  const toggleGuide = (id) => onGuide(api.guideKey === 'm:' + id ? null : { kind: 'mision', id });
   function render() {
     panel.dataset.kind = open;
     if (open === 'mapa') {
       $('panel-title').textContent = 'Mapa del territorio';
-      body.innerHTML = '<canvas id="bigmap"></canvas><p class="muted">Los lugares muestran su nombre cuando los visitas. Los puntos dorados son los piñones que faltan por recoger. La ruka marca la aldea; la estrella dorada, una misión principal; el rombo celeste, un encargo; el círculo, alguien que aún no conoces; la hoja verde, algo que te pidieron ir a buscar.</p>';
-      const c = $('bigmap'); c.width = base.width; c.height = base.height; const g = c.getContext('2d'); g.drawImage(base, 0, 0);
-      g.textAlign = 'center'; g.font = 'italic bold 19px Georgia'; g.lineWidth = 5; g.strokeStyle = '#efe6cf'; g.fillStyle = '#2a2018';
-      for (const key in POI) { const [x, y] = P(POI[key].x, POI[key].z), t = places.has(key) ? POI[key].name : '?'; g.strokeText(t, x, y - 14); g.fillText(t, x, y - 14); }
-      for (const it of world.items) if (!it.taken && !it.off) { const [x, y] = P(it.base.x, it.base.z); g.fillStyle = '#f2b441'; g.strokeStyle = '#3a2408'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 6, 0, 7); g.fill(); g.stroke(); }
-      { const [x, y] = P(0, 0); sym(g, x, y + 6, 'aldea', 1.2); } for (const mk of api.people) { const [x, y] = P(mk.x, mk.z); sym(g, x, y, mk.kind, 1.1); }
-      g.font = 'italic bold 15px Georgia'; for (const gl of api.goals) { const [x, y] = P(gl.x, gl.z); hoja(g, x, y, 1.3); g.lineWidth = 4; g.strokeStyle = '#efe6cf'; g.fillStyle = '#2a4a18'; g.strokeText(gl.label, x, y + 28); g.fillText(gl.label, x, y + 28); }
-      const [px, py] = P(last.x, last.z); g.translate(px, py); g.rotate(-last.f); g.fillStyle = '#fff'; g.strokeStyle = '#14110f'; g.lineWidth = 3;
-      g.beginPath(); g.moveTo(0, 18); g.lineTo(11, -12); g.lineTo(0, -5); g.lineTo(-11, -12); g.closePath(); g.fill(); g.stroke();
+      body.innerHTML = '<canvas id="bigmap"></canvas><div class="guiabar"><span id="guia-txt"></span><button id="guia-off" class="btn" hidden>Quitar la guía</button></div><p class="muted">Haz clic en el mapa para marcar un destino: una línea de trazos te muestra el camino y se va acortando a medida que avanzas. También puedes hacer clic en una estrella, un rombo o una hoja. Los lugares muestran su nombre cuando los visitas. Los puntos dorados son piñones; la estrella, la historia; el rombo, un encargo; el círculo, alguien que aún no conoces; la hoja verde, algo que te pidieron ir a buscar.</p>';
+      drawBig();
     } else if (open === 'misiones') {
       // Principales: todas a la vista y en orden; cada una se abre al terminar la anterior.
       // Secundarias: solo las que ya te encargaron; las demás aparecen al conversar con la gente.
@@ -121,7 +157,8 @@ export function createUI({ world, onToast, onClose, onSkill }) {
         (mine.length < sec.length ? `<p class="muted how">${mine.length ? 'Hay más encargos: conversa con la gente de la aldea.' : 'Aún no tienes encargos. Conversa con la gente de la aldea: cada quien tiene algo que pedirte o enseñarte.'}</p>` : '') + '</div>' +
         `<aside><small>${m.main ? `Historia · misión ${m.n} de ${MISSIONS.filter((x) => x.main).length}` : 'Encargo · opcional'}</small><h3>${m.title}</h3>` +
         (m.soon ? '<p class="muted">Llegará con los próximos capítulos.</p>' : k === 'locked' ? '<p class="muted">Se abre al terminar la misión anterior.</p>' :
-          `<p>${text}</p>${m.who ? `<p class="muted">${m.main ? 'Misión' : 'Encargo'} de ${m.who}.</p>` : ''}<div class="prog"><i style="width:${(k === 'done' ? 1 : r[1] / r[2]) * 100}%"></i></div><em>${k === 'done' ? 'Completada' : `${r[1]} de ${r[2]}`} · ${m.pts} puntos</em>`) + '</aside></div>';
+          `<p>${text}</p>${m.who ? `<p class="muted">${m.main ? 'Misión' : 'Encargo'} de ${m.who}.</p>` : ''}<div class="prog"><i style="width:${(k === 'done' ? 1 : r[1] / r[2]) * 100}%"></i></div><em>${k === 'done' ? 'Completada' : `${r[1]} de ${r[2]}`} · ${m.pts} puntos</em>` +
+          (k === 'open' ? `<p><button class="btn${api.guideKey === 'm:' + m.id ? '' : ' main'}" data-guia="${m.id}">${api.guideKey === 'm:' + m.id ? 'Quitar la guía' : 'Guiarme en el mapa'}</button></p>` : '')) + '</aside></div>';
     } else if (open === 'saberes') {
       // árbol: Leftraru arriba, y de él bajan las ramas; cada nudo es un saber
       $('panel-title').textContent = 'Saberes';
@@ -158,6 +195,10 @@ export function createUI({ world, onToast, onClose, onSkill }) {
     open = which; document.exitPointerLock?.(); panel.classList.add('on'); if (which === 'notas') $('btn-notas').classList.remove('new'); if (which === 'misiones') $('btn-misiones').classList.remove('new'); render();
   }
   body.addEventListener('click', (e) => {
+    const bm = e.target.closest('#bigmap'), gu = e.target.closest('[data-guia]');
+    if (bm) { const r = bm.getBoundingClientRect(); return pickOnMap(B.x0 + ((e.clientX - r.left) / r.width) * (B.x1 - B.x0), B.z0 + ((e.clientY - r.top) / r.height) * (B.z1 - B.z0)); }
+    if (e.target.closest('#guia-off')) return onGuide(null);
+    if (gu) { toggleGuide(gu.dataset.guia); return render(); }
     const c = e.target.closest('[data-cat]'), n = e.target.closest('[data-note]'), k = e.target.closest('[data-skill]'), mi = e.target.closest('[data-mis]'), nd = e.target.closest('[data-node]');
     if (mi) { selM = mi.dataset.mis; return render(); } if (nd) { selK = nd.dataset.node; return render(); }
     if (c) { cat = c.dataset.cat; sel = null; render(); } else if (n) { sel = n.dataset.note; render(); }
@@ -170,6 +211,8 @@ export function createUI({ world, onToast, onClose, onSkill }) {
   $('btn-saberes').addEventListener('click', () => show('saberes'));
   $('panel-close').addEventListener('click', () => show(null));
   cv.addEventListener('click', () => show('mapa'));
+  $('mis-lista').addEventListener('click', (e) => { const r = e.target.closest('[data-guia]'); if (r) toggleGuide(r.dataset.guia); }); // un clic en una misión de la lista de arriba pone (o quita) su guía
+  let actId = null; // la misión de la historia que está abierta
   refreshScore();
 
   const api = {
@@ -203,8 +246,8 @@ export function createUI({ world, onToast, onClose, onSkill }) {
       for (const m of won) onToast(`Misión completada: ${m.title} · +${m.pts} puntos`, 'logro');
       if (fresh.length || won.length) { save(); refreshScore(); if (open) render(); }
       for (const m of won) recien[m.id] = performance.now();
-      const act = MISSIONS.find((m) => m.main && m.check && !done[m.id] && (!m.pide || done[m.pide]));
-      const now = performance.now(), row = (m, cls) => { const r = m.check(mctx); return `<div class="ml ${cls}"><i></i><span>${m.title}</span><em>${cls !== 'hecha' && r[2] > 1 ? `${r[1]} / ${r[2]}` : ''}</em></div>`; };
+      const act = MISSIONS.find((m) => m.main && m.check && !done[m.id] && (!m.pide || done[m.pide])); actId = act ? act.id : null;
+      const now = performance.now(), row = (m, cls) => { const r = m.check(mctx), on = api.guideKey === 'm:' + m.id; return `<div class="ml ${cls}${on ? ' guiada' : ''}"${cls !== 'hecha' ? ` data-guia="${m.id}" title="${on ? 'Quitar la guía' : 'Guiarme hasta aquí en el mapa'}"` : ''}><i></i><span>${m.title}</span><em>${cls !== 'hecha' && r[2] > 1 ? `${r[1]} / ${r[2]}` : ''}</em></div>`; };
       let h = '<h5>Historia</h5>';
       for (const m of MISSIONS) if (m.main && m.check) { if (done[m.id]) h += row(m, 'hecha'); else if (m === act) h += row(m, 'actual') + `<div class="paso">${act.paso ? act.paso(mctx) : ''}</div>`; }
       if (!act) h += '<div class="paso">Continuará…</div>';
@@ -214,6 +257,8 @@ export function createUI({ world, onToast, onClose, onSkill }) {
       return act ? { title: act.title, prog: act.check(mctx), aviso: typeof act.aviso === 'function' ? act.aviso(mctx) : act.aviso, fijo: !!(act.fijo && act.fijo(mctx)) } : null;
     },
     marks: [], people: [], goals: [],
+    guide: null, guideKey: '', // la línea de guía ({ pts, x, z, label, len }) y a qué apunta ('m:id' si es una misión)
+    repaint: paintBase, done: (id) => !!done[id],
     state: { get found() { return found; }, bag, get skills() { return skills; }, get done() { return done; } },
   };
   return api;

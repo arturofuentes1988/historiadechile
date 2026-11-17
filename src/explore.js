@@ -6,7 +6,10 @@ import { TALK } from './notes.js';
 export const PERSON = { 'Curiñancu': 'curinancu', 'Millaray': 'millaray', 'la abuela': 'abuela', 'Ayelén': 'ayelen', 'Rayen': 'rayen', 'la machi': 'machi', 'Ñamku': 'namku' };
 const TREE = { pewen: ['pewen', 'el pewen'], coigue: ['coigue', 'el coigüe'], roble: ['roble', 'el roble'], canelo: ['canelo', 'el canelo'], giant: ['gigante', 'el árbol abuelo'], peumo: ['peumo', 'el peumo'], boldo: ['boldo', 'el boldo'], quillay: ['quillay', 'el quillay'], litre: ['litre', 'el litre'] };
 // Las aves solo se observan posadas. Números: desde cuán lejos se la puede observar y a qué distancia se pone la cámara de ella.
-const BIRD = { traro: ['traro', 'el traro', 36, 2.5], choroy: ['choroy', 'el choroy', 32, 1.8], small: ['rayadito', 'el rayadito', 11, 0.72] };
+const BIRD = { traro: ['traro', 'el traro', 36, 2.5], choroy: ['choroy', 'el choroy', 32, 1.8], small: ['rayadito', 'el rayadito', 11, 0.72],
+  chucao: ['chucao', 'el chucao', 10, 0.85], carpintero: ['carpintero', 'el carpintero negro', 26, 1.7], picaflor: ['picaflor', 'el picaflor', 8, 0.5], chuncho: ['chuncho', 'el chuncho', 16, 1.2] };
+// Los animales de cuatro patas: nota del cuaderno, nombre, desde cuán lejos se observan, y cómo se encuadran (distancia, altura de cámara, ángulo, alto del cuerpo).
+const QUAD = { weke: ['weke', 'el weke', 5, 2.7, 0.2, 42, 0.95], pudu: ['pudu', 'el pudú', 5.5, 1.25, 0.12, 34, 0.3], zorro: ['zorro', 'el zorro', 8, 1.8, 0.15, 36, 0.36] };
 
 export function createExplorer({ world, ui }) {
   let reach = 1; // la «vista de traro» lo aumenta
@@ -17,7 +20,8 @@ export function createExplorer({ world, ui }) {
     const k = reach * 0.7, c = [], // hay que acercarse bastante a las cosas para observarlas
           add = (id, verb, label, d, target, shot, extra) => c.push({ id, verb, label, d, target, shot, known: ui.has(id), ...extra });
     for (const a of world.life.actors) { const id = PERSON[a.name], d = d2(p, a.x, a.z); if (id && d < 2.1) add(id, 'Hablar con', TALK[id].name, d - 10, { x: a.x, y: H(a.x, a.z) + a.h * 0.78, z: a.z }, { dist: 2.1, up: 0.1, fov: 40 }, { person: a }); }
-    for (const q of world.life.quads) { const d = d2(p, q.x, q.z), w = q.kind === 'weke'; if (d < (w ? 5 : 5.5) * k) add(w ? 'weke' : 'pudu', 'Observar', w ? 'el weke' : 'el pudú', d, null, { dist: w ? 2.7 : 1.25, up: w ? 0.2 : 0.12, fov: w ? 42 : 34 }, { live: () => ({ x: q.x, y: H(q.x, q.z) + (w ? 0.95 : 0.3) * (q.g.scale.x), z: q.z }) }); }
+    for (const q of world.life.quads) { const [id, label, r, dist, up, fov, alto] = QUAD[q.kind], d = d2(p, q.x, q.z); if (d < r * k) add(id, 'Observar', label, d, null, { dist, up, fov }, { live: () => ({ x: q.x, y: H(q.x, q.z) + alto * q.g.scale.x, z: q.z }) }); }
+    for (const c of world.life.critters) { const d = d2(p, c.x, c.z); if (d < 6 * k) add(c.id, 'Observar', 'el monito del monte', d, { x: c.x, y: c.y, z: c.z }, { dist: 0.62, up: 0.06, fov: 34, side: c.cam }, { rec: c.tree.rec }); }
     for (const b of world.life.birds) { if (!b.perched) continue; const [id, label, r, dist] = BIRD[b.type], bp = b.g.position, d = d2(p, bp.x, bp.z); if (d < r * reach) add(id, 'Observar', label, d / 8, null, { dist, up: dist * 0.1, fov: 36, side: b.perch.cam }, { live: () => b.g.position, rec: b.perch.tree.rec, bird: b.grp }); }
     let rk = null; for (const r of RUKAS) { const d = d2(p, r.x, r.z); if (d < 6 && (!rk || d < rk.d)) rk = { ...r, d }; }
     if (rk) add('ruka', 'Observar', 'la ruka', rk.d, { x: rk.x, y: H(rk.x, rk.z) + 1.7, z: rk.z }, { dist: 9.5, up: 1.2, fov: 48 });
@@ -46,7 +50,7 @@ export function createExplorer({ world, ui }) {
   function hints(p) {
     const out = [], add = (id, x, z) => { if (!ui.has(id) && d2(p, x, z) < 70) out.push({ x, z }); };
     for (const a of world.life.actors) if (PERSON[a.name]) add(PERSON[a.name], a.x, a.z);
-    for (const q of world.life.quads) add(q.kind === 'weke' ? 'weke' : 'pudu', q.x, q.z);
+    for (const q of world.life.quads) add(q.kind, q.x, q.z); for (const c of world.life.critters) add(c.id, c.x, c.z);
     add('ruka', RUKAS[0].x, RUKAS[0].z); add('kutral', FOGON.x, FOGON.z); add('rewe', 20, 19); add('witral', -10.6, -4.2); add('chemamull', POI.antiguos.x, POI.antiguos.z); add('gigante', POI.viejo.x, POI.viejo.z); add('pillan', CERRO[0], CERRO[1]);
     for (const key in POI) add('l-' + key, POI[key].x, POI[key].z);
     return out;

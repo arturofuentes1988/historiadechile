@@ -62,6 +62,18 @@ export const NOTES = [
     text: 'Loro verde de pico largo y curvo que solo vive en estos bosques. Vuela en bandadas ruidosas y con su pico abre las piñas del pewen para comer los piñones. Donde gritan los choroyes, hay piñones cerca.' },
   { id: 'rayadito', cat: 'fauna', title: 'Rayadito', sub: 'Pajarito del bosque', hint: 'Revolotean entre los árboles y se posan un rato en las ramas bajas. Acércate despacio cuando estén posados.',
     text: 'Pájaro pequeño e inquieto, de cola con puntas como espinas. Recorre troncos y ramas en grupo, buscando insectos bajo la corteza, y no se va en invierno.' },
+  { id: 'zorro', cat: 'fauna', sinFoto: true, title: 'Zorro culpeo', sub: 'Ngürü · Lycalopex culpaeus', hint: 'Ronda los bordes del bosque, lejos de la aldea. Acércate caminando, sin correr.',
+    text: 'El zorro más grande de estas tierras: lomo gris rojizo, orejas en punta y una cola larga y tupida que termina en negro. Come de todo: ratones, aves, y también los frutos del maqui y del peumo, y así va sembrando semillas por el bosque. En los epew, los cuentos de animales, el zorro es el que se cree más listo que todos… y casi siempre sale perdiendo.' },
+  { id: 'monito', cat: 'fauna', sinFoto: true, title: 'Monito del monte', sub: 'Dromiciops gliroides', hint: 'Sobre una rama baja, en lo más húmedo del bosque: cerca del bosque viejo. Hay que mirar con calma.',
+    text: 'No es un mono: es un marsupial pequeñísimo, que cría a sus hijos en una bolsa. Cabe en una mano, tiene ojos grandes con un antifaz oscuro y una cola con la que se sujeta de las ramas. Guarda grasa en la base de la cola y, cuando llega el frío, pasa días enteros aletargado en su nido de hojas de quila. Come insectos y los frutos del quintral, y con eso siembra esa planta de árbol en árbol.' },
+  { id: 'chucao', cat: 'fauna', sinFoto: true, title: 'Chucao', sub: 'Chukaw · Scelorchilus rubecula', hint: 'Se posa bajo, cerca del suelo, en el bosque espeso. Se oye más de lo que se ve.',
+    text: 'Pájaro pequeño y rechoncho, de pecho rojizo y cola parada, que casi no vuela: corre por el suelo del bosque entre la quila y los helechos. Se le oye mucho más de lo que se le ve. Se dice que su canto avisa cómo irá el camino: si canta a tu derecha, buena señal; si canta a tu izquierda, más vale volver otro día.' },
+  { id: 'carpintero', cat: 'fauna', sinFoto: true, title: 'Carpintero negro', sub: 'Rere · Campephilus magellanicus', hint: 'En los troncos de los árboles grandes y viejos.',
+    text: 'El carpintero más grande de estas tierras: negro, con una mancha blanca en las alas, y el macho con toda la cabeza roja. Golpea los troncos viejos con el pico para sacar larvas, y el eco de sus golpes se oye desde lejos. Solo vive donde quedan árboles grandes y antiguos.' },
+  { id: 'picaflor', cat: 'fauna', sinFoto: true, title: 'Picaflor', sub: 'Pinda · Sephanoides sephaniodes', hint: 'Cerca del agua y de las flores: por el claro del maqui y el camino al río.',
+    text: 'El ave más pequeña del bosque: verde, de pico fino y largo, con una corona rojiza que brilla con el sol. Mueve las alas tan rápido que zumban, y puede quedarse quieto en el aire frente a una flor. No se va en invierno: se alimenta del quintral y del chilco, que florecen cuando casi nada más lo hace.' },
+  { id: 'chuncho', cat: 'fauna', sinFoto: true, title: 'Chuncho', sub: 'Kilkil · Glaucidium nana', hint: 'Quieto en una rama, en el bosque viejo y cerca del lugar de los antiguos.',
+    text: 'Un búho pequeño, del porte de un puño, de cabeza redonda y ojos amarillos. Caza de día y de noche, y es capaz de llevarse aves más grandes que él. Su silbido repetido se oye al atardecer. Mucha gente cree que su canto cerca de la casa trae una mala noticia, y por eso se le escucha con respeto.' },
   { id: 'rio', cat: 'lugares', title: 'El río', sub: 'Lewfü', hint: 'Al sur de la aldea.',
     text: 'El río baja de la cordillera hacia el mar. Da agua, peces y un camino. Como todo lugar con agua, tiene su ngen, su dueño, y se le saluda antes de entrar. En su poza se recibe el año nuevo.' },
   // ---------- vida y cultura ----------
@@ -191,4 +203,4 @@ export const MISSIONS = [
 ];
 
 // Entradas del cuaderno que tienen una fotografía fija y detallada (assets/cuaderno); los lugares se fotografían en el juego.
-export const FOTOS = new Set(NOTES.filter((n) => n.cat !== 'lugares' || n.id === 'rio').map((n) => n.id));
+export const FOTOS = new Set(NOTES.filter((n) => !n.sinFoto && (n.cat !== 'lugares' || n.id === 'rio')).map((n) => n.id));
