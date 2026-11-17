@@ -853,7 +853,10 @@ const GENTE3D = { Millaray: { archivo: 'millaray', mate: [0.2, 0.3], movs: { hab
   // Curiñancu no trae movimientos pedidos para él: hablar y escuchar son los de Millaray y caminar es el de Leftraru, traspasados
   // a su cuerpo con tools/glb-traspasa.py (el esqueleto es el mismo, pero cada modelo nace con otra postura).
   Curiñancu: { archivo: 'curinancu', mate: [0.2, 0.3], movs: { habla: 0.6, escucha: 0.35, camina: 1 }, paso: 0.75, cara: { piel: 0x9b6a52, boca: [[0.77, 6.25, 12.94], [-3.4, 5.5, 11.51], [4.69, 6.25, 11.1], [0.76, 6.7, 13.18], [0.81, 5.48, 12.92]],
-    ojos: [[[-3.57, 13.84, 11.03], [-5.17, 13.86, 11.36], [-1.92, 13.82, 10.67], [-3.52, 14.53, 11.82], [-3.49, 13.3, 11.08]], [[4.21, 14.45, 10.31], [2.39, 14.11, 10.12], [5.98, 14.54, 10.04], [4.22, 15.12, 11.18], [4.25, 13.85, 10.44]]] } } }, gente3d = [];
+    ojos: [[[-3.57, 13.84, 11.03], [-5.17, 13.86, 11.36], [-1.92, 13.82, 10.67], [-3.52, 14.53, 11.82], [-3.49, 13.3, 11.08]], [[4.21, 14.45, 10.31], [2.39, 14.11, 10.12], [5.98, 14.54, 10.04], [4.22, 15.12, 11.18], [4.25, 13.85, 10.44]]] } },
+  // Ñamku: igual que Curiñancu, con los movimientos traspasados. encorva: cuánto se le redondea la espalda (en radianes).
+  Ñamku: { archivo: 'namku', mate: [0.2, 0.3], movs: { habla: 0.6, escucha: 0.35, camina: 1 }, paso: 0.65, encorva: 0.3, cara: { piel: 0x9e6b52, boca: [[0.94, 6.13, 12.15], [-2.25, 6.13, 10.82], [3.87, 6.71, 10.29], [0.94, 6.62, 12.53], [0.99, 5.45, 12.15]],
+    ojos: [[[-3.46, 12.97, 10.01], [-4.87, 12.8, 9.89], [-1.77, 12.92, 9.78], [-3.5, 13.55, 10.01], [-3.4, 12.42, 10.24]], [[4.23, 13.57, 9.49], [2.55, 13.22, 9.38], [5.82, 13.55, 8.33], [4.19, 14.17, 9.46], [4.28, 13, 9.59]]] } } }, gente3d = [];
 if (!ANTIGUO) import('three/examples/jsm/loaders/GLTFLoader.js').then(({ GLTFLoader }) => { for (const a of world.life.actors) { const def = GENTE3D[a.name]; if (!def) continue;
   new GLTFLoader().load(`assets/modelos/${def.archivo}.glb`, (gl) => {
     const m = gl.scene; m.updateMatrixWorld(true); const caja = new THREE.Box3().setFromObject(m), e = 1 / (caja.max.y - caja.min.y); // a.g ya va a la escala de su altura: adentro, el modelo mide 1
@@ -869,8 +872,8 @@ if (!ANTIGUO) import('three/examples/jsm/loaders/GLTFLoader.js').then(({ GLTFLoa
     for (const k in def.movs || {}) fetch(`assets/modelos/${def.archivo}-${k}.json`).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!d) return;
       const clip = new THREE.AnimationClip(k, d.dura, d.pistas.map((q) => (q.que === 'giro' ? new THREE.QuaternionKeyframeTrack(`${q.hueso}.quaternion`, q.t, q.v) : new THREE.VectorKeyframeTrack(`${q.hueso}.position`, q.t, q.v))));
       if (def.movs[k] < 1) calma(clip, def.movs[k]); mov[k] = mixer.clipAction(lazo(clip, true)); mov[k].play(); mov[k].setEffectiveWeight(0); }).catch(() => { /* sin ese movimiento, sigue con los que tenga */ });
-    const H = {}; for (const n of ['RightArm', 'RightForeArm', 'RightHand', 'LeftArm', 'LeftForeArm', 'LeftHand', 'RightUpLeg', 'RightLeg', 'RightFoot', 'LeftUpLeg', 'LeftLeg', 'LeftFoot', 'Spine02', 'neck', 'Head', 'headfront']) H[n] = m.getObjectByName(n);
-    const P = { a, m, mixer, H, quieta, mov, w: { habla: 0, escucha: 0, camina: 0 }, paso: def.paso || 1.2, y0: m.position.y, pie: [0, 0], junta: 0, brazo: [0, 0], frente: H.headfront ? H.headfront.position.clone().normalize() : V3(0, 0, 1), fase: Math.random() * 6, parp: 1 + Math.random() * 3, habla: 0 }; // frente: hacia dónde mira la cara, en el espacio del hueso de la cabeza
+    const H = {}; for (const n of ['RightArm', 'RightForeArm', 'RightHand', 'LeftArm', 'LeftForeArm', 'LeftHand', 'RightUpLeg', 'RightLeg', 'RightFoot', 'LeftUpLeg', 'LeftLeg', 'LeftFoot', 'Spine02', 'Spine01', 'Spine', 'neck', 'Head', 'headfront']) H[n] = m.getObjectByName(n);
+    const P = { a, m, mixer, H, quieta, mov, w: { habla: 0, escucha: 0, camina: 0 }, paso: def.paso || 1.2, y0: m.position.y, pie: [0, 0], junta: 0, brazo: [0, 0], frente: H.headfront ? H.headfront.position.clone().normalize() : V3(0, 0, 1), fase: Math.random() * 6, parp: 1 + Math.random() * 3, habla: 0, encorva: def.encorva || 0 }; // frente: hacia dónde mira la cara, en el espacio del hueso de la cabeza
     if (def.cara) Object.assign(P, haceCara(H.Head, def.cara.ojos, def.cara.boca, def.cara.piel));
     a.c3 = P; gente3d.push(P); window.__g.gente3d = gente3d;
   }); } });
@@ -1121,6 +1124,7 @@ function updateGente3D(dt) {
     const fx = Math.sin(a.face), fz = Math.cos(a.face);
     pisa(P, dt, { suelo: a.g.position.y, apoyado: true, f: a.face, quieto: 1 - P.w.camina, slope: 0, h: a.h, junta: 0.93, centro: true });
     const inc = a.body.rotation.x; if (Math.abs(inc) > 0.004 && H.Spine02) tuerce(H.Spine02, QR.setFromAxisAngle(VC.set(fz, 0, -fx), inc), 1); // el tronco se inclina igual
+    if (P.encorva && H.Spine01 && H.Spine) { QR.setFromAxisAngle(VC.set(fz, 0, -fx), P.encorva * 0.5); tuerce(H.Spine01, QR, 1); tuerce(H.Spine, QR, 1); } // encorva: a los viejos la espalda se les ha ido redondeando; la parte alta se echa adelante y la cabeza sigue mirando al frente
     [['Left', a.armL, a.foreL, 1], ['Right', a.armR, a.foreR, -1]].forEach(([l, br, an, sx], i) => { // las manos van a donde están las del cuerpo de siempre; con los brazos caídos, se queda la postura de reposo
       const uso = suave(0.06, 0.3, Math.abs(br.rotation.x) + Math.max(0, Math.abs(an.rotation.x) - 0.16) + Math.abs(br.rotation.z - sx * 0.1)) * (1 - P.w.camina); /* caminando, los brazos los lleva el movimiento */ P.brazo[i] += (uso - P.brazo[i]) * Math.min(1, dt * 8);
       if (P.brazo[i] < 0.99) { const k = (1 - P.brazo[i]) * (1 - P.w.camina) * (1 - P.w.habla); apunta(H[l + 'Arm'], fz * sx * 0.1 + fx * 0.03, -1, -fx * sx * 0.1 + fz * 0.03, 0.85 * k); apunta(H[l + 'ForeArm'], fz * sx * 0.04 + fx * 0.13, -1, -fx * sx * 0.04 + fz * 0.13, 0.7 * k); } // en reposo, los brazos caen junto al cuerpo, los dos iguales, con el codo apenas doblado
