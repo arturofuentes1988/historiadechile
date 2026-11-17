@@ -495,18 +495,50 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
   const slopeOf = (o, dt) => { o.slope = (o.slope || 0) + ((o.speed > 0.2 ? slopeAhead(o.x, o.z, o.face) : 0) - (o.slope || 0)) * Math.min(1, dt * 4); return o.slope; };
   const turn = (o, tx, tz, dt, k = 6) => { let d = Math.atan2(tx - o.x, tz - o.z) - o.face; d = Math.atan2(Math.sin(d), Math.cos(d)); o.face += d * Math.min(1, dt * k); };
 
+  // ---------- chocar: la gente y los animales no atraviesan las cosas ----------
+  // Antes de dar cada paso tantean hacia adelante con una bola del ancho de su cuerpo. Si hay algo (una ruka, un tronco, el
+  // fogón, una cerca, una roca, un arbusto, otra persona, un animal o Leftraru) prueban hacia los lados hasta encontrar por
+  // dónde pasar, y lo rodean. El suelo no cuenta. Muy lejos de Leftraru caminan como antes, sin tantear.
+  const SIN_SUELO = 0xfffffffd, ROT0 = { x: 0, y: 0, z: 0, w: 1 }, bolas = {}, bola = (r) => bolas[r] || (bolas[r] = new RAPIER.Ball(r)), LADOS = [0.5, -0.5, 1, -1, 1.55, -1.55, 2.2, -2.2];
+  const tantea = (o, ang, largo, pp) => { // cuánto puede avanzar «o» hacia ese rumbo, hasta «largo»
+    const dx = Math.sin(ang), dz = Math.cos(ang), r = o.rad, alto = Math.max(r + 0.06, o.kind && o.kind !== 'weke' ? 0.26 : 0.5);
+    const hit = physics.castShape({ x: o.x, y: height(o.x, o.z) + alto, z: o.z }, ROT0, { x: dx, y: 0, z: dz }, bola(r), 0, largo, false, undefined, SIN_SUELO); let libre = hit ? Math.max(0, hit.time_of_impact) : largo;
+    const redondo = (sx, sz, sr) => { const ex = sx - o.x, ez = sz - o.z, al = ex * dx + ez * dz, R2 = r + sr; if (al < 0 || al > libre + R2) return; const lat2 = ex * ex + ez * ez - al * al; if (lat2 >= R2 * R2) return; const d = al - Math.sqrt(R2 * R2 - lat2); if (d > -0.05) libre = Math.min(libre, Math.max(0, d)); }; // (si ya están encima uno del otro, se dejan separar)
+    for (const q of solids) if (q !== o && !q.fuera && !q.caido) redondo(q.x, q.z, q.rad);
+    redondo(pp.x, pp.z, 0.3);
+    return libre; };
+  // Da el paso hacia donde quiere ir (quiere: el rumbo; giro: qué tan rápido se vuelve), rodeando lo que haya. traba: cuánto
+  // lleva sin poder avanzar (quien lo llama decide entonces ir a otra parte).
+  const anda = (o, quiere, dt, pp, giro, lejos) => {
+    let rumbo = quiere; const v = o.speed;
+    if (!lejos) { const largo = o.rad + 0.3 + v * 0.45;
+      if (tantea(o, quiere, largo, pp) < largo) { let mejor = -1; const s = o.lado || 1; // algo se cruza: busca el lado por donde pasar, y se queda con ese lado mientras lo rodea
+        for (const d of LADOS) { const a = quiere + d * s, l = tantea(o, a, largo, pp); if (l >= largo) { rumbo = a; o.lado = Math.sign(d * s); break; } if (l > mejor) { mejor = l; rumbo = a; } } o.ladoT = 1.2; }
+      else if (o.lado && (o.ladoT -= dt) <= 0) o.lado = 0; }
+    let d = rumbo - o.face; d = Math.atan2(Math.sin(d), Math.cos(d)); o.face += d * Math.min(1, dt * giro);
+    let av = v * dt; if (!lejos) av = Math.max(0, Math.min(av, tantea(o, o.face, av + 0.06, pp) - 0.03));
+    o.x += Math.sin(o.face) * av; o.z += Math.cos(o.face) * av;
+    if (av < v * dt * 0.35) { o.traba = (o.traba || 0) + dt; o.speed = Math.min(o.speed, av / Math.max(dt, 1e-4) + 0.25); } else o.traba = Math.max(0, (o.traba || 0) - dt * 2);
+  };
+
   function update(dt, t, pp, speed = 0) {
     for (const p of actors) {
       if (p.mode === 'walk') {
         const [tx, tz] = p.pts[p.i], d = Math.hypot(tx - p.x, tz - p.z);
         const near = Math.hypot(pp.x - p.x, pp.z - p.z); if (near < 1.7 || p.habla) { p.wait = Math.max(p.wait, 0.6); turn(p, pp.x, pp.z, dt, 3); } // si te cruzas, se detiene y te mira; y no se va mientras conversan
         if (p.wait > 0) { p.wait -= dt; p.speed += (0 - p.speed) * Math.min(1, dt * 8); }
-        else if (d < 0.5) { p.i = (p.i + 1) % p.pts.length; p.wait = R(1.5, 5); }
-        else { turn(p, tx, tz, dt); p.speed += (p.pace - p.speed) * Math.min(1, dt * 5); p.x += Math.sin(p.face) * p.speed * dt; p.z += Math.cos(p.face) * p.speed * dt; }
+        else if (d < 0.5 || (d < 1.7 && p.traba > 0.5)) { p.i = (p.i + 1) % p.pts.length; p.wait = R(1.5, 5); p.va = 0; } // llegó (o el lugar está ocupado y quedó al lado)
+        else { p.speed += (p.pace - p.speed) * Math.min(1, dt * 5); anda(p, Math.atan2(tx - p.x, tz - p.z), dt, pp, 6, near > 90);
+          if (p.traba > 2.5 || (p.va = (p.va || 0) + dt) > 60) { p.traba = 0; p.va = 0; p.i = (p.i + 1) % p.pts.length; } } // si no hay por dónde, deja ese rumbo y sigue al próximo
         p.phase += dt * (1.5 + p.speed * 3.4 / Math.sqrt(p.h)); animatePerson(p, p.phase, Math.min(1, p.speed / 2.4) * 0.75 + (p.speed > 0.1 ? 0.2 : 0), false, slopeOf(p, dt));
-      } else if (p.mode === 'work') { p.phase += dt * 2.2; animatePerson(p, 0, 0); // en el telar: teje un rato, descansa mirando la tela, la alisa con una mano y vuelve a tejer
-        const paso = (v0, v1, v) => { const q = Math.min(1, Math.max(0, (v - v0) / (v1 - v0))); return q * q * (3 - 2 * q); }, tt = (p.phase / 2.2) % 24, teje = paso(0, 1.4, tt) * (1 - paso(11, 12.6, tt)), alisa = paso(15, 16.2, tt) * (1 - paso(20, 21.4, tt));
-        p.armL.rotation.x = teje * (-0.9 + Math.sin(p.phase) * 0.3); p.armR.rotation.x = teje * (-0.9 + Math.sin(p.phase + 2) * 0.3) + alisa * (-1.2 + Math.sin(p.phase * 0.55) * 0.14); p.foreL.rotation.x = teje * (-0.7 + Math.sin(p.phase + 1) * 0.3); p.foreR.rotation.x = teje * (-0.7 + Math.sin(p.phase + 3) * 0.3) + alisa * -0.3; p.head.rotation.x = 0.1 + 0.1 * Math.max(teje, alisa); }
+      } else if (p.mode === 'work') { p.phase += dt * 2.2; animatePerson(p, 0, 0);
+        // En el telar no para: las dos manos van adelante, en la urdimbre. Una lleva la trama hacia el otro lado y la otra la
+        // recibe, subiendo y bajando entre los hilos; cada tanto las dos bajan juntas, firmes, para apretar lo tejido con la paleta.
+        const tt = p.phase / 2.2, va = Math.sin(tt * 1.7), sube = Math.sin(tt * 3.4 + 0.6), ap = Math.max(0, Math.sin(tt * 0.5 - 1.2)) ** 8, golpe = ap * Math.sin(tt * 8.5);
+        p.armL.rotation.x = -0.98 - va * 0.13 + sube * 0.06 + golpe * 0.2; p.armR.rotation.x = -0.98 + va * 0.13 - sube * 0.06 + golpe * 0.2;
+        p.armL.rotation.z = 0.1 + va * 0.16 * (1 - ap); p.armR.rotation.z = -0.1 + va * 0.16 * (1 - ap);
+        p.foreL.rotation.x = -0.62 + va * 0.2 - sube * 0.14 - golpe * 0.12; p.foreR.rotation.x = -0.62 - va * 0.2 + sube * 0.14 - golpe * 0.12;
+        p.body.rotation.x = 0.05 + golpe * 0.02; p.head.rotation.x = 0.2 + sube * 0.02; p.head.rotation.y = va * 0.07; }
       else if (p.mode === 'cook') { // junto a la olla: algo inclinada, mirándola, y con el palo en la mano derecha dando vueltas
         p.phase += dt * 2.6; animatePerson(p, 0, 0); const s = Math.sin(p.phase), c = Math.cos(p.phase);
         p.body.rotation.x = 0.13; p.head.rotation.x = 0.4; p.head.rotation.y = -0.12;
@@ -525,7 +557,7 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
         let ry = Math.atan2(h.x - p.x, h.z - p.z) - p.face; ry = Math.max(-1, Math.min(1, Math.atan2(Math.sin(ry), Math.cos(ry))));
         const rx = Math.max(-0.3, Math.min(0.5, Math.atan2(height(p.x, p.z) + p.h * 0.94 - h.y, Math.hypot(h.x - p.x, h.z - p.z) || 1))), bx = p.mode === 'work' ? 0.2 : p.mode === 'cook' ? 0.4 : 0, by = suelta ? 0 : p.head.rotation.y;
         p.head.rotation.x = bx + (rx - bx) * hk; p.head.rotation.y = by + (ry - by) * hk;
-        if (p.mode === 'work') for (const o of [p.armL, p.armR, p.foreL, p.foreR]) o.rotation.x *= 1 - hk; // conversando, deja las manos quietas
+        if (p.mode === 'work') { for (const o of [p.armL, p.armR, p.foreL, p.foreR]) o.rotation.x *= 1 - hk; p.armL.rotation.z = 0.1 + (p.armL.rotation.z - 0.1) * (1 - hk); p.armR.rotation.z = -0.1 + (p.armR.rotation.z + 0.1) * (1 - hk); p.body.rotation.x *= 1 - hk; } // conversando, deja las manos quietas
       } else { if (p.hablaP) { p.hablaP = null; if (p.mode === 'work' || p.mode === 'walk') p.head.rotation.y = 0; if (p.mode !== 'work' && p.mode !== 'cook') p.head.rotation.x = 0; }
         if (p.mode === 'work' && p.face0 !== undefined) { let d = p.face0 - p.face; d = Math.atan2(Math.sin(d), Math.cos(d)); p.face += d * Math.min(1, dt * 4); if (Math.abs(d) < 0.01) p.face0 = undefined; } }
       // Gestos de una conversación (los lleva main.js). mano: estira el brazo para entregar o recibir; obra: trabaja con las
@@ -548,7 +580,9 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
       const d = Math.hypot(q.tx - q.x, q.tz - q.z), want = flee ? 5.2 : q.pace;
       if (q.wait > 0) { q.wait -= dt; q.speed += (0 - q.speed) * Math.min(1, dt * 6); q.neck.rotation.x += ((q.graze ? 1.7 : 0.3) - q.neck.rotation.x) * Math.min(1, dt * 3); q.headPivot.rotation.x = -q.neck.rotation.x * 0.6; q.tail.rotation.x = Math.sin(q.phase * 3 + q.x) * 0.25; }
       else if (d < 0.4) { q.wait = R(2, 8); q.graze = rng() < 0.6; const a = R(0, 6.28), r = Math.sqrt(rng()) * q.hr; q.tx = q.hx + Math.cos(a) * r; q.tz = q.hz + Math.sin(a) * r; }
-      else { turn(q, q.tx, q.tz, dt, flee ? 9 : 3); q.speed += (want - q.speed) * Math.min(1, dt * 5); q.x += Math.sin(q.face) * q.speed * dt; q.z += Math.cos(q.face) * q.speed * dt; q.neck.rotation.x += (0.3 + Math.sin(q.phase) * 0.05 - q.neck.rotation.x) * Math.min(1, dt * 5); q.headPivot.rotation.x = -0.3; }
+      else { q.speed += (want - q.speed) * Math.min(1, dt * 5); anda(q, Math.atan2(q.tx - q.x, q.tz - q.z), dt, pp, flee ? 9 : 3, dp > 90);
+        if (q.traba > 1.5 && !flee) { q.traba = 0; const a = R(0, 6.28), r = Math.sqrt(rng()) * q.hr; q.tx = q.hx + Math.cos(a) * r; q.tz = q.hz + Math.sin(a) * r; } // no hay por dónde: elige otro lugar
+        q.neck.rotation.x += (0.3 + Math.sin(q.phase) * 0.05 - q.neck.rotation.x) * Math.min(1, dt * 5); q.headPivot.rotation.x = -0.3; }
       q.phase += dt * (1 + q.speed * 5); const amp = Math.min(0.6, q.speed * 0.55), OFF = [Math.PI / 2, Math.PI * 1.5, 0, Math.PI]; // delantera izq., delantera der., trasera izq., trasera der.
       for (let i = 0; i < 4; i++) { q.legs[i].rotation.x = -Math.sin(q.phase + OFF[i]) * amp; q.knees[i].rotation.x = Math.max(0, Math.cos(q.phase + OFF[i])) * amp * 1.3; }
       q.g.rotation.z = Math.sin(q.phase) * amp * 0.04;

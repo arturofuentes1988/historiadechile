@@ -35,7 +35,7 @@ const LUGARES = { viejo: 'el bosque viejo', menoko: 'el menoko', antiguos: 'el l
 const HUELLAS = [[-70, -70], [40, -52], [-60, 66]];
 const NOMBRE = { curinancu: 'Curiñancu', millaray: 'Millaray', abuela: 'la abuela', ayelen: 'Ayelén', rayen: 'Rayen', machi: 'la machi', namku: 'Ñamku' }; // cómo se llama en el mundo cada persona del cuaderno
 
-export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripple, player, place, pinones, story, sanar, choca, tecla = (a) => a }) {
+export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripple, player, place, pinones, story, sanar, choca, guiar, tecla = (a) => a }) {
   const TRONCOS = [0, 1, 2, 3, 4].map((i) => { const a = 0.6 + i * 1.2; return { x: FOGON.x + Math.cos(a) * 2.9, z: FOGON.z + Math.sin(a) * 2.9, a }; }); // los troncos alrededor del fogón
   const S = Object.assign({ f: {}, inv: {} }, JSON.parse(localStorage.getItem(KEY) || '{}')), save = () => localStorage.setItem(KEY, JSON.stringify(S));
   const f = S.f, inv = S.inv, have = (id) => inv[id] || 0, d2 = (p, x, z) => Math.hypot(p.x - x, p.z - z), actor = (name) => world.life.actors.find((a) => a.name === name);
@@ -103,6 +103,7 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
   }
 
   // ---------- lo que hace falta ahora, según los encargos abiertos ----------
+  let busca = false, yo = null; // busca: anda buscando con qué hacer una flecha; yo: dónde está Leftraru
   function needs() {
     const n = {};
     if (f.m3 === 1) { n.canelo = 2; n.quillay = 1; n.maqui = 2; }
@@ -111,6 +112,7 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
     if (f.na === 1) n.nalca = 2;
     if (f.rm === 1) { n.maqui = 2; n.boldo = 2; }
     if (f.cz === 1) { n.quila = 3; n.pluma = 3; }
+    if (busca) { if (have('quila') && have('pluma')) busca = false; else { n.quila = Math.max(n.quila || 0, 1); n.pluma = Math.max(n.pluma || 0, 1); } } // quiso hacer una flecha y le faltaba algo: se marca dónde hay
     for (const k in n) n[k] = Math.max(0, n[k] - have(k));
     return n;
   }
@@ -210,7 +212,7 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
     else for (const t of world.trees) { if (t.kind !== it.tree || t.rec.picked) continue; const d = d2(p, t.x, t.z); if (d < 3.2 && (!s || d < s.d)) s = { d, rec: t.rec }; }
     return s && !s.rec.picked ? s : null;
   }
-  function pick(id, rec) { rec.picked = true; if (rec.mesh) rec.mesh.visible = false; give(id); snd.play('arbusto-1', 0.35); const n = needs()[id] || 0, pedido = id in needs();
+  function pick(id, rec) { rec.picked = true; if (rec.mesh) rec.mesh.visible = false; give(id); snd.play('arbusto-1', 0.35); const n = needs()[id] || 0, pedido = id in needs(); if (busca) guiaAlMaterial(); // si aún falta lo otro, la guía sigue hacia allá
     hint(n ? `Recogiste ${ITEMS[id].uno}. Faltan ${n}.` : pedido ? `Recogiste ${ITEMS[id].uno}. Ya tienes lo necesario.` : `Recogiste ${ITEMS[id].uno}. Llevas ${have(id)}.`, 4); }
   // Lo que ya sabe preparar se puede juntar siempre, pero de a poco: de cada cosa lleva hasta TOPE y no corta más.
   const TOPE = 3;
@@ -311,7 +313,7 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
   function equipar(si) {
     if (!(f.cz >= 2 && have('arco') > 0)) return false;
     S.eq = si === undefined ? !S.eq : !!si; save(); COSAS.arco.usar = S.eq ? 'Guardar' : 'Equipar'; if (!S.eq) apuntar(false);
-    snd.play('ui-clic', 0.4, S.eq ? 1.1 : 0.8); hint(S.eq ? `Arco en la mano. Botón derecho para apuntar; mantén el izquierdo para tensar y suéltalo para tirar. ${tecla('flecha')} hace una flecha.` : 'Guardaste el arco.', S.eq ? 7 : 3); return true;
+    snd.play('ui-clic', 0.4, S.eq ? 1.1 : 0.8); hint(S.eq ? `Arco en la mano. Mantén el botón derecho para apuntar y, sin soltarlo, el izquierdo para tensar; suéltalo para tirar. ${tecla('flecha')} hace una flecha.` : 'Guardaste el arco.', S.eq ? 7 : 3); return true;
   }
   // Tensar: mientras se mantiene apretado el botón, el arco se va cargando; al soltarlo, sale la flecha con esa fuerza.
   const empiezaATensar = () => { if (!punt.on || !punt.quiere || punt.tira || vuelo || punt.pausa > 0 || !have('flecha')) return false; punt.tira = true; return true; };
@@ -321,10 +323,16 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
     return empiezaATensar();
   }
   // Hacer una flecha, donde sea: una caña de quila y una pluma. Ñamku lo enseña en la misión 4.
+  // Lo que falte para una flecha queda marcado en el mapa (y con una hoja flotando en el lugar), y la guía lleva a lo más cercano.
+  function guiaAlMaterial() {
+    if (!yo || !guiar) return null; const q = metas(yo).filter((m) => (m.id === 'quila' || m.id === 'pluma') && !have(m.id)).sort((a, b) => d2(yo, a.x, a.z) - d2(yo, b.x, b.z))[0];
+    if (q) guiar({ kind: 'punto', x: q.x, z: q.z, label: q.label }); return q;
+  }
   function hacerFlecha() {
     if (!(f.cz >= 2) || sit || hace || punt.on) return false;
     if (have('flecha') >= TOPE_FL) { hint('Ya llevas todas las flechas que caben.', 3); return false; }
-    if (!have('quila') || !have('pluma')) { hint(`Para una flecha hacen falta una caña de quila y una pluma. Tienes ${have('quila')} y ${have('pluma')}.`, 5); return false; }
+    if (!have('quila') || !have('pluma')) { busca = true; const falta = [!have('quila') && 'una caña de quila', !have('pluma') && 'una pluma'].filter(Boolean).join(' y ');
+      const fn = !have('quila') && !have('pluma') ? 'faltan' : 'falta'; hint(guiaAlMaterial() ? `Para una flecha te ${fn} ${falta}. Quedó marcado en el mapa dónde buscar.` : `Para una flecha te ${fn} ${falta}.`, 7); return false; }
     haz('labrar', () => { take('quila', 1); take('pluma', 1); give('flecha', 1); snd.play('ui-logro', 0.35, 1.2); hint(`Hiciste una flecha. Llevas ${have('flecha')}.`, 3); }); return true;
   }
   function soltar(desde, hacia) { // desde: de dónde sale la flecha (el arco); hacia: el punto del mundo que marca la mira
@@ -438,7 +446,7 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
     return out.sort((a, b) => a.d - b.d)[0] || null;
   }
 
-  function update(dt, t, p) {
+  function update(dt, t, p) { yo = p;
     here = p; if (palin) updatePalin(dt, p);
     if (sit) updateSit(dt);
     updateArco(dt, p);
@@ -492,19 +500,20 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
     boy.head.rotation.x = w * (0.16 - (lean - 0.1) * 0.7); boy.head.rotation.y = Math.sin(on * 0.31) * 0.2 * w;
   }
 
-  return { scan, talk, wants, update, pose, stand, madreCocina, f, pins: S.pin, pin(i) { if (!S.pin.includes(i)) { S.pin.push(i); save(); } },
-    get sitting() { return !!sit; }, get busy() { return (!!sit && sit.st !== 'on') || !!hace; }, get abrigado() { return alFuego(); }, get hace() { return hace; }, get tensa() { return punt.on ? punt.carga : 0; }, get equipado() { return !!S.eq && f.cz >= 2 && have('arco') > 0; }, get tieneArco() { return f.cz >= 2 && have('arco') > 0; }, get recarga() { return punt.pausa / RECARGA; }, get tira() { return punt.tira; }, equipar, tensar, hacerFlecha, get apunta() { return punt.on; }, get vuela() { return !!vuelo; }, get clavadas() { return clav.length; }, apuntar, soltar, mira, // hace: el gesto en curso; tensa: cuánto lleva tensado el arco // abrigado: junto a un fuego // busy: está sentándose o levantándose
-    ctx: () => ({ f, tengo: (id) => have(id), hierbas: Math.min(2, have('canelo')) + Math.min(1, have('quillay')) + Math.min(2, have('maqui')), llevo: { canelo: Math.min(2, have('canelo')), quillay: Math.min(1, have('quillay')), maqui: Math.min(2, have('maqui')) } }),
-    // Dónde ir a buscar lo que falta para las misiones abiertas: los árboles más cercanos de cada especie y las matas de maqui del claro.
-    goals(p) {
-      const n = needs(), out = [];
+  function metas(p) {
+    const n = needs(), out = [];
       for (const id in n) { if (n[id] <= 0) continue; const it = ITEMS[id];
         if (it.tree) world.trees.filter((t) => t.kind === it.tree && !t.rec.picked && Math.abs(t.x) < 186 && t.z > -136).map((t) => [d2(p, t.x, t.z), t]).sort((a, b) => a[0] - b[0]).slice(0, Math.max(2, n[id])).forEach(([, t]) => out.push({ x: t.x, z: t.z, id, label: it.uno, alto: 3 }));
         else if (it.bush) world.bushesIn(POI.maqui.x, POI.maqui.z, 30).filter((t) => !t.picked).map((t) => [d2(p, t.x, t.z), t]).sort((a, b) => a[0] - b[0]).slice(0, Math.max(2, n[id])).forEach(([, t]) => out.push({ x: t.x, z: t.z, id, label: it.uno, alto: 2.1 * t.s + 0.45 }));
         else if (it.pluma) plumas.filter((q) => !q.picked).map((q) => [d2(p, q.x, q.z), q]).sort((a, b) => a[0] - b[0]).slice(0, 3).forEach(([, q]) => out.push({ x: q.x, z: q.z, id, label: it.uno, alto: 1.2 }));
         else if (it.plant === 'quila') { const t = world.findPlant('quila', p.x, p.z); if (t) out.push({ x: t.x, z: t.z, id, label: it.uno, alto: 2.2 }); } } // alto: a qué altura flota la hoja que lo marca en el mundo
-      return out;
-    },
+    return out;
+  }
+  return { scan, talk, wants, update, pose, stand, madreCocina, f, pins: S.pin, pin(i) { if (!S.pin.includes(i)) { S.pin.push(i); save(); } },
+    get sitting() { return !!sit; }, get busy() { return (!!sit && sit.st !== 'on') || !!hace; }, get abrigado() { return alFuego(); }, get hace() { return hace; }, get tensa() { return punt.on ? punt.carga : 0; }, get equipado() { return !!S.eq && f.cz >= 2 && have('arco') > 0; }, get tieneArco() { return f.cz >= 2 && have('arco') > 0; }, get recarga() { return punt.pausa / RECARGA; }, get tira() { return punt.tira; }, equipar, tensar, hacerFlecha, get arma() { const tiene = f.cz >= 2 && have('arco') > 0; return { tiene, eq: tiene && !!S.eq, flechas: have('flecha'), quila: have('quila'), pluma: have('pluma'), tope: TOPE_FL }; }, get apunta() { return punt.on; }, get vuela() { return !!vuelo; }, get clavadas() { return clav.length; }, apuntar, soltar, mira, // hace: el gesto en curso; tensa: cuánto lleva tensado el arco // abrigado: junto a un fuego // busy: está sentándose o levantándose
+    ctx: () => ({ f, tengo: (id) => have(id), hierbas: Math.min(2, have('canelo')) + Math.min(1, have('quillay')) + Math.min(2, have('maqui')), llevo: { canelo: Math.min(2, have('canelo')), quillay: Math.min(1, have('quillay')), maqui: Math.min(2, have('maqui')) } }),
+    // Dónde ir a buscar lo que falta para las misiones abiertas: los árboles más cercanos de cada especie y las matas de maqui del claro.
+    goals: (p) => metas(p),
     // A dónde hay que ir ahora para avanzar en una misión (para la línea de guía). Devuelve { x, z, label } o nada si no hay un lugar que marcar.
     objetivo(id, p) {
       const [got, total] = pinones(), has = ui.has, TELAR = { x: -10.6, z: -4.2, label: 'el telar' };
