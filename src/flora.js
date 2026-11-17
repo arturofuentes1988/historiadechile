@@ -111,27 +111,34 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
   const fernGeo = (() => { const parts = []; for (let i = 0; i < 7; i++) { const a = (i / 7) * PI * 2, d = V(Math.cos(a), 0.75, Math.sin(a)).normalize(); quad(parts, d.clone().multiplyScalar(0.55), V(-Math.sin(a), 0, Math.cos(a)).multiplyScalar(0.42), d.clone().multiplyScalar(1.1), UP); } return mergeGeometries(parts); })();
   // ---------- plantas modeladas en 3D, livianas: tallos, hojas, flores y frutos con volumen ----------
   const plantMat = withWind(new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.78, side: THREE.DoubleSide }), 0.05, true);
-  const put = (parts, geo, m, color) => { const g = geo.index ? geo.toNonIndexed() : geo.clone(); g.deleteAttribute('uv'); if (geo === berryG || geo === bellG) { const P0 = g.attributes.position, N0 = new Float32Array(P0.count * 3), t = V(); for (let i = 0; i < P0.count; i++) { t.fromBufferAttribute(P0, i); if (geo === bellG) t.y = 0.25; t.normalize(); N0[i * 3] = t.x; N0[i * 3 + 1] = t.y; N0[i * 3 + 2] = t.z; } g.setAttribute('normal', new THREE.BufferAttribute(N0, 3)); if (m) g.applyMatrix4(m); } else { if (m) g.applyMatrix4(m); g.computeVertexNormals(); } // frutos y flores redondeados, sin caras marcadas
+  const put = (parts, geo, m, color) => { const g = geo.index ? geo.toNonIndexed() : geo.clone(); g.deleteAttribute('uv'); if (ROUND.has(geo)) { const P0 = g.attributes.position, N0 = new Float32Array(P0.count * 3), t = V(); for (let i = 0; i < P0.count; i++) { t.fromBufferAttribute(P0, i); if (geo === bellG || geo === bellF) t.y = 0.25; t.normalize(); N0[i * 3] = t.x; N0[i * 3 + 1] = t.y; N0[i * 3 + 2] = t.z; } g.setAttribute('normal', new THREE.BufferAttribute(N0, 3)); if (m) g.applyMatrix4(m); } else { if (m) g.applyMatrix4(m); g.computeVertexNormals(); } // frutos y flores redondeados, sin caras marcadas
     const n = g.attributes.position.count, c = new THREE.Color(color), C = new Float32Array(n * 3); for (let i = 0; i < n; i++) { C[i * 3] = c.r; C[i * 3 + 1] = c.g; C[i * 3 + 2] = c.b; } g.setAttribute('color', new THREE.BufferAttribute(C, 3)); parts.push(g); };
   const TM4 = (pos, dir, sx, sy = sx, sz = sx) => new THREE.Matrix4().compose(pos, new THREE.Quaternion().setFromUnitVectors(UP, dir.clone().normalize()), V(sx, sy, sz));
   const stemG = new THREE.CylinderGeometry(0.6, 1, 1, 4, 1, true).translate(0, 0.5, 0), berryG = new THREE.OctahedronGeometry(1, 1), bellG = new THREE.CylinderGeometry(0.35, 1, 1, 6, 1, true).translate(0, -0.5, 0);
+  // Las mismas piezas con pocas caras, para la versión que se dibuja de lejos (ver «de lejos» en build y update): a esa
+  // distancia una baya mide un par de puntos de pantalla, y casi todos los triángulos de estas matas eran sus bayas y flores.
+  const stemF = new THREE.CylinderGeometry(0.6, 1, 1, 3, 1, true).translate(0, 0.5, 0), berryF = new THREE.OctahedronGeometry(1, 0), bellF = new THREE.CylinderGeometry(0.35, 1, 1, 3, 1, true).translate(0, -0.5, 0), ROUND = new Set([berryG, bellG, berryF, bellF]);
   const leafG = (() => { const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, -0.5, 0.45, 0.12, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0.5, 0.45, 0.12], 3)); return g; })(); // hoja plegada por el nervio
   const finish = (parts, H) => { const g = mergeGeometries(parts), P = g.attributes.position, U = new Float32Array(P.count * 2); for (let i = 0; i < P.count; i++) U[i * 2 + 1] = Math.pow(Math.min(1, Math.max(0, P.getY(i) / H)), 1.4); g.setAttribute('uv', new THREE.BufferAttribute(U, 2)); return g; }; // la base queda firme y las puntas se mecen
   const pr = mulberry32(77), Q = (a, b) => a + (b - a) * pr();
   // un tallo arqueado con hojas a los lados; devuelve los puntos para colgarle flores o frutos
-  const spray = (parts, a, L, lean, { r = 0.012, seg = 4, leaves = 6, leaf = 0.07, lw = 0.6, cols = [0x3f6a2c], stem = 0x5a4630 } = {}) => {
+  // far: si se pasa, ahí se arma a la vez la misma rama con piezas de pocas caras (misma forma, para que el cambio no se note)
+  const spray = (parts, a, L, lean, { r = 0.012, seg = 4, leaves = 6, leaf = 0.07, lw = 0.6, cols = [0x3f6a2c], stem = 0x5a4630, far = null } = {}) => {
     const ca = Math.cos(a), sa = Math.sin(a), pt = (u) => V(ca * lean * L * u * u, L * u * (1 - 0.25 * lean * u), sa * lean * L * u * u), pts = [];
-    for (let i = 0; i < seg; i++) { const p0 = pt(i / seg), p1 = pt((i + 1) / seg), d = p1.clone().sub(p0); put(parts, stemG, TM4(p0, d, r * (1 - i / seg * 0.6), d.length(), r * (1 - i / seg * 0.6)), stem); }
-    for (let i = 0; i < leaves; i++) { const u = 0.25 + (i / leaves) * 0.75, p0 = pt(u), side = i % 2 ? 1 : -1, d = V(-sa * side + ca * 0.5, 0.45 + Q(-0.2, 0.3), ca * side + sa * 0.5); put(parts, leafG, TM4(p0, d, leaf * lw, leaf * Q(0.8, 1.2), leaf * lw), cols[i % cols.length]); pts.push(p0); }
+    for (let i = 0; i < seg; i++) { const p0 = pt(i / seg), p1 = pt((i + 1) / seg), d = p1.clone().sub(p0), m = TM4(p0, d, r * (1 - i / seg * 0.6), d.length(), r * (1 - i / seg * 0.6)); put(parts, stemG, m, stem); if (far) put(far, stemF, m, stem); }
+    for (let i = 0; i < leaves; i++) { const u = 0.25 + (i / leaves) * 0.75, p0 = pt(u), side = i % 2 ? 1 : -1, d = V(-sa * side + ca * 0.5, 0.45 + Q(-0.2, 0.3), ca * side + sa * 0.5); const m = TM4(p0, d, leaf * lw, leaf * Q(0.8, 1.2), leaf * lw); put(parts, leafG, m, cols[i % cols.length]); if (far) put(far, leafG, m, cols[i % cols.length]); pts.push(p0); }
     return pts;
   };
   const MODELS = {
     // murtilla (Ugni molinae): mata baja de hojitas brillantes y frutos rojos
-    murtilla: () => { const p = []; for (let k = 0; k < 13; k++) { const pts = spray(p, k * 0.5 + Q(-0.2, 0.2), Q(0.3, 0.6), Q(0.3, 0.9), { r: 0.014, leaves: 12, leaf: 0.1, lw: 0.75, cols: [0x4a7a34, 0x5a8c3a, 0x6a5a30], stem: 0x7a5a3a }); for (let j = 1; j < pts.length; j += 3) put(p, berryG, new THREE.Matrix4().compose(pts[j].clone().add(V(Q(-0.02, 0.02), -0.02, Q(-0.02, 0.02))), new THREE.Quaternion(), V(0.026, 0.026, 0.026)), 0xc02830); } return finish(p, 0.55); },
+    // (murtilla, michay y chilco devuelven dos modelos de la misma mata: geo, con todo su detalle, y far, para verla de lejos)
+    murtilla: () => { const p = [], f = []; for (let k = 0; k < 13; k++) { const pts = spray(p, k * 0.5 + Q(-0.2, 0.2), Q(0.3, 0.6), Q(0.3, 0.9), { r: 0.014, leaves: 12, leaf: 0.1, lw: 0.75, cols: [0x4a7a34, 0x5a8c3a, 0x6a5a30], stem: 0x7a5a3a, far: f }); for (let j = 1; j < pts.length; j += 3) { const m = new THREE.Matrix4().compose(pts[j].clone().add(V(Q(-0.02, 0.02), -0.02, Q(-0.02, 0.02))), new THREE.Quaternion(), V(0.026, 0.026, 0.026)); put(p, berryG, m, 0xc02830); put(f, berryF, m, 0xc02830); } } return { geo: finish(p, 0.55), far: finish(f, 0.55) }; },
     // michay (Berberis darwinii): arbusto espinoso, hojas chicas oscuras y racimos de flores anaranjadas
-    michay: () => { const p = []; for (let k = 0; k < 8; k++) { const pts = spray(p, k * 0.8 + Q(-0.2, 0.2), Q(0.8, 1.3), Q(0.25, 0.7), { r: 0.026, seg: 5, leaves: 18, leaf: 0.12, lw: 0.7, cols: [0x2e5426, 0x3a622c], stem: 0x6a5238 }); for (let j = 2; j < pts.length; j += 3) for (let f = 0; f < 3; f++) put(p, berryG, new THREE.Matrix4().compose(pts[j].clone().add(V(Q(-0.03, 0.03), -0.03 - f * 0.022, Q(-0.03, 0.03))), new THREE.Quaternion(), V(0.026, 0.03, 0.026)), f % 2 ? 0xf0901c : 0xe8b020); } return finish(p, 1.3); },
+    michay: () => { const p = [], fr = []; for (let k = 0; k < 8; k++) { const pts = spray(p, k * 0.8 + Q(-0.2, 0.2), Q(0.8, 1.3), Q(0.25, 0.7), { r: 0.026, seg: 5, leaves: 18, leaf: 0.12, lw: 0.7, cols: [0x2e5426, 0x3a622c], stem: 0x6a5238, far: fr }); for (let j = 2; j < pts.length; j += 3) { for (let f = 0; f < 3; f++) put(p, berryG, new THREE.Matrix4().compose(pts[j].clone().add(V(Q(-0.03, 0.03), -0.03 - f * 0.022, Q(-0.03, 0.03))), new THREE.Quaternion(), V(0.026, 0.03, 0.026)), f % 2 ? 0xf0901c : 0xe8b020);
+      put(fr, berryF, new THREE.Matrix4().compose(pts[j].clone().add(V(0, -0.052, 0)), new THREE.Quaternion(), V(0.042, 0.056, 0.042)), 0xeca61e); } } return { geo: finish(p, 1.3), far: finish(fr, 1.3) }; }, // de lejos, cada racimo de tres flores es un solo bulto del mismo color
     // chilco (Fuchsia magellanica): ramas arqueadas con flores colgantes, rojas por fuera y moradas por dentro
-    chilco: () => { const p = []; for (let k = 0; k < 7; k++) { const pts = spray(p, k * 0.9 + Q(-0.2, 0.2), Q(1.0, 1.6), Q(0.5, 1.0), { r: 0.022, seg: 5, leaves: 18, leaf: 0.17, lw: 0.55, cols: [0x4a7e38, 0x5a9040], stem: 0x8a4a3a }); for (let j = 3; j < pts.length; j += 2) { const q0 = pts[j].clone().add(V(Q(-0.03, 0.03), -0.03, Q(-0.03, 0.03))); put(p, stemG, TM4(q0.clone().add(V(0, 0.03, 0)), V(0, -1, 0), 0.003, 0.04), 0x8a2a3a); put(p, bellG, new THREE.Matrix4().compose(q0, new THREE.Quaternion(), V(0.03, 0.07, 0.03)), 0xd8203c); put(p, bellG, new THREE.Matrix4().compose(q0.clone().add(V(0, -0.04, 0)), new THREE.Quaternion(), V(0.02, 0.05, 0.02)), 0x6a30a0); } } return finish(p, 1.5); },
+    chilco: () => { const p = [], f = []; for (let k = 0; k < 7; k++) { const pts = spray(p, k * 0.9 + Q(-0.2, 0.2), Q(1.0, 1.6), Q(0.5, 1.0), { r: 0.022, seg: 5, leaves: 18, leaf: 0.17, lw: 0.55, cols: [0x4a7e38, 0x5a9040], stem: 0x8a4a3a, far: f }); for (let j = 3; j < pts.length; j += 2) { const q0 = pts[j].clone().add(V(Q(-0.03, 0.03), -0.03, Q(-0.03, 0.03))), m1 = new THREE.Matrix4().compose(q0, new THREE.Quaternion(), V(0.03, 0.07, 0.03)), m2 = new THREE.Matrix4().compose(q0.clone().add(V(0, -0.04, 0)), new THREE.Quaternion(), V(0.02, 0.05, 0.02));
+      put(p, stemG, TM4(q0.clone().add(V(0, 0.03, 0)), V(0, -1, 0), 0.003, 0.04), 0x8a2a3a); put(p, bellG, m1, 0xd8203c); put(p, bellG, m2, 0x6a30a0); put(f, bellF, m1, 0xd8203c); put(f, bellF, m2, 0x6a30a0); } } return { geo: finish(p, 1.5), far: finish(f, 1.5) }; },
     // nalca (Gunnera tinctoria): hojas enormes, redondas y lobuladas, sobre tallos gruesos y rojizos
     nalca: () => { const p = []; for (let k = 0; k < 6; k++) { const a = k * 1.05 + Q(-0.2, 0.2), L = Q(0.7, 1.25), lean = Q(0.35, 0.8), top = V(Math.cos(a) * lean * L, L * 0.85, Math.sin(a) * lean * L); put(p, new THREE.CylinderGeometry(0.5, 1, 1, 5, 1, true).translate(0, 0.5, 0), TM4(V(0, 0, 0), top, 0.04, top.length(), 0.04), 0x7a4a3a);
       const R0 = Q(0.45, 0.7), g = new THREE.CircleGeometry(1, 14), P = g.attributes.position; for (let i = 1; i < P.count; i++) { const an = Math.atan2(P.getY(i), P.getX(i)), rr = 1 + 0.16 * Math.cos(an * 7) + 0.06 * Math.cos(an * 13); P.setXYZ(i, P.getX(i) * rr, P.getY(i) * rr, 0.22); } P.setXYZ(0, 0, 0, 0); // el centro hundido: la hoja hace de embudo
@@ -150,8 +157,8 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
       n += (SEG + 1) * 2; }
     g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2)); g.setAttribute('normal', new THREE.Float32BufferAttribute(N, 3)); g.setIndex(I); return g; })();
   const SCATTER = {
-    murtilla: { geo: MODELS.murtilla(), mat: plantMat, range: 60, cells: new Map() }, michay: { geo: MODELS.michay(), mat: plantMat, range: 75, cells: new Map() },
-    chilco: { geo: MODELS.chilco(), mat: plantMat, range: 75, cells: new Map() }, nalca: { geo: MODELS.nalca(), mat: plantMat, range: 85, cells: new Map() },
+    murtilla: { ...MODELS.murtilla(), mat: plantMat, range: 60, cells: new Map() }, michay: { ...MODELS.michay(), mat: plantMat, range: 75, cells: new Map() },
+    chilco: { ...MODELS.chilco(), mat: plantMat, range: 75, cells: new Map() }, nalca: { geo: MODELS.nalca(), mat: plantMat, range: 85, cells: new Map() },
     grass: { geo: cross(1.0, 0.62), mat: MAT.grass(photo('pasto', { cut: true })), range: 75, cells: new Map() },
     grass2: { geo: cross(0.8, 1.05), mat: MAT.grass(photo('pasto-espiga', { cut: true })), range: 80, cells: new Map() },
     reed: { geo: cross(0.9, 1.7), mat: MAT.grass(photo('junco', { cut: true })), range: 110, cells: new Map() },
@@ -169,7 +176,11 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
   }
 
   // ---------- rocas y troncos caídos ----------
-  const rockGeos = [0, 1, 2].map((i) => { const g = new THREE.IcosahedronGeometry(1, 3), P = g.attributes.position, sd = i * 37.7; for (let k = 0; k < P.count; k++) { const x = P.getX(k), y = P.getY(k), z = P.getZ(k), d = 1 + 0.26 * Math.sin(x * 3.1 + sd) * Math.sin(y * 2.7 + sd * 1.3) + 0.13 * Math.sin(z * 5.3 + sd * 0.7) + 0.05 * Math.sin(x * 11 + y * 9 + sd); P.setXYZ(k, x * d, y * d, z * d); } const m = BufferGeometryUtilsMerge(g); m.computeVertexNormals(); return m; });
+  // Tres formas de roca, cada una en dos versiones de la misma forma: 320 caras para las rocas y las piedras, y 80 para las
+  // piedritas más chicas (menos de un palmo). Son miles: con el modelo detallado y su sombra pesaban tanto como todas las rocas juntas.
+  // (Se probó aligerar también las piedras del porte de un puño, pero de cerca se les notaban los cantos: quedaron como estaban.)
+  const rockGeo = (i, detail) => { const g = new THREE.IcosahedronGeometry(1, detail), P = g.attributes.position, sd = i * 37.7; for (let k = 0; k < P.count; k++) { const x = P.getX(k), y = P.getY(k), z = P.getZ(k), d = 1 + 0.26 * Math.sin(x * 3.1 + sd) * Math.sin(y * 2.7 + sd * 1.3) + 0.13 * Math.sin(z * 5.3 + sd * 0.7) + 0.05 * Math.sin(x * 11 + y * 9 + sd); P.setXYZ(k, x * d, y * d, z * d); } const m = BufferGeometryUtilsMerge(g); m.computeVertexNormals(); return m; };
+  const rockGeos = [0, 1, 2].map((i) => rockGeo(i, 3)), rockLod = [rockGeos, [0, 1, 2].map((i) => rockGeo(i, 1))]; // rockLod[nivel][forma]: 0 con todo el detalle, 1 liviana
   function BufferGeometryUtilsMerge(g) { // suaviza las normales compartiendo vértices
     const P = g.attributes.position, map = new Map(), pos = [], uv = [], idx = [];
     for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i), k = x.toFixed(4) + y.toFixed(4) + z.toFixed(4); let j = map.get(k); if (j === undefined) { j = pos.length / 3; map.set(k, j); pos.push(x, y, z); uv.push(Math.atan2(z, x) / PI * 1.5, y * 1.2); } idx.push(j); }
@@ -178,7 +189,7 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
   const rocks = [[], [], []], logs = [];
   function rock(x, y, z, s, { squash = 0.7, color = 0xb4b4b0 } = {}) {
     const v = (rng() * 3) | 0, m = new THREE.Matrix4().compose(V(x, y + s * squash * 0.3, z), new THREE.Quaternion().setFromAxisAngle(UP, R(0, 6.28)), V(s, s * squash, s * R(0.75, 1.15)));
-    rocks[v].push({ m, color });
+    rocks[v].push({ m, color, lod: s < 0.1 ? 1 : 0 }); // s es el radio: bajo 10 cm es una piedrita
     if (s > 0.28) { const P = rockGeos[v].attributes.position, pts = new Float32Array(P.count * 3), t = V(); for (let i = 0; i < P.count; i++) { t.fromBufferAttribute(P, i).applyMatrix4(m); pts[i * 3] = t.x; pts[i * 3 + 1] = t.y; pts[i * 3 + 2] = t.z; } physics.createCollider(RAPIER.ColliderDesc.convexHull(pts) || RAPIER.ColliderDesc.ball(s), fixed); }
   }
   function log(x, y, z, len, r, yaw) {
@@ -199,16 +210,26 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
       tris += (mdl.wood.index.count + mdl.leaves.index.count) / 3 * list.length;
     });
     for (const k in SCATTER) for (const [key, list] of SCATTER[k].cells) {
-      const m = new THREE.InstancedMesh(SCATTER[k].geo, SCATTER[k].mat, list.length), [ci, cj] = key.split(',').map(Number);
-      list.forEach((t, i) => { t.yaw = rng() * 6.28; t.sy = 0.8 + rng() * 0.5; t.meshes = [m]; t.i = i; M.compose(V(t.x, t.y - 0.03, t.z), q.setFromAxisAngle(UP, t.yaw), V(t.s, t.s * t.sy, t.s)); m.setMatrixAt(i, M); m.setColorAt(i, c.set(t.color).multiplyScalar(0.62 + rng() * 0.34)); });
-      m.receiveShadow = true; m.frustumCulled = false; scene.add(m); chunks.push({ m, cx: (ci + 0.5) * CS, cz: (cj + 0.5) * CS, range: SCATTER[k].range });
+      // Las matas que tienen modelo «de lejos» llevan dos mallas con las mismas plantas en los mismos lugares; update muestra una u otra.
+      const sc = SCATTER[k], m = new THREE.InstancedMesh(sc.geo, sc.mat, list.length), far = sc.far ? new THREE.InstancedMesh(sc.far, sc.mat, list.length) : null, both = far ? [m, far] : [m], [ci, cj] = key.split(',').map(Number);
+      list.forEach((t, i) => { t.yaw = rng() * 6.28; t.sy = 0.8 + rng() * 0.5; t.meshes = both; t.i = i; M.compose(V(t.x, t.y - 0.03, t.z), q.setFromAxisAngle(UP, t.yaw), V(t.s, t.s * t.sy, t.s)); c.set(t.color).multiplyScalar(0.62 + rng() * 0.34); for (const o of both) { o.setMatrixAt(i, M); o.setColorAt(i, c); } });
+      for (const o of both) { o.receiveShadow = true; o.frustumCulled = false; scene.add(o); } if (far) far.visible = false;
+      chunks.push({ m, far, cx: (ci + 0.5) * CS, cz: (cj + 0.5) * CS, range: sc.range });
     }
     const rm = MAT.rock();
-    rocks.forEach((list, v) => { if (!list.length) return; const m = new THREE.InstancedMesh(rockGeos[v], rm, list.length); list.forEach((t, i) => { m.setMatrixAt(i, t.m); m.setColorAt(i, c.set(t.color).multiplyScalar(0.85 + rng() * 0.3)); }); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; scene.add(m); });
+    rocks.forEach((list, v) => { // una malla por nivel de detalle; las piedritas (nivel 1) no proyectan sombra: medía un par de puntos
+      const n = [0, 0]; for (const t of list) n[t.lod]++;
+      const ms = n.map((k, lod) => (k ? new THREE.InstancedMesh(rockLod[lod][v], rm, k) : null)), at = [0, 0];
+      for (const t of list) { const m = ms[t.lod], i = at[t.lod]++; m.setMatrixAt(i, t.m); m.setColorAt(i, c.set(t.color).multiplyScalar(0.85 + rng() * 0.3)); }
+      ms.forEach((m, lod) => { if (!m) return; m.castShadow = lod === 0; m.receiveShadow = true; m.frustumCulled = false; scene.add(m); });
+    });
     if (logs.length) { const g = new THREE.CylinderGeometry(1, 0.85, 1, 10), m = new THREE.InstancedMesh(g, MAT.bark(0xa89a78), logs.length); logs.forEach((mm, i) => m.setMatrixAt(i, mm)); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; scene.add(m); }
     return tris;
   }
-  function update(p) { for (const c of chunks) c.m.visible = Math.hypot(p.x - c.cx, p.z - c.cz) < c.range + 30; }
+  // Cada trozo de mapa se dibuja solo si está a la vista. Los que tienen modelo «de lejos» usan el detallado cuando la cámara
+  // está a menos de CERCA metros de su centro (así toda mata a menos de unos 17 m va siempre con todo su detalle) y el liviano más allá.
+  const CERCA = 45;
+  function update(p) { for (const c of chunks) { const d = Math.hypot(p.x - c.cx, p.z - c.cz), on = d < c.range + 30; if (c.far) { c.m.visible = on && d < CERCA; c.far.visible = on && d >= CERCA; } else c.m.visible = on; } }
 
   // ---------- despejar la vista: al observar algo, lo que tapa el encuadre se oculta un momento ----------
   const hidden = [], ZERO = new THREE.Matrix4().makeScale(0, 0, 0), TM = new THREE.Matrix4(), TQ = new THREE.Quaternion();

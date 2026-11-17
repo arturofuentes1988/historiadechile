@@ -5,7 +5,7 @@ import { height, POI, CERRO, riverZ, WATER_Y } from './terrain.js';
 import { RUKAS, CORRAL, FOGON } from './village.js';
 
 const mats = new Map();
-const mat = (c) => mats.get(c) || mats.set(c, new THREE.MeshStandardMaterial({ color: c, roughness: 0.88, side: THREE.DoubleSide })).get(c);
+const mat = (c) => { let m = mats.get(c); if (!m) { m = new THREE.MeshStandardMaterial({ color: c, roughness: 0.88, side: THREE.DoubleSide }); m.userData.liso = true; mats.set(c, m); } return m; }; // liso: un color parejo y nada más (al juntar las piezas, ese color pasa a los vértices)
 const weave = photo('tejido', { repeat: [5, 5] });
 const vmat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, side: THREE.DoubleSide, map: weave, bumpMap: weave, bumpScale: 2 }); // la ropa tiene trama de tejido
 const shadows = (g) => { g.traverse((o) => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); return g; };
@@ -19,6 +19,55 @@ function drape(profile, zs, colorAt, par) {
   for (let i = 0; i < P.count; i++) { const c = new THREE.Color(colorAt(P.getY(i))); col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b; }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.scale(1, 1, zs); g.computeVertexNormals();
   const m = new THREE.Mesh(g, vmat); par.add(m); return m;
+}
+
+// ---------- juntar las piezas de un cuerpo ----------
+// Una persona o un animal se arma con decenas de piezas sueltas colgadas de sus articulaciones, y cada pieza era una
+// orden de dibujo aparte (dos, contando su sombra): entre todos sumaban más de la mitad de las órdenes de cada cuadro.
+// Aquí, terminado de armar el cuerpo, las piezas que comparten material se juntan en una sola malla «con esqueleto»:
+// cada vértice queda amarrado a la articulación de la que colgaba su pieza. Las articulaciones siguen siendo las mismas
+// y se animan igual que antes, así que el cuerpo se ve y se mueve igual; solo cambia cuántas veces hay que mandarlo a dibujar.
+const lisoMat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.88, side: THREE.DoubleSide }); // todas las piezas de color parejo, cada una con su color en los vértices
+const SUELTAS = new URLSearchParams(location.search).has('sueltas'); // con ?sueltas en la dirección no se junta nada: sirve para comparar si algo se ve distinto
+function fuse(root) {
+  if (SUELTAS) return [];
+  root.updateMatrixWorld(true);
+  const inv = new THREE.Matrix4().copy(root.matrixWorld).invert(), M = new THREE.Matrix4(), bones = [], lots = new Map(), old = [];
+  const walk = (o, joint) => {
+    if (!o.isMesh) { for (const c of o.children) walk(c, o); return; } // lo que no es una pieza es una articulación
+    let b = bones.indexOf(joint); if (b < 0) b = bones.push(joint) - 1;
+    const liso = !!o.material.userData.liso, shell = !!o.userData.shell, key = (liso ? 'liso' : o.material.uuid) + (shell ? '-pelo' : '');
+    const lot = lots.get(key) || lots.set(key, { mat: liso ? lisoMat : o.material, shell, pos: [], nor: [], uv: [], col: [], bone: [], idx: [] }).get(key);
+    const geo = o.geometry.clone(); if (!geo.attributes.normal) geo.computeVertexNormals();
+    geo.applyMatrix4(M.multiplyMatrices(inv, o.matrixWorld)); // la pieza, puesta donde está en el cuerpo en reposo
+    const P = geo.attributes.position, N = geo.attributes.normal, U = geo.attributes.uv, C = geo.attributes.color, I = geo.index, n0 = lot.pos.length / 3, flip = M.determinant() < 0, c = o.material.color;
+    for (let i = 0; i < P.count; i++) {
+      lot.pos.push(P.getX(i), P.getY(i), P.getZ(i)); lot.nor.push(N.getX(i), N.getY(i), N.getZ(i)); lot.uv.push(U ? U.getX(i) : 0, U ? U.getY(i) : 0);
+      if (liso) lot.col.push(c.r, c.g, c.b); else if (C) lot.col.push(C.getX(i), C.getY(i), C.getZ(i)); else lot.col.push(1, 1, 1);
+      lot.bone.push(b);
+    }
+    for (let i = 0, n = I ? I.count : P.count; i < n; i += 3) { const v0 = I ? I.getX(i) : i, v1 = I ? I.getX(i + 1) : i + 1, v2 = I ? I.getX(i + 2) : i + 2; lot.idx.push(n0 + v0, n0 + (flip ? v2 : v1), n0 + (flip ? v1 : v2)); }
+    old.push(o); for (const ch of o.children) walk(ch, joint); // el pelaje fino cuelga de su piel: va con la misma articulación
+  };
+  for (const c of root.children) walk(c, root);
+  if (!old.length) return [];
+  for (const o of old) o.removeFromParent();
+  const skeleton = new THREE.Skeleton(bones), out = []; // la postura en que quedó armado es su postura de reposo
+  for (const lot of lots.values()) {
+    const n = lot.bone.length, si = new Uint16Array(n * 4), sw = new Float32Array(n * 4), g = new THREE.BufferGeometry();
+    for (let i = 0; i < n; i++) { si[i * 4] = lot.bone[i]; sw[i * 4] = 1; }
+    g.setAttribute('position', new THREE.Float32BufferAttribute(lot.pos, 3)); g.setAttribute('normal', new THREE.Float32BufferAttribute(lot.nor, 3)); g.setAttribute('uv', new THREE.Float32BufferAttribute(lot.uv, 2)); g.setAttribute('color', new THREE.Float32BufferAttribute(lot.col, 3));
+    g.setAttribute('skinIndex', new THREE.BufferAttribute(si, 4)); g.setAttribute('skinWeight', new THREE.BufferAttribute(sw, 4)); g.setIndex(lot.idx); g.computeBoundingBox();
+    const m = new THREE.SkinnedMesh(g, lot.mat); if (lot.shell) m.userData.shell = true; root.add(m); m.bind(skeleton);
+    out.push(m);
+  }
+  // Para decidir si está en pantalla, todas las mallas de un mismo cuerpo usan la misma esfera: la del cuerpo entero, con
+  // holgura para cuando estira el cuello, abre los brazos o pliega las alas. (Con una esfera por malla, los ojos de un animal
+  // que baja la cabeza a pastar quedaban fuera de la suya y dejaban de dibujarse cerca del borde de la pantalla.)
+  const box = new THREE.Box3(); for (const m of out) box.union(m.geometry.boundingBox);
+  const sph = box.getBoundingSphere(new THREE.Sphere()); sph.radius *= 1.6;
+  for (const m of out) { m.boundingSphere = sph.clone(); m.geometry.boundingSphere = sph.clone(); }
+  return out;
 }
 
 // Figura humana hecha por código, con proporciones reales y articulaciones (rodillas, codos, cuello).
@@ -64,7 +113,7 @@ export function buildPerson({ h = 1.38, kind = 'boy', skin = 0xa9714b, cloth = 0
     drape([[0.074, 0.58], [0.098, 0.52], [0.1, 0.4], [0.094, 0.33]], 0.82, () => 0x7a6a56, body); // chiripa
     drape([[0.038, 0.872], [0.13, 0.838], [0.172, 0.74], [0.186, 0.6], [0.192, 0.47]], 0.6, (y) => ((y > 0.5 && y < 0.53) || (y > 0.57 && y < 0.585) ? trim : cloth), body); // makuñ (poncho) con franjas
   }
-  g.scale.setScalar(h); shadows(g);
+  g.scale.setScalar(h); fuse(g); shadows(g);
   return { g, body, head, legL, legR, shinL, shinR, armL, armR, foreL, foreR, h, woman };
 }
 // Cuánto sube (+) o baja (−) el terreno hacia donde mira alguien parado en (x, z): metros de alto por metro de avance.
@@ -168,7 +217,7 @@ function buildQuad({ s = 1, kind = 'weke', body = 0xb07a4a, belly = 0xf0e8d8, le
     Ls.push(hip); Ks.push(knee);
   }
   hd.rotation.x = -0.3; neck.rotation.x = 0.3;
-  g.scale.setScalar(s); shadows(g);
+  g.scale.setScalar(s); fuse(g); shadows(g);
   const shells = []; g.traverse((o) => { if (o.userData.shell) { o.castShadow = false; shells.push(o); } });
   return { g, shells, legs: [Ls[0], Ls[1], Ls[2], Ls[3]], knees: Ks, neck, headPivot: hd, tail };
 }
@@ -215,7 +264,7 @@ function buildMonito() {
   for (const sx of [-1, 1]) { ball(0.0105, dark, hd, sx * 0.016, 0.008, 0.02, 1, 1, 0.5); ball(0.0068, dark, hd, sx * 0.0165, 0.0085, 0.0235).material = eyeMat; ball(0.012, 0xc8a090, hd, sx * 0.022, 0.024, -0.004, 1, 1, 0.3).rotation.y = sx * 0.5; }
   g.add(skin([[0.032, -0.05, 0.012, 0.012], [0.012, -0.085, 0.013, 0.013], [-0.022, -0.1, 0.012, 0.012], [-0.055, -0.085, 0.01, 0.01], [-0.066, -0.055, 0.008, 0.008], [-0.05, -0.036, 0.005, 0.005]], () => 0x7a6a58, { rings: 16, radial: 8, fur: 0.003 }));
   for (const [x, z] of [[0.02, 0.035], [-0.02, 0.035], [0.022, -0.03], [-0.022, -0.03]]) ball(0.008, 0xd8b0a0, g, x, 0.008, z, 1, 0.6, 1.4);
-  g.scale.setScalar(2); shadows(g); g.traverse((o) => { if (o.userData.shell) o.castShadow = false; });
+  g.scale.setScalar(2); fuse(g); shadows(g); g.traverse((o) => { if (o.userData.shell) o.castShadow = false; });
   return { g, hd };
 }
 const featherMat = new THREE.MeshStandardMaterial({ vertexColors: true, map: furTex, roughness: 0.9, side: THREE.DoubleSide });
@@ -254,7 +303,7 @@ function buildBird(type) {
     return [inner, outer];
   };
   const [wl, wlo] = wing(1), [wr, wro] = wing(-1);
-  shadows(g);
+  fuse(g); shadows(g);
   return { g, wl, wr, wlo, wro };
 }
 
