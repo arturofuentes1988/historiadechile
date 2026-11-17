@@ -140,12 +140,12 @@ const medidor = createMeter(renderer, { calidad: () => opts.calidad, texturas: (
 // teclas: cada acción tiene una tecla que se puede cambiar en Menú → Controles
 const ACTIONS = [['adelante', 'Adelante', 'KeyW'], ['atras', 'Atrás', 'KeyS'], ['izquierda', 'Izquierda', 'KeyA'], ['derecha', 'Derecha', 'KeyD'], ['correr', 'Correr', 'ShiftLeft'], ['saltar', 'Saltar', 'Space'],
   ['observar', 'Observar o hablar', 'KeyE'], ['accion', 'Recoger, usar, hacer', 'KeyR'], ['camIzq', 'Girar a la izquierda', 'KeyZ'], ['camDer', 'Girar a la derecha', 'KeyC'], ['cuaderno', 'Cuaderno', 'KeyN'], ['misiones', 'Misiones', 'KeyJ'], ['saberes', 'Saberes', 'KeyK'],
-  ['bolsa', 'Bolsa', 'KeyB'], ['mapa', 'Mapa', 'KeyM'], ['pantalla', 'Pantalla completa', 'KeyF'], ['menu', 'Menú', 'KeyP']];
+  ['bolsa', 'Bolsa', 'KeyB'], ['mapa', 'Mapa', 'KeyM'], ['arma', 'Sacar o guardar el arco', 'KeyQ'], ['flecha', 'Hacer una flecha', 'KeyG'], ['rodar', 'Rodar', 'ControlLeft'], ['pantalla', 'Pantalla completa', 'KeyF'], ['menu', 'Menú', 'KeyP']];
 opts.keys = Object.assign(Object.fromEntries(ACTIONS.map(([a, , k]) => [a, k])), opts.keys || {});
 const down = (a) => !!keys[opts.keys[a]], is = (e, a) => e.code === opts.keys[a];
 const keyName = (c) => ({ Space: 'Espacio', ShiftLeft: 'Shift izq.', ShiftRight: 'Shift der.', ControlLeft: 'Ctrl izq.', ControlRight: 'Ctrl der.', AltLeft: 'Alt izq.', AltRight: 'Alt der.', Tab: 'Tab', Enter: 'Enter', Backspace: 'Retroceso', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→' }[c] || c.replace(/^Key|^Digit/, '').replace(/^Numpad/, 'Num '));
 let rebinding = null;
-const GROUPS = [['Movimiento', ['adelante', 'atras', 'izquierda', 'derecha', 'correr', 'saltar']], ['Acción y cámara', ['observar', 'accion', 'camIzq', 'camDer']], ['Paneles', ['cuaderno', 'misiones', 'saberes', 'bolsa', 'mapa']], ['Juego', ['pantalla', 'menu']]];
+const GROUPS = [['Movimiento', ['adelante', 'atras', 'izquierda', 'derecha', 'correr', 'saltar', 'rodar']], ['Acción y cámara', ['observar', 'accion', 'arma', 'flecha', 'camIzq', 'camDer']], ['Paneles', ['cuaderno', 'misiones', 'saberes', 'bolsa', 'mapa']], ['Juego', ['pantalla', 'menu']]];
 function drawKeys() {
   const label = Object.fromEntries(ACTIONS.map(([a, l]) => [a, l]));
   $('ctl-list').innerHTML = GROUPS.map(([g, list]) => `<section><h4>${g}</h4>${list.map((a) => `<div class="krow"><span>${label[a]}</span><button class="kcap${rebinding === a ? ' wait' : ''}" data-act="${a}">${rebinding === a ? '…' : keyName(opts.keys[a])}</button></div>`).join('')}</section>`).join('');
@@ -191,7 +191,7 @@ const toggleFull = () => { if (document.fullscreenElement) document.exitFullscre
 $('btn-full').onclick = toggleFull; $('o-full').onchange = toggleFull;
 // En pantalla completa se le pide al navegador que Escape llegue al juego en vez de sacarte de ella
 // (funciona en Chrome y Edge; en otros navegadores Escape sigue saliendo de la pantalla completa).
-document.addEventListener('fullscreenchange', () => { const on = !!document.fullscreenElement; try { if (on) navigator.keyboard?.lock?.(['Escape'])?.catch?.(() => {}); else navigator.keyboard?.unlock?.(); } catch { /* sin soporte */ } if (on && state === 'play' && !menuOpen && !ui.open) lock(); $('o-full').checked = on; $('btn-full').classList.toggle('on', on); $('btn-full').title = on ? 'Salir de pantalla completa' : 'Pantalla completa'; });
+document.addEventListener('fullscreenchange', () => { const on = !!document.fullscreenElement; try { if (on) navigator.keyboard?.lock?.(['Escape', 'KeyW', 'KeyT', 'KeyN'])?.catch?.(() => {}); else navigator.keyboard?.unlock?.(); } catch { /* sin soporte */ } if (on && state === 'play' && !menuOpen && !ui.open) lock(); $('o-full').checked = on; $('btn-full').classList.toggle('on', on); $('btn-full').title = on ? 'Salir de pantalla completa' : 'Pantalla completa'; });
 if (!document.documentElement.requestFullscreen) { $('btn-full').style.display = 'none'; $('o-full').parentElement.style.display = 'none'; }
 // El ratón nunca queda atrapado: el puntero siempre se ve y se puede hacer clic en cualquier botón sin salir del juego.
 // La cámara se gira arrastrando con un botón apretado sobre el juego (o con sus teclas); la rueda acerca y aleja.
@@ -200,22 +200,24 @@ function lock() { /* ya no se captura el ratón */ }
 const locked = () => false;
 document.body.classList.add('sin-raton'); // deja a la vista la ayuda de cómo girar, hasta que se arrastra por primera vez
 renderer.domElement.addEventListener('mousedown', (e) => { if (state !== 'play') return; dragging = true; document.body.classList.add('girando'); e.preventDefault();
-  if (e.button === 2 && puedeApuntar() && acc.apuntar(true)) { const pr = renderer.domElement.requestPointerLock && renderer.domElement.requestPointerLock(); if (pr && pr.catch) pr.catch(() => { /* sin captura del ratón se apunta igual, arrastrando */ }); } // el botón derecho tensa el arco
-  else if (e.button === 0 && acc.apunta) dispara(); }); // y el izquierdo suelta la flecha
+  if (e.button === 2) { botonDer = true; if (puedeApuntar() && acc.apuntar(true)) captura(); } // el botón derecho apunta
+  else if (e.button === 0 && acc.equipado && puedeApuntar()) { if (!acc.apunta && acc.apuntar(true)) captura(); salirAp = 0; acc.tensar(true); } }); // el izquierdo, mientras se mantiene, tensa el arco
 renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
-addEventListener('mouseup', (e) => { if (e.button === 2) dejaDeApuntar(); if (!e.buttons) { dragging = false; document.body.classList.remove('girando'); } });
+addEventListener('mouseup', (e) => { if (e.button === 0 && acc.apunta) { dispara(); if (!botonDer) salirAp = 0.5; } if (e.button === 2) { botonDer = false; if (acc.tira) salirAp = 0.01; else dejaDeApuntar(); } if (!e.buttons) { dragging = false; document.body.classList.remove('girando'); } });
 // ---------- el arco: apuntar y soltar ----------
 // Con el botón derecho apretado Leftraru tensa el arco, la cámara se le pone al hombro y aparece la mira. El ratón queda
 // capturado mientras tanto, para poder girar sin que el puntero se salga de la ventana.
-const puedeApuntar = () => state === 'play' && !talk && !focus && !ui.open && !auto && !cine.active && !acc.sitting && player.grounded;
+const puedeApuntar = () => state === 'play' && !talk && !focus && !ui.open && !auto && !cine.active && !acc.sitting && player.grounded && !rueda;
 const capturado = () => document.pointerLockElement === renderer.domElement;
-function dejaDeApuntar() { if (acc.apunta) acc.apuntar(false); if (capturado()) document.exitPointerLock(); }
+function dejaDeApuntar() { salirAp = 0; if (acc.apunta) acc.apuntar(false); if (capturado()) document.exitPointerLock(); }
+function captura() { const pr = renderer.domElement.requestPointerLock && renderer.domElement.requestPointerLock(); if (pr && pr.catch) pr.catch(() => { /* sin captura del ratón se apunta igual, arrastrando */ }); }
+let botonDer = false, salirAp = 0, retro = 0; // botonDer: el botón derecho sigue apretado; salirAp: cuánto falta para bajar el arco después de un tiro sin apuntar; retro: el golpe del arco al soltar
 function dispara() { // suelta la flecha hacia donde marca la mira: lo primero que se ve al centro de la pantalla
   const d = camera.getWorldDirection(V3()), o = camera.position, ini = 1.7; let dist = 70; // ini: lo que haya entre la cámara y Leftraru (un muro pegado a la espalda) no cuenta
   const hit = physics.castRay(new RAPIER.Ray(V3().copy(o).addScaledVector(d, ini), d), 70 - ini, true, undefined, undefined, pCol); if (hit) dist = ini + (hit.timeOfImpact ?? hit.toi);
   for (let k = 2; k < dist; k += 0.5) if (o.y + d.y * k < height(o.x + d.x * k, o.z + d.z * k)) { dist = k; break; } // el suelo, a pasos
   const algo = acc.mira(o, d); if (algo !== null && algo < dist) dist = algo; // un blanco o un pudú que esté antes
-  acc.soltar(cuerpo ? cuerpo.H.LeftHand.getWorldPosition(V3()) : V3(pp().x, pp().y + 0.35, pp().z), V3().copy(o).addScaledVector(d, dist));
+  if (acc.soltar(cuerpo ? cuerpo.arco.position.clone() : V3(pp().x, pp().y + 0.35, pp().z), V3().copy(o).addScaledVector(d, dist))) retro = 1; else acc.tensar(false);
 }
 renderer.domElement.addEventListener('wheel', (e) => { if (state === 'play' && !focus) cam.dist = Math.min(9, Math.max(2.6, cam.dist + Math.sign(e.deltaY) * 0.6)); }, { passive: true });
 
@@ -439,6 +441,8 @@ addEventListener('keydown', (e) => {
   if (menuOpen) { if (e.code === 'Escape') { if (page === 'controles') menuPage('opciones'); else setMenu(false); } return; }
   keys[e.code] = true;
   if (is(e, 'observar') && !e.repeat) interact();
+  if (e.ctrlKey && state === 'play' && e.code !== 'KeyW' && e.code.startsWith('Key')) e.preventDefault(); // con Control apretado (rodar), las demás teclas no abren los atajos del navegador (el de cerrar pestaña, Ctrl+W, no se puede evitar)
+  if (state === 'play' && !talk && !ui.open && !focus && !e.repeat) { if (is(e, 'arma')) acc.equipar(); else if (is(e, 'flecha')) acc.hacerFlecha(); else if (is(e, 'rodar')) { e.preventDefault(); rodar(); } }
   if (is(e, 'accion') && !e.repeat && !talk && !ui.open && !focus && state === 'play' && doable) { const a = doable; doable = null; $('prompt2').classList.remove('on'); a.run(); }
   if (talk) { if (e.code === 'Enter' || e.code === 'Space') interact(); return; }
   if (state === 'play') for (const pn of ['cuaderno', 'misiones', 'saberes', 'bolsa', 'mapa']) if (is(e, pn)) { snd.play('ui-cuaderno', 0.6); ui.show(pn === 'cuaderno' ? 'notas' : pn); }
@@ -448,13 +452,13 @@ addEventListener('keydown', (e) => {
 addEventListener('keyup', (e) => { keys[e.code] = false; });
 // Si la ventana pierde el foco con una tecla apretada, el navegador nunca avisa que se soltó y Leftraru seguiría
 // caminando solo. Al salir de la ventana se sueltan todas, y también el arrastre de la cámara.
-const sueltaTodo = () => { for (const k in keys) keys[k] = false; dragging = false; document.body.classList.remove('girando'); dejaDeApuntar(); };
+const sueltaTodo = () => { for (const k in keys) keys[k] = false; dragging = false; document.body.classList.remove('girando'); botonDer = false; acc.tensar(false); dejaDeApuntar(); };
 addEventListener('blur', sueltaTodo); document.addEventListener('visibilitychange', sueltaTodo);
 addEventListener('mousemove', (e) => {
   if (dragging && !e.buttons) { dragging = false; document.body.classList.remove('girando'); } // el botón se soltó fuera de la ventana
   if (focus || (!locked() && !capturado() && !(dragging && state === 'play'))) return;
   document.body.classList.remove('sin-raton');
-  const fino = acc.apunta ? 0.55 : 1; // apuntando, el ratón gira más despacio y deja mirar hacia arriba
+  const fino = acc.apunta ? 0.7 - 0.25 * acc.tensa : 1; // apuntando, el ratón gira más despacio y deja mirar hacia arriba
   cam.yaw -= e.movementX * 0.0042 * opts.sens * fino; cam.pitch = Math.min(1.2, Math.max(acc.apunta ? -0.75 : Math.min(-0.25, cam.pitch), cam.pitch + e.movementY * 0.0032 * opts.sens * fino * (opts.inv ? -1 : 1)));
 });
 
@@ -462,10 +466,17 @@ let doable = null, actT = 0;
 const ripples = Array.from({ length: 10 }, () => { const m = new THREE.Mesh(new THREE.RingGeometry(0.8, 1, 40).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0xeaf4f4, transparent: true, opacity: 0, depthWrite: false })); m.visible = false; m.renderOrder = 4; scene.add(m); return m; });
 let ripT = 0, ripI = 0;
 // Cuando la historia lo pide, Leftraru camina solo hasta un punto: { x, z, face, done }. Al llegar se gira hacia face y se llama done.
+let rueda = null, ruedaT = 0; // rodando: { t, dur, dx, dz }; ruedaT: cuánto falta para poder rodar otra vez
+function rodar() { // una vuelta por el suelo hacia donde va caminando (o, quieto, hacia donde mira)
+  if (state !== 'play' || rueda || ruedaT > 0 || talk || focus || ui.open || auto || acc.sitting || acc.busy || !player.grounded || desmayo > 0) return;
+  dejaDeApuntar(); const mov = player.speed > 0.6, dx = mov ? player.dirX : Math.sin(player.facing), dz = mov ? player.dirZ : Math.cos(player.facing);
+  rueda = { t: 0, dur: 0.95, dx, dz }; ruedaT = 1.3; player.facing = Math.atan2(dx, dz); snd.play('arbusto-2', 0.35, 0.8);
+}
 let auto = null, miraOn = false, miraLista = false, miraN = -1; // la mira del arco: si está a la vista, si el arco ya está tenso y cuántas flechas muestra
 function updatePlayer(dt) {
   let ix = 0, iz = 0, andar = null;
-  if (auto && state === 'play') {
+  if (rueda && state === 'play') { rueda.t += dt; const u = rueda.t / rueda.dur; andar = [rueda.dx, rueda.dz, 5.4 * (1 - 0.45 * u * u)]; if (u >= 1) rueda = null; } // rodando va derecho y rápido, y frena al final
+  else if (auto && state === 'play') {
     const q = pp(), ax = auto.x - q.x, az = auto.z - q.z, ad = Math.hypot(ax, az); auto.t = (auto.t || 0) + dt;
     if (ad > 0.14 && auto.t < 6) andar = [ax / ad, az / ad, Math.min(2.3, 0.6 + ad * 2.5)]; // hacia allá, frenando al acercarse
     else { if (ad > 0.14) setPos(auto.x, height(auto.x, auto.z) + FEET + 0.05, auto.z); // si algo le estorbó, igual queda en su lugar
@@ -477,7 +488,7 @@ function updatePlayer(dt) {
     cam.yaw += ((down('camIzq') ? 1 : 0) - (down('camDer') ? 1 : 0)) * dt * 1.8;
   }
   const wade = Math.min(1, Math.max(0, (WATER_Y - (pp().y - FEET)) / 0.8)); player.wade = wade; // con el agua a las rodillas se avanza más lento
-  const run = down('correr'), apunta = acc.apunta, target = andar ? andar[2] : (ix || iz ? (apunta ? 1.4 : run ? 6.2 * (ui.skill('ligero') ? 1.18 : 1) : 3.3) : 0) * (1 - wade * 0.5);
+  const run = down('correr'), apunta = acc.apunta, target = andar ? andar[2] : (ix || iz ? (apunta ? 2.0 : run ? 6.2 * (ui.skill('ligero') ? 1.18 : 1) : 3.3) : 0) * (1 - wade * 0.5);
   player.speed += (target - player.speed) * Math.min(1, dt * 10);
   const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw);
   let dx = fx * iz + rx * ix, dz = fz * iz + rz * ix; if (andar) { dx = andar[0]; dz = andar[1]; } const l = Math.hypot(dx, dz);
@@ -495,7 +506,7 @@ function updatePlayer(dt) {
       yaw = Math.max(-0.9, Math.min(0.9, c)); pit = Math.max(-0.4, Math.min(0.3, -Math.atan2(a.g.position.y + a.h * 0.94 - (q.y - FEET + boy.h * 0.94), Math.hypot(a.x - q.x, a.z - q.z) || 1))); } // y levanta o baja la vista hasta su cara
     player.giro = (player.giro || 0) + (giro - (player.giro || 0)) * Math.min(1, dt * 10); // cuánto está girando en el lugar: da los pasitos
     player.miraY = (player.miraY || 0) + (yaw - (player.miraY || 0)) * Math.min(1, dt * 6); player.miraX = (player.miraX || 0) + (pit - (player.miraX || 0)) * Math.min(1, dt * 6); }
-  if (player.grounded && state === 'play' && !ui.open && !talk && !focus && !acc.sitting && !auto && !apunta && down('saltar')) { player.vy = 6.6 * (ui.skill('salto') ? 1.22 : 1); player.grounded = false; }
+  if (player.grounded && state === 'play' && !ui.open && !talk && !focus && !acc.sitting && !auto && !apunta && !rueda && down('saltar')) { player.vy = 6.6 * (ui.skill('salto') ? 1.22 : 1); player.grounded = false; }
   player.vy = Math.max(-25, player.vy - 18 * dt);
   if (player.vy > 0) ctrl.disableSnapToGround(); else ctrl.enableSnapToGround(0.3);
   const mvx = (player.dirX || 0) * player.speed * dt, mvz = (player.dirZ || 0) * player.speed * dt;
@@ -546,7 +557,7 @@ function updatePlayer(dt) {
 // De los dos costados se elige el más despejado, el que deja ver mejor la cara de quien habla y, a igualdad, el que le
 // queda más cerca a la cámara. Al terminar, la cámara vuelve sola a su lugar de siempre.
 const FOV_JUEGO = camera.fov, FOV_CHARLA = 38;
-const FOV_ARCO = 50, DE_LADO = 0.95, CAM_ARCO = [0.13, 0.55, 0.12]; let apK = 0; // CAM_ARCO: la cámara del arco, a la derecha, arriba y atrás de Leftraru; // DE_LADO: cuánto gira el cuerpo al apuntar, como se para un arquero; // apK: cuánto ha entrado la cámara del arco
+const FOV_ARCO = 50, DE_LADO = 0.45, CAM_ARCO = [0.1, 0.56, 0.1]; let apK = 0; // CAM_ARCO: la cámara del arco, a la derecha, arriba y atrás de Leftraru; // DE_LADO: cuánto gira el cuerpo al apuntar, como se para un arquero; // apK: cuánto ha entrado la cámara del arco
 let plano = null, planoK = 0; // plano: { pos, look } del diálogo en curso; planoK: cuánto ha entrado (0 la cámara de juego, 1 el plano)
 const cabeza = (p) => p.head.getWorldPosition(V3());
 function abrePlano(a, frente) { // frente: quien habla va a quedar vuelto hacia Leftraru
@@ -600,9 +611,10 @@ function updateCamera(dt) {
   if (!acc.apunta && cam.pitch < -0.25) cam.pitch += (-0.25 - cam.pitch) * Math.min(1, dt * 6); // al soltar, la cámara vuelve a su altura de siempre
   if (apK > 0) { const ka = ease(apK), t = pp(), cp = Math.cos(cam.pitch), dx = Math.sin(cam.yaw) * cp, dy = Math.sin(cam.pitch), dz = Math.cos(cam.yaw) * cp, rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw);
     const ap = V3(t.x + rx * CAM_ARCO[0] + dx * CAM_ARCO[2], t.y + CAM_ARCO[1] + dy * CAM_ARCO[2], t.z + rz * CAM_ARCO[0] + dz * CAM_ARCO[2]); ap.y = Math.max(ap.y, height(ap.x, ap.z) + 0.3);
-    pos.lerp(ap, ka); look.lerp(V3(ap.x - dx * 12, ap.y - dy * 12, ap.z - dz * 12), ka); lente = fov + (FOV_ARCO - fov) * ka; }
-  if (camera.fov !== lente) { camera.fov = lente; camera.updateProjectionMatrix(); }
-  camera.position.lerp(pos, Math.min(1, dt * (9 + apK * 40))); camera.lookAt(look);
+    pos.lerp(ap, ka); look.lerp(V3(ap.x - dx * 12, ap.y - dy * 12, ap.z - dz * 12), ka); lente = fov + (FOV_ARCO - 7 * suave(0, 1, acc.tensa) - fov) * ka; look.y += retro * 0.28 * ka; } // al tensar, el lente cierra un poco más; al soltar, el arco da un golpe hacia arriba
+  retro = Math.max(0, retro - dt * 5); const cerca = apK > 0.3 ? 0.05 : 0.2; // apuntando, las manos quedan muy cerca de la cámara
+  if (camera.fov !== lente || camera.near !== cerca) { camera.fov = lente; camera.near = cerca; camera.updateProjectionMatrix(); }
+  camera.position.lerp(pos, apK >= 1 ? 1 : Math.min(1, dt * (9 + apK * 40))); camera.lookAt(look);
 }
 
 // ---------- observar: la cámara se acerca sola al objeto, lo encuadra, toma la foto y vuelve ----------
@@ -661,7 +673,7 @@ function updateItems() {
 
 const ui = createUI({ world, onToast: (t, kind) => toast(t, 5, kind || 'hallazgo'), onClose: () => { if (state === 'play' && !menuOpen) lock(); }, onSkill: () => applySkills(), onGuide: (g) => setGuia(g, 'jugador') });
 renderer.domElement.addEventListener('webglcontextrestored', () => ui.repaint()); // si el navegador pierde y recupera el contexto gráfico, el fondo del minimapa se vuelve a pintar
-const acc = createActions({ world, ui, snd, scene, hint, murmur, player, choca: (a, b) => { const d = V3().subVectors(b, a), L = d.length(); if (L < 1e-6) return null; d.divideScalar(L); const hit = physics.castRay(new RAPIER.Ray(a, d), L, true, undefined, undefined, pCol); return hit ? V3().copy(a).addScaledVector(d, hit.timeOfImpact ?? hit.toi) : null; }, /* choca: ¿la flecha da con algo sólido entre a y b? */ story, pinones: () => [got, world.items.length], sanar: (n) => { vida = Math.min(100, vida + n); },
+const acc = createActions({ world, ui, snd, scene, hint, murmur, player, tecla: (a) => keyName(opts.keys[a]), choca: (a, b) => { const d = V3().subVectors(b, a), L = d.length(); if (L < 1e-6) return null; d.divideScalar(L); const hit = physics.castRay(new RAPIER.Ray(a, d), L, true, undefined, undefined, pCol); return hit ? V3().copy(a).addScaledVector(d, hit.timeOfImpact ?? hit.toi) : null; }, /* choca: ¿la flecha da con algo sólido entre a y b? */ story, pinones: () => [got, world.items.length], sanar: (n) => { vida = Math.min(100, vida + n); },
   place: (x, z, facing) => { setPos(x, height(x, z) + FEET + 0.05, z); player.vy = 0; player.speed = 0; player.facing = facing; },
   speak: (name, lines, done, gestos) => { const who = world.life.actors.find((a) => a.name && a.name.toLowerCase() === name.toLowerCase()) || null, gira = !!who && !who.quieto && !acc.sitting; // quien habla, si está en el mundo; el que está mirando el valle no se da vuelta
     talk = { name, lines, i: 0, done: done || null, who, gira, gestos: gestos || null }; charla(who, gira); sigue(); if (cuerpo && who) cuerpo.habla = 0.9; },
@@ -724,7 +736,7 @@ function updateVida(dt) {
 }
 drawKeys(); applySkills();
 await assets.whenLoaded(); bar(1, 'Listo'); assets.onProgress = null; $('loading').classList.add('hide'); setTimeout(() => $('loading').remove(), 700);
-window.__g = { CAM_ARCO, snd, height, ui, explorer, acc, story, toasts, murmur, setGuia, renderer, get vida() { return vida; }, set vida(v) { vida = v; }, camera, abrirPrologo, cerrarPrologo, get prologo() { return prologo; }, get acto() { return acto; }, hojas, cerrarActo, portadaMenu, avanzarPrologo, ayudas, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, get guia() { return guia; }, get guiaT() { return guiaT; }, get tour() { return tour; }, get gesto() { return gesto; }, tourIr, relato, get plano() { return plano; }, get planoK() { return planoK; }, outro, apuntes, sueltaTodo, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter() { portadaMenu(); coverT = 0; enter(); }, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
+window.__g = { CAM_ARCO, rodar, get rueda() { return rueda; }, snd, height, ui, explorer, acc, story, toasts, murmur, setGuia, renderer, get vida() { return vida; }, set vida(v) { vida = v; }, camera, abrirPrologo, cerrarPrologo, get prologo() { return prologo; }, get acto() { return acto; }, hojas, cerrarActo, portadaMenu, avanzarPrologo, ayudas, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, get guia() { return guia; }, get guiaT() { return guiaT; }, get tour() { return tour; }, get gesto() { return gesto; }, tourIr, relato, get plano() { return plano; }, get planoK() { return planoK; }, outro, apuntes, sueltaTodo, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter() { portadaMenu(); coverT = 0; enter(); }, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
   tp(x, y, z) { setPos(x, y, z); player.vy = 0; },
   view(x, y, z, lx, ly, lz) { camera.position.set(x, y, z); camera.lookAt(lx, ly, lz); world.update(0, time, camera.position, pp()); draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); },
   snap() { draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); } };
@@ -772,8 +784,8 @@ function haceCara(cabeza, OJOS, BOCA, piel) {
 const CARA_LEFTRARU = { ojos: [[[-4.78, 11.75, 11.67], [-7.81, 10.81, 9.37], [-2.4, 11.33, 10.9], [-4.75, 13.08, 11.64], [-4.87, 10.08, 11.37]], [[5.65, 12.2, 10.98], [3.2, 11.84, 10.62], [8.29, 11.53, 8.5], [5.63, 13.6, 10.88], [5.68, 10.58, 10.78]]], boca: [[0.94, 4.16, 13.7], [-2.11, 3.41, 12.7], [4.04, 3.59, 12.18], [0.94, 4.85, 13.64], [0.92, 3.18, 13.4]], piel: 0xb97b59 };
 let cuerpo = null; // { mixer, acciones, H: huesos, peso }
 const QUIETUD = 0.035; // cuánto queda del vaivén del movimiento de estar quieto (0 nada, 1 todo)
-const UNA_VEZ = ['salta', 'recoge', 'bebe']; // movimientos que no se repiten: se recorren al compás de lo que pasa en el juego
-const TRAMO = { salta: [0.25, 0.75], recoge: [0.1, 0.3], bebe: [0.22, 0.68] }; // qué parte de cada movimiento se usa (los originales traen esperas antes y después): en recoger, bajar la mano y volver; en beber, llevarse el cuenco a la boca y bajarlo
+const UNA_VEZ = ['salta', 'recoge', 'bebe', 'rueda']; // movimientos que no se repiten: se recorren al compás de lo que pasa en el juego
+const TRAMO = { salta: [0.25, 0.75], recoge: [0.1, 0.3], bebe: [0.22, 0.68], rueda: [0.2, 1] }; // qué parte de cada movimiento se usa (los originales traen esperas antes y después): en recoger, bajar la mano y volver; en beber, llevarse el cuenco a la boca y bajarlo
 const viejo = boy.g.children.filter((c) => c.isSkinnedMesh), ANTIGUO = new URLSearchParams(location.search).has('antiguo');
 if (!ANTIGUO) for (const c of viejo) c.visible = false; // el cuerpo de antes no se ve (si el modelo no carga, vuelve)
 if (!ANTIGUO) import('three/examples/jsm/loaders/GLTFLoader.js').then(({ GLTFLoader }) => new GLTFLoader().load('assets/modelos/leftraru-camina.glb', (gl) => {
@@ -786,7 +798,8 @@ if (!ANTIGUO) import('three/examples/jsm/loaders/GLTFLoader.js').then(({ GLTFLoa
   if (acciones.anda) { acciones.anda.play(); acciones.anda.setEffectiveWeight(0); }
   // Quieto y correr vienen aparte, en archivos chicos que solo traen cómo se mueve cada hueso (los saca tools/glb-animacion.mjs):
   // así el modelo, con su textura, se descarga una sola vez.
-  for (const k of ['quieto', 'corre', 'salta', 'recoge', 'bebe']) fetch(`assets/modelos/leftraru-${k}.json`).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!d) return;
+  for (const k of ['quieto', 'corre', 'salta', 'recoge', 'bebe', 'rueda']) fetch(`assets/modelos/leftraru-${k}.json`).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!d) return;
+    if (k === 'rueda') for (const q of d.pistas) if (q.que === 'lugar') for (let i = 0; i < q.v.length; i += 3) { q.v[i] = q.v[0]; q.v[i + 2] = q.v[2]; } // al rodar, el avance lo pone el juego: del movimiento queda solo cuánto sube y baja la cadera
     if (k === 'salta') d.pistas = d.pistas.filter((q) => q.que === 'giro'); // en el salto, la altura la pone el juego: del movimiento se usa solo la postura
     const clip = new THREE.AnimationClip(k, d.dura, d.pistas.map((q) => (q.que === 'giro' ? new THREE.QuaternionKeyframeTrack(`${q.hueso}.quaternion`, q.t, q.v) : new THREE.VectorKeyframeTrack(`${q.hueso}.position`, q.t, q.v))));
     if (k === 'quieto') calma(clip, QUIETUD);
@@ -794,9 +807,10 @@ if (!ANTIGUO) import('three/examples/jsm/loaders/GLTFLoader.js').then(({ GLTFLoa
   const H = {}; for (const n of ['RightArm', 'RightForeArm', 'RightHand', 'LeftArm', 'LeftForeArm', 'LeftHand', 'RightUpLeg', 'RightLeg', 'RightFoot', 'LeftUpLeg', 'LeftLeg', 'LeftFoot', 'Spine', 'Spine02', 'neck', 'Head']) H[n] = m.getObjectByName(n); // los huesos que se mueven a mano
   const { ojos, boca, bocaAlto } = haceCara(H.Head, CARA_LEFTRARU.ojos, CARA_LEFTRARU.boca, CARA_LEFTRARU.piel);
   // el arco, cuando lo tensa: va en su mano izquierda, de pie y apuntando hacia donde mira
-  const arcoN = new THREE.Mesh(new THREE.TorusGeometry(0.42, 0.011, 5, 16, Math.PI * 0.8).rotateZ(-Math.PI * 0.4).rotateY(-Math.PI / 2).translate(0, 0, -0.42), new THREE.MeshStandardMaterial({ color: 0x4a3626, roughness: 1 })); arcoN.visible = false; arcoN.castShadow = true; arcoN.rotation.order = 'YXZ'; scene.add(arcoN); boy.sinArco = true;
-  const puesta = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.007, 0.72, 5).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x9a8458, roughness: 1 })); puesta.visible = false; scene.add(puesta); // la flecha puesta en el arco, antes de soltarla
-  cuerpo = { mixer, acciones, H, m, y0: m.position.y, peso: { anda: 0, quieto: 0, corre: 0 }, aire: 0, sienta: 0, atento: 0, junta: 0, tapa: 0, pie: [0, 0], parp: 2, habla: 0, ojos, boca, bocaAlto, arco: arcoN, puesta }; window.__g.modelo = m; window.__g.cuerpo = cuerpo;
+  const arcoN = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.011, 5, 18, Math.PI * 0.5).rotateZ(-Math.PI * 0.25).rotateY(-Math.PI / 2).translate(0, 0, -0.6), new THREE.MeshStandardMaterial({ color: 0x4a3626, roughness: 1 })); arcoN.visible = false; arcoN.castShadow = true; arcoN.rotation.order = 'YXZ'; scene.add(arcoN); boy.sinArco = true;
+  const puesta = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.72, 5).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xb49a62, roughness: 1 })); puesta.visible = false; scene.add(puesta); // la flecha puesta en el arco, antes de soltarla
+  const cuerda = new THREE.Group(), hilo = new THREE.CylinderGeometry(0.0022, 0.0022, 1, 4).rotateX(Math.PI / 2).translate(0, 0, 0.5), hiloM = new THREE.MeshStandardMaterial({ color: 0xd8cfb8, roughness: 1 }); cuerda.add(new THREE.Mesh(hilo, hiloM), new THREE.Mesh(hilo, hiloM)); cuerda.visible = false; scene.add(cuerda); // la cuerda: de una punta del arco a la otra, pasando por donde la lleva la mano
+  cuerpo = { mixer, acciones, H, m, y0: m.position.y, peso: { anda: 0, quieto: 0, corre: 0 }, aire: 0, sienta: 0, atento: 0, junta: 0, tapa: 0, pie: [0, 0], parp: 2, habla: 0, ojos, boca, bocaAlto, arco: arcoN, puesta, cuerda }; window.__g.modelo = m; window.__g.cuerpo = cuerpo;
 }, undefined, () => { for (const c of viejo) c.visible = true; }));
 // ---------- la gente de la aldea en 3D ----------
 // Quien tiene modelo 3D lo lleva encima de su cuerpo de siempre, que queda invisible y sigue decidiendo todo: dónde está, qué
@@ -805,13 +819,17 @@ if (!ANTIGUO) import('three/examples/jsm/loaders/GLTFLoader.js').then(({ GLTFLoa
 // Así todo lo que la persona ya sabía hacer (tejer, revolver la olla, entregar, acariciar) sirve tal cual. De pie queda quieta:
 // la postura media de su movimiento de reposo, casi sin vaivén, con los pies juntos y una respiración leve.
 // cara: las medidas de sus ojos y su boca, para el pestañeo y los labios (ver haceCara).
-const GENTE3D = { Millaray: { archivo: 'millaray', cara: { piel: 0x9c6240, boca: [[0.32, 5.6, 9.97], [-3.04, 5.53, 8.32], [3.41, 6.13, 7.86], [0.29, 6.28, 10.1], [0.37, 4.7, 9.94]],
+const GENTE3D = { Millaray: { archivo: 'millaray', mate: [0.2, 0.3], cara: { piel: 0x9c6240, boca: [[0.32, 5.6, 9.97], [-3.04, 5.53, 8.32], [3.41, 6.13, 7.86], [0.29, 6.28, 10.1], [0.37, 4.7, 9.94]],
   ojos: [[[-4.43, 11.85, 7.51], [-6.58, 11.64, 6.26], [-2.42, 11.62, 6.95], [-4.49, 12.86, 7.44], [-4.36, 10.77, 7.58]], [[3.62, 12.47, 6.9], [1.75, 11.93, 6.68], [5.7, 12.5, 5.39], [3.55, 13.48, 6.76], [3.69, 11.39, 6.91]]] } } }, gente3d = [];
 if (!ANTIGUO) import('three/examples/jsm/loaders/GLTFLoader.js').then(({ GLTFLoader }) => { for (const a of world.life.actors) { const def = GENTE3D[a.name]; if (!def) continue;
   new GLTFLoader().load(`assets/modelos/${def.archivo}.glb`, (gl) => {
     const m = gl.scene; m.updateMatrixWorld(true); const caja = new THREE.Box3().setFromObject(m), e = 1 / (caja.max.y - caja.min.y); // a.g ya va a la escala de su altura: adentro, el modelo mide 1
     m.scale.setScalar(e); m.position.set(-((caja.min.x + caja.max.x) / 2) * e, -caja.min.y * e, -((caja.min.z + caja.max.z) / 2) * e);
     m.traverse((o) => { if (o.isMesh) { o.castShadow = o.receiveShadow = true; o.frustumCulled = false; } });
+    // mate: el dibujo de este modelo trae luces y brillos pintados (viene de una imagen con luz de estudio). Lo más claro se
+    // baja, para que las luces y sombras que se le vean sean las del lugar: [desde qué claridad, cuánto queda de ahí para arriba].
+    if (def.mate) m.traverse((o) => { if (o.isMesh) { o.material.roughness = 1; o.material.onBeforeCompile = (sh) => { sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
+{ float cl = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11)); if (cl > ${def.mate[0].toFixed(3)}) diffuseColor.rgb *= (${def.mate[0].toFixed(3)} + (cl - ${def.mate[0].toFixed(3)}) * ${def.mate[1].toFixed(3)}) / cl; }`); }; } });
     for (const c of a.g.children) if (c.isSkinnedMesh) c.visible = false; // el cuerpo de siempre deja de verse
     a.g.add(m);
     const mixer = new THREE.AnimationMixer(m); if (gl.animations[0]) { const q = mixer.clipAction(lazo(calma(gl.animations[0], QUIETUD), true)); q.timeScale = 0.55; q.play(); }
@@ -838,7 +856,7 @@ function updateCuerpo(dt) {
   const v = player.speed, A = cuerpo.acciones, W = cuerpo.peso, H = cuerpo.H, h = acc.hace, jugando = state === 'play';
   // 2. qué movimiento de una sola vez toca, y por dónde va (0 a 1; −1 si no toca)
   cuerpo.aire = jugando && !player.grounded ? cuerpo.aire + dt : 0;
-  const va = { salta: cuerpo.aire > 0.05 ? Math.min(1, cuerpo.aire / 0.75) : -1, recoge: h && (h.tipo === 'recoger' || h.tipo === 'cargar') ? h.t / h.dur : -1, bebe: h && h.tipo === 'beber' ? h.t / h.dur : gesto && gesto.tipo === 'come' ? gesto.t / gesto.dur : -1 };
+  const va = { salta: cuerpo.aire > 0.05 ? Math.min(1, cuerpo.aire / 0.75) : -1, recoge: h && (h.tipo === 'recoger' || h.tipo === 'cargar') ? h.t / h.dur : -1, bebe: h && h.tipo === 'beber' ? h.t / h.dur : gesto && gesto.tipo === 'come' ? gesto.t / gesto.dur : -1, rueda: rueda ? rueda.t / rueda.dur : -1 };
   let tapa = 0;
   for (const k of UNA_VEZ) { const a = A[k]; if (!a) continue; const on = va[k] >= 0; W[k] = (W[k] || 0) + ((on ? 1 : 0) - (W[k] || 0)) * Math.min(1, dt * 10); a.setEffectiveWeight(W[k]);
     if (on) a.time = (TRAMO[k][0] + (TRAMO[k][1] - TRAMO[k][0]) * Math.min(1, va[k])) * a.getClip().duration; tapa = Math.max(tapa, W[k]); }
@@ -853,7 +871,7 @@ function updateCuerpo(dt) {
   if (A.anda) A.anda.timeScale = Math.min(2.2, Math.max(0.7, v / 0.62)); if (A.corre) A.corre.timeScale = Math.min(1.45, Math.max(0.6, v / 5.1));
   cuerpo.mixer.update(dt);
   if (H.Spine02 && W.quieto > 0.05) { const b = Math.sin(time * 1.3) * 0.014 * W.quieto; H.Spine02.rotateX(b); if (H.neck) H.neck.rotateX(-b); } // quieto, respira: el pecho se mueve apenas y la cabeza se queda en su lugar
-  pisa(cuerpo, dt, { suelo: pp().y - FEET, apoyado: player.grounded && !acc.sitting && state !== 'title', f: player.facing, quieto: (W.quieto || 0) * (1 - tapa), slope: player.slope, h: boy.h });
+  pisa(cuerpo, dt, { suelo: pp().y - FEET, apoyado: player.grounded && !acc.sitting && !rueda && state !== 'title', f: player.facing, quieto: (W.quieto || 0) * (1 - tapa), slope: player.slope, h: boy.h });
   // 3. a mano. Adelante (fx, fz), a su derecha (rx, rz) y arriba.
   const f = player.facing; let fx = Math.sin(f), fz = Math.cos(f), rx = -fz, rz = fx;
   const brazo = (lado, ad, arr, cos, ad2, arr2, cos2, k) => { const sg = lado === 'Right' ? 1 : -1; apunta(H[lado + 'Arm'], fx * ad + rx * cos * sg, arr, fz * ad + rz * cos * sg, k); apunta(H[lado + 'ForeArm'], fx * ad2 + rx * cos2 * sg, arr2, fz * ad2 + rz * cos2 * sg, k); }; // hacia dónde van el brazo y el antebrazo: cuánto adelante, arriba y al costado
@@ -863,15 +881,14 @@ function updateCuerpo(dt) {
   if (h && h.tipo === 'saludar') brazo('Right', 0.3, 0.9, 0.25, 0.1, 1, 0, env);                          // la mano en alto
   if (entrega.alza > 0) { const k = entrega.alza, w = entrega.vuelca * (0.16 + Math.sin(time * 9) * 0.05); for (const l of ['Right', 'Left']) brazo(l, 0.8, -0.45, 0.24, 0.9, 0.16 - w, -0.22, k); } // el canasto entre las dos manos, adelante; al echar los piñones, las baja un poco
   if (h && h.tipo === 'verter') { brazo('Right', 0.7, -0.5, 0.2, 0.9, -0.2, 0, env); brazo('Left', 0.7, -0.5, 0.2, 0.9, -0.2, 0, env); } // las dos manos adelante y abajo
-  const ten = acc.tensa, sube = acc.apunta ? -Math.sin(cam.pitch) : 0; if (acc.apunta) { const k = suave(0, 0.45, ten) * 0.75 + 0.25, tira = suave(0.2, 1, ten), fa = cam.yaw + Math.PI, de = [fx, fz, rx, rz]; fx = Math.sin(fa); fz = Math.cos(fa); rx = -fz; rz = fx; // los brazos van hacia donde apunta la mira, no hacia donde mira el cuerpo
-    brazo('Left', 1, 0.02 + sube, 0.1, 1, 0.02 + sube, 0.03, k); brazo('Right', 0.25 - 0.6 * tira, 0.05 + sube * 0.6, 0.55, 0.85, 0.05 + sube, -0.45, k); [fx, fz, rx, rz] = de; } // el arco va en la mano izquierda, estirada; la derecha lleva la cuerda atrás // el arco: el brazo izquierdo estirado, el derecho con el codo atrás y la mano junto a la cara
+  if (h && h.tipo === 'labrar') { const w = Math.sin(time * 11) * 0.07; brazo('Right', 0.55, -0.62, 0.1, 0.75, 0.1 + w, -0.55, env); brazo('Left', 0.55, -0.62, 0.1, 0.75, 0.1 - w, -0.55, env); } // haciendo una flecha: las dos manos juntas adelante, trabajando
   cuerpo.sienta += ((acc.sitting ? 1 : 0) - cuerpo.sienta) * Math.min(1, dt * 5);                          // sentado: los muslos adelante y las canillas hacia abajo
   if (cuerpo.sienta > 0.02) for (const l of ['Right', 'Left']) { apunta(H[l + 'UpLeg'], fx, -0.12, fz, cuerpo.sienta); apunta(H[l + 'Leg'], fx * 0.15, -1, fz * 0.15, cuerpo.sienta); }
   // La mirada: la cabeza y el cuello se vuelven hacia donde mira (la cámara, o la cara de quien le habla).
   const my = player.miraY || 0, mx = player.miraX || 0;
   // Conversando pone atención: la cabeza deja el vaivén de estar parado y queda quieta, de frente a la cara del otro.
   cuerpo.atento += ((talk && talk.who && !acc.sitting && state === 'play' ? 1 : 0) - cuerpo.atento) * Math.min(1, dt * 5);
-  const cp = Math.cos(mx), a2 = f + my, at = cuerpo.atento; VD.set(Math.sin(a2) * cp, -Math.sin(mx) - entrega.vuelca * 0.55, Math.cos(a2) * cp).normalize(); // hacia dónde mira (echando los piñones, a la olla)
+  const cp = Math.cos(mx), a2 = f + my, at = cuerpo.atento; VD.set(Math.sin(a2) * cp, -Math.sin(mx) - entrega.vuelca * 0.55 - (h && h.tipo === 'labrar' ? env * 0.45 : 0), Math.cos(a2) * cp).normalize(); // hacia dónde mira (echando los piñones, a la olla)
   if (!acc.sitting && at < 0.98 && Math.abs(my) + Math.abs(mx) > 0.01) { QR.setFromUnitVectors(VC.set(fx, 0, fz), VD); tuerce(H.neck, QR, 0.4 * (1 - at)); tuerce(H.Head, QR, 0.6 * (1 - at)); }
   if (at > 0.02) for (const [hueso, k] of [[H.neck, 0.4], [H.Head, 1]]) { QR.setFromUnitVectors(VC.copy(CARA).applyQuaternion(H.Head.getWorldQuaternion(QD)).normalize(), VD); tuerce(hueso, QR, k * at); }
   // El pestañeo: cada tanto los párpados bajan y suben en un quinto de segundo.
@@ -881,10 +898,7 @@ function updateCuerpo(dt) {
   cuerpo.habla = Math.max(0, cuerpo.habla - dt); const abre = cuerpo.habla > 0 ? 0.2 + 0.8 * Math.abs(Math.sin(time * 14)) * (0.45 + 0.55 * Math.abs(Math.sin(time * 5.1 + 1))) : 0;
   cuerpo.boca.visible = abre > 0.03; cuerpo.boca.scale.y = Math.max(0.001, cuerpo.bocaAlto * abre);
   // El arco, en la mano izquierda mientras lo tensa.
-  cuerpo.arco.visible = acc.apunta && boy.g.visible; if (acc.apunta) { H.LeftHand.getWorldPosition(cuerpo.arco.position); cuerpo.arco.rotation.set(cam.pitch, cam.yaw + Math.PI, 0); }
-  cuerpo.puesta.visible = cuerpo.arco.visible && !acc.vuela && acc.ctx().tengo('flecha') > 0; if (cuerpo.puesta.visible) { const cp = Math.cos(cam.pitch), ax = -Math.sin(cam.yaw) * cp, ay = -Math.sin(cam.pitch), az = -Math.cos(cam.yaw) * cp, atras = 0.2 + 0.24 * suave(0.2, 1, acc.tensa); // (ax, ay, az): hacia donde apunta
-    cuerpo.puesta.position.copy(cuerpo.arco.position).addScaledVector(VC.set(ax, ay, az), 0.36 - atras); cuerpo.puesta.position.y += 0.03; cuerpo.puesta.lookAt(VD.copy(cuerpo.puesta.position).addScaledVector(VC, 1)); }
-  H.Head.scale.setScalar(apK > 0.45 ? 0.001 : 1); // apuntando, la cámara va donde están sus ojos: la cabeza no se dibuja, para que no tape la vista
+  armaArco(dt, f, h);
 }
 // Los pies siguen el suelo. Bajo cada pie se mira cuánto más arriba o más abajo queda el terreno respecto de donde está parado
 // el personaje: la cadera baja lo justo para que el pie de más abajo alcance a pisar, y el otro se recoge doblando la rodilla.
@@ -913,6 +927,36 @@ function pisa(C, dt, o) { // C: el cuerpo 3D; o: la altura del suelo donde está
     pie.quaternion.copy(pie.parent.getWorldQuaternion(QA).invert()).multiply(QF); pie.updateMatrixWorld(true); // el pie conserva la postura que traía: no se ladea con la pierna
   });
 }
+// El arco en las manos. Guardado no se ve. En la mano y sin apuntar, Leftraru lo lleva en la izquierda, con el brazo algo
+// doblado, y así camina y corre. Apuntando, la cámara está en sus ojos y las manos se ponen donde la cámara las ve: la
+// izquierda sostiene el arco adelante; la derecha lleva la cuerda, con la flecha, hacia atrás mientras se mantiene apretado
+// el botón; al soltar, la cuerda vuelve de golpe y la mano baja a buscar otra flecha.
+const TIP = 0.424, PANZA = 0.176, PN = V3(), PW = V3(); // el arco: de la empuñadura a cada punta, hacia arriba y hacia atrás
+function cuerdaPor(C, p) { // la cuerda pasa por p (o va derecha de punta a punta)
+  C.arco.updateMatrixWorld(true); const a = C.arco.localToWorld(PA.set(0, TIP, -PANZA)), b = C.arco.localToWorld(PB.set(0, -TIP, -PANZA)), m = p || PC.copy(a).lerp(b, 0.5);
+  [a, b].forEach((q, i) => { const t = C.cuerda.children[i]; t.position.copy(q); t.lookAt(m); t.scale.z = q.distanceTo(m); });
+}
+function armaArco(dt, f, h) {
+  const C = cuerpo, H = C.H, eq = acc.equipado && boy.g.visible && state !== 'title', ap = eq && acc.apunta && apK > 0.2;
+  C.arco.visible = C.cuerda.visible = eq; C.puesta.visible = false; H.Head.scale.setScalar(apK > 0.2 ? 0.001 : 1); // apuntando, la cámara va donde están sus ojos: la cabeza no se dibuja
+  if (!eq) return;
+  if (!ap) { // en la mano, al costado: el brazo izquierdo no se balancea, lleva el arco
+    if (!(h && h.tipo === 'labrar') && !acc.sitting && !rueda) { const fx = Math.sin(f), fz = Math.cos(f); apunta(H.LeftArm, fx * 0.2 + fz * 0.16, -0.95, fz * 0.2 - fx * 0.16, 0.9); apunta(H.LeftForeArm, fx * 0.62 + fz * 0.04, -0.78, fz * 0.62 - fx * 0.04, 0.9); }
+    H.LeftHand.getWorldPosition(C.arco.position); C.arco.rotation.set(1.0, f, 0); C.arco.scale.set(1, 1, 1); cuerdaPor(C, null); return; }
+  // apuntando: todo se mide desde los ojos (donde está la cámara) y hacia donde apunta la mira
+  const cp = Math.cos(cam.pitch), ax = -Math.sin(cam.yaw) * cp, ay = -Math.sin(cam.pitch), az = -Math.cos(cam.yaw) * cp, rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw), ux = -rz * ay, uy = rz * ax - rx * az, uz = rx * ay; // adelante, a la derecha y arriba
+  const t = pp(), ex = t.x + rx * CAM_ARCO[0] - ax * CAM_ARCO[2], ey = t.y + CAM_ARCO[1] - ay * CAM_ARCO[2], ez = t.z + rz * CAM_ARCO[0] - az * CAM_ARCO[2]; // los ojos
+  const en = (ad, de, ar, o) => o.set(ex + ax * ad + rx * de + ux * ar, ey + ay * ad + uy * ar, ez + az * ad + rz * de + uz * ar); // un punto a tanto adelante, a la derecha y arriba de los ojos
+  const c = suave(0, 1, acc.tensa), rec = acc.recarga, hay = acc.ctx().tengo('flecha') > 0, puestaYa = hay && !acc.vuela && rec < 0.45;
+  C.m.updateMatrixWorld(true);
+  ikBrazo(H.LeftArm, H.LeftForeArm, H.LeftHand, en(0.4, -0.11, -0.235 + retro * 0.03, PW), VA.set(-rx * 0.5, -0.8, -rz * 0.5), 1); // la mano del arco, adelante y a la izquierda
+  en(0.46, -0.105, -0.215 + retro * 0.03, C.arco.position); C.arco.rotation.set(cam.pitch, cam.yaw + Math.PI, 0.1); C.arco.scale.set(1, 1 - 0.06 * c, 1 + 0.5 * c); // al tensarlo, las puntas se vienen hacia atrás
+  const D = PANZA + (0.42 - PANZA) * c; en(0.46 - D, -0.085, -0.165 + retro * 0.03, PN); // dónde va la cuerda con la flecha
+  const baja = suave(0.35, 1, rec); // después de soltar, la mano derecha baja a buscar otra flecha y vuelve a la cuerda
+  en(0.46 - D - 0.05 - baja * 0.1, -0.06 + baja * 0.3, -0.19 - baja * 0.35, PW); ikBrazo(H.RightArm, H.RightForeArm, H.RightHand, PW, VA.set(rx * 0.55 - ax * 0.3, -0.6, rz * 0.55 - az * 0.3), 1);
+  cuerdaPor(C, puestaYa || acc.tira ? PN : null);
+  if (puestaYa) { C.puesta.visible = true; C.puesta.position.set(PN.x + ax * 0.36, PN.y + ay * 0.36, PN.z + az * 0.36); C.puesta.lookAt(PN.x + ax * 2, PN.y + ay * 2, PN.z + az * 2); }
+}
 // La gente en 3D, cuadro a cuadro: después de que su cuerpo de siempre tomó la postura de este momento, el modelo la copia.
 const PT = V3();
 function ikBrazo(sup, inf, fin, T, polo, k) { // gira brazo y antebrazo para que la muñeca llegue a T; polo: hacia dónde queda el codo; k: cuánto (0 nada, 1 del todo)
@@ -935,6 +979,7 @@ function updateGente3D(dt) {
     const inc = a.body.rotation.x; if (Math.abs(inc) > 0.004 && H.Spine02) tuerce(H.Spine02, QR.setFromAxisAngle(VC.set(fz, 0, -fx), inc), 1); // el tronco se inclina igual
     [['Left', a.armL, a.foreL, 1], ['Right', a.armR, a.foreR, -1]].forEach(([l, br, an, sx], i) => { // las manos van a donde están las del cuerpo de siempre; con los brazos caídos, se queda la postura de reposo
       const uso = suave(0.06, 0.3, Math.abs(br.rotation.x) + Math.abs(an.rotation.x) + Math.abs(br.rotation.z - sx * 0.1)); P.brazo[i] += (uso - P.brazo[i]) * Math.min(1, dt * 8);
+      if (P.brazo[i] < 0.99) apunta(H[l + 'Arm'], fz * sx * 0.17 + fx * 0.04, -1, -fx * sx * 0.17 + fz * 0.04, 0.55 * (1 - P.brazo[i])); // en reposo, los brazos caen junto al cuerpo
       if (P.brazo[i] > 0.01) ikBrazo(H[l + 'Arm'], H[l + 'ForeArm'], H[l + 'Hand'], an.localToWorld(PT.set(0, -0.2, 0.03)), V3(fz * sx * 0.45 - fx * 0.5, -0.75, -fx * sx * 0.45 - fz * 0.5), P.brazo[i]); }); // el codo, hacia abajo, atrás y afuera
     if (H.Head) { VD.set(0, 0, 1).applyQuaternion(a.head.getWorldQuaternion(QD)).normalize(); const mira = PT.copy(VD); // la cabeza mira hacia donde mira la del cuerpo de siempre
       for (const [hueso, k] of [[H.neck, 0.4], [H.Head, 1]]) if (hueso) tuerce(hueso, QR.setFromUnitVectors(VC.copy(P.frente).applyQuaternion(H.Head.getWorldQuaternion(QF)).normalize(), VD.copy(mira)), k); }
@@ -947,7 +992,8 @@ applyOpts();
 function tick(dt) {
   time += dt; uTime.value = time;
   updatePlayer(dt); updateVida(dt); if (gesto) updateGesto(dt); updateEntrega(dt);
-  if (acc.apunta !== miraOn) { miraOn = acc.apunta; $('mira').classList.toggle('on', miraOn); } if (miraOn) { const lista = acc.tensa >= 0.4, fl = acc.ctx().tengo('flecha'); if (lista !== miraLista) { miraLista = lista; $('mira').classList.toggle('lista', lista); } if (fl !== miraN) { miraN = fl; $('mira-n').textContent = fl === 1 ? '1 flecha' : `${fl} flechas`; $('mira').classList.toggle('sin', !fl); } }
+  if (acc.apunta !== miraOn) { miraOn = acc.apunta; $('mira').classList.toggle('on', miraOn); } if (salirAp > 0 && (salirAp -= dt) <= 0 && !botonDer && !acc.tira) dejaDeApuntar(); ruedaT = Math.max(0, ruedaT - dt);
+  if (miraOn) { const lista = acc.tensa >= 0.97, fl = acc.ctx().tengo('flecha'); $('mira').style.setProperty('--c', acc.tensa.toFixed(3)); if (lista !== miraLista) { miraLista = lista; $('mira').classList.toggle('lista', lista); } if (fl !== miraN) { miraN = fl; $('mira-n').textContent = fl === 1 ? '1 flecha' : `${fl} flechas`; $('mira').classList.toggle('sin', !fl); } }
   if (cuerpo) updateCuerpo(dt);
   if (cine.active) cine.update(dt);
   else if (fuera()) { const a = time * 0.04 + 2.4; camera.position.set(Math.sin(a) * 31, 12, Math.cos(a) * 31); camera.lookAt(0, 4, 0); }
