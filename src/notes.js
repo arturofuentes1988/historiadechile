@@ -201,9 +201,18 @@ export const MISSIONS = [
   // --- la machi ---
   { id: 's13', title: 'Pedir permiso', who: 'la machi', pts: 30, ver: met('machi'), text: 'La machi dice que todo tiene dueño. Saluda al entrar al bosque viejo, al menoko y al lugar de los antiguos.', check: (c) => { const n = ['viejo', 'menoko', 'antiguos'].filter((k) => c.f['s-' + k]).length; return [n === 3, n, 3]; } },
   { id: 's7', title: 'Plantas del suelo', who: 'la machi', pts: 30, ver: met('machi'), text: 'La machi quiere que conozcas las plantas pequeñas. Observa el helecho, los juncos, las flores, el maqui, la quila y el copihue.', check: set(['helecho', 'junco', 'flores', 'maqui', 'quila', 'copihue']) },
+  { id: 's17', title: 'Agua de hierbas', who: 'la machi', pts: 35, ver: (c) => !!c.f.rm,
+    text: (c) => (c.f.rm === 2 ? 'La machi te enseñó a preparar agua de hierbas, que devuelve las fuerzas. Se hace junto al fogón, desde la bolsa, con hojas de maqui y de boldo.' : 'La machi te va a enseñar un agua de hierbas que se sabe en toda casa. Tráele dos manojos de hojas de maqui, del claro del surponiente, y dos de boldo, el árbol de hoja dura del monte soleado.'),
+    check: (c) => [c.f.rm === 2, c.f.rm === 2 ? 1 : 0, 1] },
   // --- Ñamku ---
   { id: 's5', title: 'La casa y el fuego', who: 'Ñamku', pts: 30, ver: met('namku'), text: 'Ñamku dice que antes de conocer el mundo hay que conocer la casa. Observa la ruka, el fogón, el rewe, el telar y las figuras de madera.', check: set(['ruka', 'kutral', 'rewe', 'witral', 'chemamull']) },
   { id: 's8', title: 'El monte soleado', who: 'Ñamku', pts: 30, ver: met('namku'), text: 'Ñamku conoce los árboles de hoja dura, los que aguantan el sol. Observa el peumo, el boldo, el quillay y el litre.', check: set(['peumo', 'boldo', 'quillay', 'litre']) },
+  { id: 's18', title: 'La primera caza', who: 'Ñamku', pts: 50, ver: (c) => !!c.f.cz,
+    text: (c) => ['', 'Ñamku te va a enseñar a hacer flechas. Tráele tres cañas de quila y tres plumas: las plumas están al pie de los árboles donde se posan los pájaros.',
+      'Ñamku te dio su arco. Prueba la puntería: dale tres veces al atado de paja que dejó al oriente de su ruka. Párate a unos pasos y usa la tecla de acción.',
+      'Sal a buscar un pudú para la olla de la fiesta. Sigue sus huellas, acércate caminando y sin correr, y cuando lo tengas cerca tensa el arco con la tecla de acción. Uno solo. Si se acaban las flechas, se hacen más junto al fogón, desde la bolsa.',
+      'Lleva el pudú a Ñamku, en su ruka al oriente de la aldea.', 'Cazaste tu primer pudú y se repartió entre todos. El arco es tuyo, pero se queda colgado mientras haya carne en la casa.'][c.f.cz || 1],
+    check: (c) => { const st = c.f.cz || 0; return [st >= 5, Math.max(0, Math.min(4, st - 1)), 4]; } },
 ];
 
 // Entradas del cuaderno que tienen una fotografía fija y detallada (assets/cuaderno); los lugares se fotografían en el juego.

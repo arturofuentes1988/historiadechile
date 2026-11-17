@@ -1,6 +1,6 @@
 // La línea de guía: el camino sugerido desde donde estás hasta un destino.
 // Sigue los senderos cuando conviene (todos parten de la plaza) y, si no, va derecho.
-import { PATHS } from './terrain.js';
+import { PATHS, CERRO } from './terrain.js';
 
 // La red de senderos: cada punto es un nodo y los senderos se juntan en la plaza (nodo 0).
 const nodes = [[0, 0]], edges = [];
@@ -48,6 +48,8 @@ export function route(sx, sz, gx, gz, viaAntes = false) {
     for (let i = pick[0]; i !== pick[1]; i = NEXT[i][pick[1]]) mid.push(nodes[i]); mid.push(nodes[pick[1]]);
   }
   const net = tidy([S, s.q, ...mid, g.q, G].filter((p, i, l) => !i || dist(p, l[i - 1]) > 0.6)), nl = length(net);
-  const via = nl <= direct * (viaAntes ? 1.9 : 1.6) + 15; // el sendero vale la pena si no alarga demasiado
+  const enCerro = (x, z) => Math.hypot(x - CERRO[0], z - CERRO[1]);
+  const sube = (enCerro(gx, gz) < 16 && enCerro(sx, sz) < 90) || (enCerro(sx, sz) < 16 && enCerro(gx, gz) > 40); // subir o bajar el Treng Treng: derecho por la ladera es mucho más empinado
+  const via = sube || nl <= direct * (viaAntes ? 1.9 : 1.6) + 15; // el sendero vale la pena si no alarga demasiado
   return via ? { pts: net, via, len: nl } : { pts: [S, G], via, len: direct };
 }

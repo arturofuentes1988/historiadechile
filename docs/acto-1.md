@@ -22,6 +22,9 @@ Guion de trabajo (borrador 3). Un acto de **inmersión**: Leftraru es un niño q
 - **Lo que hay que recoger se ve:** cada planta pedida lleva una hoja verde sobre un disco claro, en el mapa y flotando sobre ella en el mundo; la guía apunta a la más cercana que falte. El claro del maqui tiene sus matas al centro, donde termina el sendero.
 - **La mirada:** Leftraru mira hacia donde mira la cámara: quieto, se vuelve hacia allá (la cabeza llega primero y el cuerpo la sigue de cerca, con pasitos en el lugar), así que al girar con el ratón gira él también. El minimapa gira con la cámara.
 - **Conversar de cerca:** al hablar con alguien, la cámara se acerca y deja a los dos en primer plano, vistos en ángulo por sobre el hombro de Leftraru. Se vuelven el uno hacia el otro, se miran a la cara, y quien estaba trabajando deja lo suyo mientras habla. Al terminar, la cámara vuelve a su lugar, a la espalda de Leftraru.
+- **La subida al Treng Treng:** el cerro es más ancho y tendido, y el sendero ya no va derecho a la cima: lo rodea por el poniente y el norte, tallado en la ladera, con una pendiente pareja de unos 13 grados (antes llegaba a 40) y unos 150 pasos de largo. Llega arriba por el oriente, donde se para Curiñancu.
+- **Recolectar y preparar:** lo que alguien le enseñó a preparar se puede juntar siempre, pero de a poco (hasta tres de cada cosa). Se prepara junto al fogón, desde la bolsa. Hoy son dos cosas: el **agua de hierbas** (maqui y boldo; devuelve vida) y las **flechas** (una caña de quila y una pluma). El agua de hierbas no es un lawen: los remedios siguen siendo de la machi.
+- **El arco:** se tensa con la tecla de acción, quieto y de frente, y se suelta solo. Al blanco de paja se le tira siempre; a un pudú, solo durante el encargo de Ñamku, de cerca y sin haberlo espantado. A las crías no se les tira. Terminado el encargo no se caza más: «se caza cuando hace falta».
 - **Sin presión:** nada tiene tiempo límite ni se puede fallar. Lo que mueve al jugador es la curiosidad.
 - **El mapa se va pintando:** al inicio es un pergamino casi vacío. Cada lugar visitado aparece dibujado, y los puntos de interés se marcan cuando alguien los menciona en una conversación.
 
@@ -131,9 +134,11 @@ Son opcionales y se pueden hacer en cualquier orden. **Aparecen en la lista cuan
 | **Rayen** | Los caminos del valle | Recorrer los diez lugares del territorio. |
 | | A dos rayas | Jugar un palin en la cancha. |
 | **La machi** | Pedir permiso | Saludar al entrar al bosque viejo, al menoko y al lugar de los antiguos. |
+| | Agua de hierbas | Después de la misión 3. Llevarle hojas de maqui y de boldo; enseña a preparar el agua de hierbas. |
 | | Plantas del suelo | Observar helecho, juncos, flores, maqui, quila y copihue. |
 | **Ñamku** | La casa y el fuego | Observar la ruka, el fogón, el rewe, el telar y las figuras de madera. |
 | | El monte soleado | Observar peumo, boldo, quillay y litre. |
+| | La primera caza | Después de la misión 3. Llevarle tres cañas de quila y tres plumas; enseña a hacer flechas y entrega su arco. Tres tiros al blanco de paja, salir tras un pudú para la olla de la fiesta, agradecer y traerlo. Por confirmar con quien revise la cultura: el arco y la flecha en esta zona en 1545, y la caza hecha por un niño de once años. |
 
 ### Ideas para más adelante
 

@@ -2,7 +2,7 @@
 // ayudar en la aldea, sentarse al fogón, saludar al bosque, seguir huellas, jugar palin y tirar piedras al río.
 // También lleva el hilo de la historia: qué misión principal está abierta y quién la da.
 import * as THREE from 'three';
-import { height, POI, CERRO, riverZ, WATER_Y } from './terrain.js';
+import { height, POI, CERRO, SUBIDA, riverZ, WATER_Y } from './terrain.js';
 import { animatePerson } from './life.js';
 import { FOGON, CORRAL, OLLA } from './village.js';
 
@@ -11,6 +11,9 @@ const KEY = 'leftraru.tareas';
 const ITEMS = {
   canelo: { uno: 'hojas de canelo', tree: 'canelo' }, quillay: { uno: 'corteza de quillay', tree: 'quillay' }, maqui: { uno: 'hojas de maqui', bush: true },
   murtilla: { uno: 'murtilla', plant: 'murtilla' }, michay: { uno: 'raíz de michay', plant: 'michay' }, nalca: { uno: 'tallo de nalca', plant: 'nalca' },
+  // para preparar: lo que se junta en el monte y lo que sale de las manos
+  boldo: { uno: 'hojas de boldo', tree: 'boldo' }, quila: { uno: 'caña de quila', plant: 'quila' }, pluma: { uno: 'pluma', pluma: true },
+  remedio: { uno: 'agua de hierbas' }, flecha: { uno: 'flecha' }, arco: { uno: 'arco' }, presa: { uno: 'pudú' },
 };
 const FUEGO = [
   ['La abuela', 'El fuego no se deja solo, niño. Mientras arde, la casa está viva.'],
@@ -19,11 +22,20 @@ const FUEGO = [
   ['La abuela', 'Antes de comer, el primer bocado es para la tierra. Ella comió primero que nosotros y comerá después.'],
   ['La abuela', 'Cuando yo era chica, mi abuela me contaba estas mismas cosas en este mismo lugar. Algún día las contarás tú.'],
 ];
+// Cómo se ven en la bolsa las cosas que no tienen ficha en el cuaderno. usar: si se puede usar desde la bolsa, qué dice el botón.
+const DIB = (d) => `<svg viewBox="0 0 24 24">${d}</svg>`;
+const COSAS = {
+  pluma: { title: 'Pluma', ico: DIB('<path d="M19 4C11 5 6 10 5 19M5 19c4-1 9-3 12-8M9 13l5-1M8 16l6-2"/>') },
+  flecha: { title: 'Flecha', ico: DIB('<path d="M4 20 19 5M19 5h-5M19 5v5M5.500 15.500l3 3M8 13l3 3"/>') },
+  arco: { title: 'Arco de Ñamku', ico: DIB('<path d="M7 3c9 3 9 15 0 18M7 3v18"/>') },
+  remedio: { title: 'Agua de hierbas', usar: 'Tomar', ico: DIB('<path d="M4 11h16c0 5-3.5 8-8 8s-8-3-8-8zM9 7c0-1.5 1.5-1.5 1.5-3M13.5 7c0-1.5 1.5-1.5 1.5-3"/>') },
+  presa: { title: 'Pudú para la olla', ico: DIB('<path d="M4 16c0-4 3-6 7-6h4l2-3 1 3c1.5.5 2 2 2 4M6 16v4M15 16v4M9 16h6"/>') },
+};
 const LUGARES = { viejo: 'el bosque viejo', menoko: 'el menoko', antiguos: 'el lugar de los antiguos' };
 const HUELLAS = [[-70, -70], [40, -52], [-60, 66]];
 const NOMBRE = { curinancu: 'Curiñancu', millaray: 'Millaray', abuela: 'la abuela', ayelen: 'Ayelén', rayen: 'Rayen', machi: 'la machi', namku: 'Ñamku' }; // cómo se llama en el mundo cada persona del cuaderno
 
-export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripple, player, place, pinones, story }) {
+export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripple, player, place, pinones, story, sanar }) {
   const TRONCOS = [0, 1, 2, 3, 4].map((i) => { const a = 0.6 + i * 1.2; return { x: FOGON.x + Math.cos(a) * 2.9, z: FOGON.z + Math.sin(a) * 2.9, a }; }); // los troncos alrededor del fogón
   const S = Object.assign({ f: {}, inv: {} }, JSON.parse(localStorage.getItem(KEY) || '{}')), save = () => localStorage.setItem(KEY, JSON.stringify(S));
   const f = S.f, inv = S.inv, have = (id) => inv[id] || 0, d2 = (p, x, z) => Math.hypot(p.x - x, p.z - z), actor = (name) => world.life.actors.find((a) => a.name === name);
@@ -38,9 +50,10 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
   // ---------- Curiñancu te lleva al cerro: va adelante por el sendero, a tu paso, y si te quedas atrás te espera ----------
   // f.m2: 1 mientras suben (o te espera arriba), 2 cuando ya te mostró lo que quería.
   const padre = actor('Curiñancu'), CIMA = [CERRO[0] + 4.6, CERRO[1] - 2.6], CASA = [2, -9];
-  // el camino: el sendero del nororiente y, arriba, un rodeo por el borde para no pasar por encima de las rocas del mirador
-  const RUTA = [[6, -5], [40, -30], [70, -55], [90, -74], [97, -81], [97.5, -90], [101, -93.5], [106.5, -93.6], CIMA];
-  const DICHOS = { 2: '¿Oyes a los choroyes? Donde gritan, hay piñones. El bosque avisa todo, si uno sabe escuchar.', 3: 'Por aquí subía yo con mi padre, cuando tenía tu edad. Y él, con el suyo.', 4: 'Este cerro salvó a nuestra gente cuando subió el mar. Por eso se llama Treng Treng.' }; // lo que va diciendo al pasar cada tramo
+  // el camino: el sendero del nororiente y la subida larga que rodea el cerro; arriba, del borde derecho a su lugar en el mirador
+  const SUBE = SUBIDA.filter((q, i) => i % 6 === 0 || i === SUBIDA.length - 1), RUTA = [[6, -5], [40, -30], ...SUBE, CIMA];
+  // lo que va diciendo al pasar ciertos puntos de la ruta: al entrar al bosque, a media subida y poco antes de llegar
+  const tramo = (u) => 2 + Math.round(u * (SUBE.length - 1)), DICHOS = { [tramo(0.12)]: '¿Oyes a los choroyes? Donde gritan, hay piñones. El bosque avisa todo, si uno sabe escuchar.', [tramo(0.5)]: 'Por aquí subía yo con mi padre, cuando tenía tu edad. Y él, con el suyo.', [tramo(0.85)]: 'Este cerro salvó a nuestra gente cuando subió el mar. Por eso se llama Treng Treng.' };
   const volcan = () => Math.atan2(world.volcano.x - CIMA[0], world.volcano.z - CIMA[1]); // arriba queda mirando hacia el volcán
   const enCima = () => !!padre && !padre.yendo && d2(padre, CIMA[0], CIMA[1]) < 3;
   function ponPadre(arriba) { padre.mode = 'idle'; padre.yendo = false; padre.quieto = arriba; [padre.x, padre.z] = arriba ? CIMA : CASA; padre.face = arriba ? volcan() : Math.PI; padre.speed = 0; }
@@ -82,6 +95,8 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
     if (f.ab === 1) n.murtilla = 3;
     if (f.mi === 1) n.michay = 2;
     if (f.na === 1) n.nalca = 2;
+    if (f.rm === 1) { n.maqui = 2; n.boldo = 2; }
+    if (f.cz === 1) { n.quila = 3; n.pluma = 3; }
     for (const k in n) n[k] = Math.max(0, n[k] - have(k));
     return n;
   }
@@ -129,8 +144,25 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
       if (f.m3 === 1 && !listo(['canelo', 'quillay', 'maqui'])) return { lines: [`Todavía falta: ${falta()}.`, 'No te apures. Mira bien cada planta antes de cortarla: hay que conocerla para pedirle.'] };
       if (f.m3 === 1) return { main: true, lines: ['Déjame ver… Sí. Las cortaste con cuidado, se nota.', 'El canelo abre el camino, el quillay suelta el pecho y el maqui baja la fiebre. Pero lo que sana es que alguien fue a buscarlas pensando en el enfermo.', 'Ya está. Llévaselo a Ñamku mientras está tibio. Y dile que se lo tome todo, que yo sé que es porfiado.'], done: () => { take('canelo', 2); take('quillay', 1); take('maqui', 2); inv.lawen = 1; set('m3', 2); } };
       if (f.m3 === 2) return { lines: ['El lawen se enfría, niño. Ñamku está en su ruka, al oriente.'] };
+      // Después de la historia: le enseña el agua de hierbas (f.rm: 1 juntando las hojas, 2 aprendida). No es su lawen: es lo de casa.
+      if (f.m3 === 3) {
+        if (!f.rm) return { lines: ['Ñamku ya anda de pie, y fue por tus pies. Ahora te toca aprender algo con las manos.', 'Lo que yo le di era lawen, y eso es cosa mía: se pide, se canta, y no se enseña de un día para otro. Pero hay un agua de hierbas que en toda casa se sabe preparar, para el cansancio, el frío y los golpes.', 'Tráeme dos manojos de hojas de maqui y dos de boldo, el árbol de hoja dura y olorosa que crece donde pega el sol. Pide antes de cortar, como ya sabes.'], done: () => set('rm', 1) };
+        if (f.rm === 1 && !listo(['maqui', 'boldo'])) return { lines: [`Todavía falta: ${falta()}.`, 'El boldo se conoce por el olor: restriega una hoja entre los dedos.'] };
+        if (f.rm === 1) return { lines: ['Bien cortadas. Ahora mira, que esto se aprende mirando.', 'El agua tiene que hervir primero. Las hojas se echan cuando ya la sacaste del fuego, y se tapa. Si las hierves, amarga y no sirve.', 'Una hoja de maqui por una de boldo. Ni más, que cae pesado; ni menos, que es agua sola.', 'Toma: esta la hicimos juntos. Las que vengan las preparas tú, junto al fogón. Y no cortes más de lo que vayas a usar.'], done: () => { take('maqui', 2); take('boldo', 2); give('remedio', 1); set('rm', 2); hint('Aprendiste a preparar agua de hierbas. Se hace junto al fogón, desde la bolsa.', 8); } };
+      }
     }
     if (id === 'namku' && f.m3 === 2) return { main: true, lines: ['¿Eso es para mí? Huele al monte entero… La machi te mandó a ti, ¿no? Así se aprende.', 'Amargo. Bien amargo. Así tiene que ser.', 'Cuando yo tenía tu edad, mi abuelo se enfermó y fui yo a buscar las plantas. Me perdí dos días. Volví con las hojas equivocadas, y él se mejoró igual, de puro reírse.', 'Gracias, Leftraru. Uno no se sana solo: lo sana su gente.', 'Y prepárate, que ya vienen los de la costa para el We Tripantu. Alguien tendrá que salir a recibirlos.'], done: () => { inv.lawen = 0; set('m3', 3); } };
+    // Después de la historia: le enseña a hacer flechas y lo manda a su primera caza.
+    // f.cz: 1 juntando cañas y plumas, 2 con el arco, probando la puntería (f.blanco: aciertos), 3 de caza, 4 trae el pudú, 5 hecha.
+    if (id === 'namku' && f.m3 === 3) {
+      if (!f.cz) return { lines: ['Leftraru. Mira estas manos: ya no tiemblan. Te debo una, y yo pago enseñando.', 'Vienen los de la costa y en la olla no hay más que piñones. Hace falta carne, y mis piernas todavía no están para el monte. Vas a ir tú.', 'Pero primero se hacen las flechas. Tráeme tres cañas de quila, derechas, y tres plumas: las encuentras al pie de los árboles donde se posan los pájaros.'], done: () => set('cz', 1) };
+      if (f.cz === 1 && !listo(['quila', 'pluma'])) return { lines: [`Falta: ${falta()}.`, 'La caña, derecha. Las plumas, enteras.'] };
+      if (f.cz === 1) return { lines: ['A ver… Sirven. Siéntate y mira.', 'La caña se endereza al calor del fuego y la punta se endurece en la brasa: queda dura como hueso. La pluma se parte por el medio y se amarra atrás, para que la flecha vuele derecho y no dé tumbos.', 'Este arco fue de mi padre. Ahora lo llevas tú, y también estas tres flechas. Las que falten las haces tú junto al fogón: una caña y una pluma por cada una.', 'Antes de salir al monte, pruébalo. Dejé un atado de paja amarrado a un poste, aquí al oriente. Dale tres veces y vuelve.'], done: () => { take('quila', 3); take('pluma', 3); give('arco', 1); give('flecha', 3); set('blanco', 0); set('cz', 2); hint('Aprendiste a hacer flechas. Se hacen junto al fogón, desde la bolsa.', 8); } };
+      if (f.cz === 2 && (f.blanco || 0) < 3) return { lines: [`Llevas ${f.blanco || 0} de 3 en el blanco. Párate a unos pasos, quédate quieto y suelta.`] };
+      if (f.cz === 2) return { lines: ['Tres de tres. Tienes el ojo de tu nombre.', 'Ahora escucha, que esto es lo que importa. Al pudú no se le corre: se le sigue. Busca sus huellas y camina despacio. Si corres, no lo ves más.', 'Antes de soltar la flecha, pide. Al dueño del monte se le dice para quién es la carne. Y se toma uno solo: el monte da, pero lleva la cuenta.', 'Anda. Y si vuelves con las manos vacías, también se aprende.'], done: () => set('cz', 3) };
+      if (f.cz === 3) return { lines: ['Las huellas, despacio, y de cerca. Uno solo.'] };
+      if (f.cz === 4) return { lines: ['Lo trajiste… Déjame verlo. Un tiro limpio: no sufrió.', 'Hoy comen los de la costa por tu mano. La primera caza no se la come el cazador: se reparte. Así nadie olvida que se caza para todos.', 'El arco es tuyo. Pero óyeme bien: mientras haya carne en la casa, se queda colgado. Se caza cuando hace falta, no cuando dan ganas.'], done: () => { take('presa', 1); set('cz', 5); } };
+    }
     if (id === 'abuela') {
       if (!f.ab) return { lines: ['Leftraru, ¿me harías un favor? Tengo antojo de murtilla y ya no llego hasta donde crece.', 'Es una mata bajita de frutos rojos. Se da en los claros y en las laderas con sol. Tráeme tres puñados.'], done: () => set('ab', 1) };
       if (f.ab === 1 && !listo(['murtilla'])) return { lines: [`Todavía me falta: ${falta()}. Busca donde llega el sol.`] };
@@ -149,7 +181,7 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
     const madre = !f.m1 ? !f.tu || (f.tu === 1 && ui.has('witral')) || (f.tu === 2 && !!f.lana) : f.m1 === 1 && got >= total; // en el tutorial, la estrella vuelve a ella cuando ya hiciste lo que pidió
     if ((id === 'millaray' && madre) || (id === 'curinancu' && f.m1 === 2 && f.m2 !== 2)
       || (id === 'machi' && f.m2 === 2 && (!f.m3 || (f.m3 === 1 && listo(['canelo', 'quillay', 'maqui'])))) || (id === 'namku' && f.m3 === 2)) return 'main';
-    const sec = { abuela: !f.ab || (f.ab === 1 && listo(['murtilla'])), millaray: !!f.m1 && (!f.mi || (f.mi === 1 && listo(['michay']))), curinancu: ui.has('nalca') && (!f.na || (f.na === 1 && listo(['nalca']))), rayen: !f.palin }[id];
+    const sec = { abuela: !f.ab || (f.ab === 1 && listo(['murtilla'])), millaray: !!f.m1 && (!f.mi || (f.mi === 1 && listo(['michay']))), curinancu: ui.has('nalca') && (!f.na || (f.na === 1 && listo(['nalca']))), rayen: !f.palin, machi: f.m3 === 3 && (!f.rm || (f.rm === 1 && listo(['maqui', 'boldo']))), namku: f.m3 === 3 && (!f.cz || (f.cz === 1 && listo(['quila', 'pluma'])) || (f.cz === 2 && (f.blanco || 0) >= 3) || f.cz === 4) }[id];
     return sec ? 'sec' : null;
   };
 
@@ -157,13 +189,18 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
   function source(id, p) {
     const it = ITEMS[id]; let s = null;
     if (it.plant) s = world.nearPlant(it.plant, p.x, p.z, 1.6);
+    else if (it.pluma) { for (const q of plumas) { const d = d2(p, q.x, q.z); if (!q.picked && d < 1.8 && (!s || d < s.d)) s = { d, rec: q }; } }
     // De lo que sirve, lo más cercano que aún no se ha cortado: una mata ya cortada o un árbol de otra especie que
     // quede más a mano no deben tapar al que sí se puede recoger.
     else if (it.bush) { if (d2(p, POI.maqui.x, POI.maqui.z) < 32) for (const t of world.bushesIn(p.x, p.z, 2.8)) { const d = d2(p, t.x, t.z); if (!t.picked && (!s || d < s.d)) s = { d, rec: t }; } }
     else for (const t of world.trees) { if (t.kind !== it.tree || t.rec.picked) continue; const d = d2(p, t.x, t.z); if (d < 3.2 && (!s || d < s.d)) s = { d, rec: t.rec }; }
     return s && !s.rec.picked ? s : null;
   }
-  function pick(id, rec) { rec.picked = true; give(id); snd.play('arbusto-1', 0.35); const n = needs()[id] || 0; hint(n ? `Recogiste ${ITEMS[id].uno}. Faltan ${n}.` : `Recogiste ${ITEMS[id].uno}. Ya tienes lo necesario.`, 4); }
+  function pick(id, rec) { rec.picked = true; if (rec.mesh) rec.mesh.visible = false; give(id); snd.play('arbusto-1', 0.35); const n = needs()[id] || 0, pedido = id in needs();
+    hint(n ? `Recogiste ${ITEMS[id].uno}. Faltan ${n}.` : pedido ? `Recogiste ${ITEMS[id].uno}. Ya tienes lo necesario.` : `Recogiste ${ITEMS[id].uno}. Llevas ${have(id)}.`, 4); }
+  // Lo que ya sabe preparar se puede juntar siempre, pero de a poco: de cada cosa lleva hasta TOPE y no corta más.
+  const TOPE = 3;
+  function libres() { const n = {}; if (f.rm === 2) n.maqui = n.boldo = TOPE; if (f.cz >= 2) n.quila = n.pluma = TOPE; for (const k in n) n[k] = Math.max(0, n[k] - have(k)); return n; }
 
   // ---------- luces que responden al saludo ----------
   const luzTex = (() => { const c = document.createElement('canvas'); c.width = c.height = 64; const x = c.getContext('2d'), g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.3, 'rgba(200,240,255,0.5)'); g.addColorStop(1, 'rgba(200,240,255,0)'); x.fillStyle = g; x.fillRect(0, 0, 64, 64); return new THREE.CanvasTexture(c); })();
@@ -197,6 +234,71 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
   // ---------- piedras al río ----------
   const piedra = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshStandardMaterial({ color: 0x8a8880, roughness: 1 })); piedra.visible = false; scene.add(piedra); let tiro = null;
 
+  // ---------- preparar: agua de hierbas y flechas ----------
+  // Cada receta la enseña alguien (sabe) y se prepara junto al fogón, desde la bolsa. tope: cuántas se llevan a la vez.
+  const RECETAS = [
+    { id: 'remedio', sabe: () => f.rm === 2, title: 'Agua de hierbas', pide: { maqui: 1, boldo: 1 }, tope: 3, text: 'Devuelve las fuerzas después del frío, del cansancio o de un golpe. Te la enseñó la machi: no es un lawen, es lo que se sabe en toda casa.' },
+    { id: 'flecha', sabe: () => f.cz >= 2, title: 'Flecha', pide: { quila: 1, pluma: 1 }, tope: 6, text: 'Una caña de quila enderezada al calor, con la punta endurecida en la brasa y media pluma amarrada atrás. Te la enseñó Ñamku.' },
+  ];
+  const alFuego = () => d2(here, FOGON.x, FOGON.z) < 6.5;
+  function recetas() {
+    return RECETAS.filter((r) => r.sabe()).map((r) => { const sin = Object.keys(r.pide).filter((k) => have(k) < r.pide[k]), lleno = have(r.id) >= r.tope;
+      return { id: r.id, title: r.title, text: r.text, lleva: Object.keys(r.pide).map((k) => `${ITEMS[k].uno}: ${have(k)} de ${r.pide[k]}`).join(' · '), puede: !sin.length && !lleno && alFuego(), porque: lleno ? 'Ya llevas suficiente' : sin.length ? `Falta ${sin.map((k) => ITEMS[k].uno).join(' y ')}` : 'Acércate al fogón' }; });
+  }
+  function preparar(id) {
+    const r = RECETAS.find((q) => q.id === id); if (!r || !r.sabe() || have(id) >= r.tope || !alFuego() || Object.keys(r.pide).some((k) => have(k) < r.pide[k])) return false;
+    for (const k in r.pide) take(k, r.pide[k]); give(id, 1); snd.play('ui-logro', 0.4); return true;
+  }
+  function usar(id) {
+    if (id !== 'remedio' || !have('remedio')) return false;
+    if ((S.vida ?? 100) >= 100) { hint('Ahora no te hace falta: guárdala para cuando la necesites.', 4); return false; }
+    take('remedio', 1); sanar(60); snd.play('paso-agua-2', 0.4); hint('Tibia y amarga. El cuerpo se te afirma de a poco.', 5); return true;
+  }
+  ui.cosas = COSAS; ui.recetas = recetas; ui.preparar = preparar; ui.usar = usar;
+
+  // ---------- plumas: al pie de los árboles donde se posan las aves ----------
+  const plumas = [];
+  { const g = new THREE.PlaneGeometry(0.08, 0.28), m = new THREE.MeshBasicMaterial({ color: 0xe6ecd6, side: THREE.DoubleSide });
+    const sitios = world.life.birds.filter((b) => b.perch).map((b) => [b.perch.x, b.perch.z]).concat([[-6, -84], [9, -96], [-12, -102], [30, -44], [-40, 24], [44, 12]]);
+    for (const [x, z] of sitios) { if (plumas.length >= 14 || plumas.some((q) => d2(q, x, z) < 4)) continue; const px = x + 0.9, pz = z + 0.6, mesh = new THREE.Mesh(g, m);
+      mesh.position.set(px, height(px, pz) + 0.06, pz); mesh.rotation.set(-1.4, 0, plumas.length * 1.3); scene.add(mesh); plumas.push({ x: px, z: pz, mesh, picked: false }); } }
+
+  // ---------- el arco ----------
+  // Ñamku se lo entrega con la misión de la caza. Con la tecla de acción se tensa (un momento, quieto y de frente) y se suelta
+  // solo. Al blanco de paja se le puede tirar siempre; a un pudú, solo mientras dura el encargo, y a las crías nunca.
+  const BLANCO = { x: 32, z: -4 }; BLANCO.y = height(BLANCO.x, BLANCO.z);
+  const blanco = new THREE.Group();
+  { const palo = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.08, 1.5, 7), new THREE.MeshStandardMaterial({ color: 0x5a4632, roughness: 1 })); palo.position.y = 0.75;
+    const paja = new THREE.Mesh(new THREE.CylinderGeometry(0.27, 0.31, 0.62, 14), new THREE.MeshStandardMaterial({ color: 0xcfa85a, roughness: 1 })); paja.position.y = 1.02;
+    const amarra = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.05, 14), new THREE.MeshStandardMaterial({ color: 0x8a3a2c, roughness: 1 })); amarra.position.y = 1.02;
+    blanco.add(palo, paja, amarra); blanco.traverse((o) => { if (o.isMesh) o.castShadow = o.receiveShadow = true; }); blanco.position.set(BLANCO.x, BLANCO.y, BLANCO.z); blanco.visible = false; scene.add(blanco); }
+  const flechaM = new THREE.Mesh(new THREE.CylinderGeometry(0.009, 0.009, 0.72, 5), new THREE.MeshStandardMaterial({ color: 0x9a8458, roughness: 1 })); flechaM.visible = false; scene.add(flechaM);
+  const UP = new THREE.Vector3(0, 1, 0), VF = new THREE.Vector3(), TENSA = 0.9, giro = (d) => Math.atan2(Math.sin(d), Math.cos(d));
+  let arco = null; // { tg: { q } o {} para el blanco, st: 'tensa' | 'vuela', t }
+  const puduCerca = (p, r) => { let b = null; for (const q of world.life.quads) { if (q.kind !== 'pudu' || q.caido || q.fuera || (q.g.scale.x || 1) < 0.8) continue; const d = d2(p, q.x, q.z); if (d < r && (!b || d < b.d)) b = { d, q }; } return b; }; // los grandes: a las crías no se les tira
+  function updateArco(dt, p) {
+    const a = arco, q = a.tg.q, tx = q ? q.x : BLANCO.x, tz = q ? q.z : BLANCO.z, ty = q ? height(tx, tz) + 0.3 : BLANCO.y + 1.05; a.t += dt;
+    if (a.st === 'tensa') {
+      player.facing += giro(Math.atan2(tx - p.x, tz - p.z) - player.facing) * Math.min(1, dt * 10);
+      if (a.t < TENSA) return;
+      const d = d2(p, tx, tz); a.st = 'vuela'; a.t = 0; a.d = d; a.dur = Math.max(0.25, d / 30); a.from = [p.x, p.y + 0.35, p.z]; a.to = [tx, ty, tz];
+      a.da = q ? d <= 11 && (q.speed || 0) < 1.6 : d <= 17; // al pudú, de cerca y mientras no va huyendo
+      if (q) take('flecha', 1); flechaM.visible = true; snd.play('ui-clic', 0.5, 1.5);
+    } else {
+      const u = Math.min(1, a.t / a.dur), alto = a.to[1] + (a.da ? 0 : 1.3); // la que falla pasa por arriba
+      VF.set(a.to[0] - a.from[0], alto - a.from[1] + Math.cos(Math.PI * u) * a.d * 0.09, a.to[2] - a.from[2]).normalize(); flechaM.quaternion.setFromUnitVectors(UP, VF);
+      flechaM.position.set(mix(a.from[0], a.to[0], u), mix(a.from[1], alto, u) + Math.sin(Math.PI * u) * a.d * 0.03, mix(a.from[2], a.to[2], u));
+      if (u < 1) return;
+      flechaM.visible = false; arco = null;
+      if (!q) { // el blanco: las flechas se recogen, no se gastan
+        if (!a.da) return hint('Muy lejos: la flecha cayó antes de llegar. Acércate unos pasos.', 4);
+        snd.play('ui-hallazgo', 0.4, 1.2);
+        if (f.cz === 2 && (f.blanco || 0) < 3) { set('blanco', (f.blanco || 0) + 1); hint(f.blanco >= 3 ? 'Tres de tres. Vuelve con Ñamku.' : `¡En el blanco! Llevas ${f.blanco} de 3.`, 4); } else hint('¡En el blanco!', 3);
+      } else if (a.da) { q.caido = true; q.speed = 0; snd.play('ui-hallazgo', 0.4, 0.8); hint('Le diste. Acércate despacio.', 5); }
+      else { q.susto = 4; snd.play('arbusto-2', 0.4); hint(have('flecha') ? 'La flecha pasó de largo y el pudú se perdió entre la quila. Búscalo otra vez: más de cerca y sin correr.' : 'Fallaste, y era tu última flecha. Haz más junto al fogón, desde la bolsa: una caña de quila y una pluma por cada una.', 7); }
+    }
+  }
+
   // ---------- qué se puede hacer aquí ----------
   // Sentarse en un tronco: camina hasta quedar delante (si venía por detrás, pasa por encima), se gira hacia el fuego
   // y baja de a poco doblando las rodillas. Sentado respira, mira el fuego y a ratos acerca las manos. Al levantarse, lo contrario.
@@ -217,8 +319,18 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
   }
   function scan(p) {
     if (sit) return sit.st === 'on' ? { label: 'Levantarse', run: stand } : null;
+    if (arco) return null; // con el arco tenso no se hace otra cosa
     const out = [], add = (d, label, run) => out.push({ d, label, run }), n = needs();
     for (const id in n) if (n[id] > 0) { const s = source(id, p); if (s) add(s.d - 5, `Recoger ${ITEMS[id].uno}`, () => pick(id, s.rec)); }
+    const lb = libres(); for (const id in lb) if (!(n[id] > 0) && lb[id] > 0) { const s = source(id, p); if (s) add(s.d - 4, `Recoger ${ITEMS[id].uno}`, () => pick(id, s.rec)); }
+    // el arco: al blanco de paja siempre; al pudú, solo durante el encargo de Ñamku
+    if (f.cz >= 2 && !arco && have('flecha')) {
+      const db = d2(p, BLANCO.x, BLANCO.z); if (db > 4 && db < 24) add(6, 'Tirar al blanco', () => { arco = { tg: {}, st: 'tensa', t: 0 }; });
+      const c = f.cz === 3 && !world.life.quads.some((q) => q.caido && !q.fuera) ? puduCerca(p, 13) : null;
+      if (c) add(0.5, 'Tensar el arco', () => { arco = { tg: { q: c.q }, st: 'tensa', t: 0 }; hint('«Dueño de este monte: es para mi gente.»', 3); });
+    }
+    for (const q of world.life.quads) if (q.caido && !q.fuera && d2(p, q.x, q.z) < 2.2) { add(0.2, 'Agradecer y cargar el pudú', () => { q.fuera = true; q.g.visible = false; q.x = q.z = 1e4; give('presa', 1); set('cz', 4); snd.play('ui-mision', 0.4); hint('«Gracias. No tomaré más.» Te echas el pudú al hombro: llévaselo a Ñamku.', 8); }); break; }
+    if (have('remedio') && (S.vida ?? 100) < 60) add(9, 'Tomar agua de hierbas', () => usar('remedio'));
     const df = d2(p, FOGON.x, FOGON.z);
     const tr = TRONCOS.map((l) => ({ l, d: d2(p, l.x, l.z) })).sort((a, b) => a.d - b.d)[0];
     if (tr.d < 1.5) add(tr.d, 'Sentarse en el tronco', () => sentarse(tr.l, here));
@@ -245,6 +357,8 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
   function update(dt, t, p) {
     here = p; if (palin) updatePalin(dt, p);
     if (sit) updateSit(dt);
+    if (arco) updateArco(dt, p);
+    blanco.visible = f.cz >= 2;
     if (mama && mama.mode === 'cook' && f.m1 !== 1 && d2(p, mama.x, mama.z) > 45) madreCocina(false); // entregados los piñones, cuando ya no la ves vuelve al telar
     if (padre) {
       if (padre.yendo) guia(dt, p);
@@ -256,6 +370,14 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
   // La postura al sentarse se mezcla con la de pie según w (0 de pie, 1 sentado). La cadera sigue un camino
   // desde donde está parado hasta el asiento, y el cuerpo se inclina hacia adelante mientras baja o sube.
   function pose(boy) {
+    if (boy.arcoM) boy.arcoM.visible = !!arco && arco.st === 'tensa' && !sit;
+    if (arco && !sit) { // con el arco: el brazo izquierdo estirado hacia donde apunta, el derecho llevando la cuerda atrás, el cuerpo de medio lado
+      if (!boy.arcoM) { const g = new THREE.TorusGeometry(0.3, 0.008, 5, 16, Math.PI * 0.8).rotateZ(-Math.PI * 0.9).rotateY(Math.PI / 2); boy.arcoM = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ color: 0x4a3626, roughness: 1 })); boy.arcoM.position.set(0, 0.125, 0); boy.foreL.add(boy.arcoM); }
+      const u = arco.t / TENSA, k = arco.st === 'tensa' ? sm(0, 0.45, u) : 1 - sm(0, 1, arco.t / 0.3);
+      boy.armL.rotation.x = mix(boy.armL.rotation.x, -1.5, k); boy.foreL.rotation.x = mix(boy.foreL.rotation.x, -0.05, k);
+      boy.armR.rotation.x = mix(boy.armR.rotation.x, -1.3, k); boy.foreR.rotation.x = mix(boy.foreR.rotation.x, arco.st === 'tensa' ? -0.6 - 1.4 * sm(0.3, 1, u) : -0.4, k); boy.body.rotation.y = 0.45 * k;
+      return;
+    }
     if (!sit) return;
     const s = sit, l = s.l, HIP = 0.52 * (boy.h || 1.38); let w = 1, a = 1;
     if (s.st === 'in') { const u = Math.min(1, s.t / SIT_IN); a = sm(0, 0.5, u); w = sm(0.36, 1, u); } else if (s.st === 'out') w = 1 - sm(0, 0.85, s.t / SIT_OUT);
@@ -274,14 +396,16 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
   }
 
   return { scan, talk, wants, update, pose, stand, madreCocina, f, pins: S.pin, pin(i) { if (!S.pin.includes(i)) { S.pin.push(i); save(); } },
-    get sitting() { return !!sit; }, get busy() { return !!sit && sit.st !== 'on'; }, // busy: está sentándose o levantándose
+    get sitting() { return !!sit; }, get busy() { return (!!sit && sit.st !== 'on') || !!arco; }, // busy: está sentándose o levantándose
     ctx: () => ({ f, hierbas: Math.min(2, have('canelo')) + Math.min(1, have('quillay')) + Math.min(2, have('maqui')), llevo: { canelo: Math.min(2, have('canelo')), quillay: Math.min(1, have('quillay')), maqui: Math.min(2, have('maqui')) } }),
     // Dónde ir a buscar lo que falta para las misiones abiertas: los árboles más cercanos de cada especie y las matas de maqui del claro.
     goals(p) {
       const n = needs(), out = [];
       for (const id in n) { if (n[id] <= 0) continue; const it = ITEMS[id];
-        if (it.tree) world.trees.filter((t) => t.kind === it.tree && !t.rec.picked).map((t) => [d2(p, t.x, t.z), t]).sort((a, b) => a[0] - b[0]).slice(0, Math.max(2, n[id])).forEach(([, t]) => out.push({ x: t.x, z: t.z, id, label: it.uno, alto: 3 }));
-        else if (it.bush) world.bushesIn(POI.maqui.x, POI.maqui.z, 30).filter((t) => !t.picked).map((t) => [d2(p, t.x, t.z), t]).sort((a, b) => a[0] - b[0]).slice(0, Math.max(2, n[id])).forEach(([, t]) => out.push({ x: t.x, z: t.z, id, label: it.uno, alto: 2.1 * t.s + 0.45 })); } // alto: a qué altura flota la hoja que lo marca en el mundo
+        if (it.tree) world.trees.filter((t) => t.kind === it.tree && !t.rec.picked && Math.abs(t.x) < 186 && t.z > -136).map((t) => [d2(p, t.x, t.z), t]).sort((a, b) => a[0] - b[0]).slice(0, Math.max(2, n[id])).forEach(([, t]) => out.push({ x: t.x, z: t.z, id, label: it.uno, alto: 3 }));
+        else if (it.bush) world.bushesIn(POI.maqui.x, POI.maqui.z, 30).filter((t) => !t.picked).map((t) => [d2(p, t.x, t.z), t]).sort((a, b) => a[0] - b[0]).slice(0, Math.max(2, n[id])).forEach(([, t]) => out.push({ x: t.x, z: t.z, id, label: it.uno, alto: 2.1 * t.s + 0.45 }));
+        else if (it.pluma) plumas.filter((q) => !q.picked).map((q) => [d2(p, q.x, q.z), q]).sort((a, b) => a[0] - b[0]).slice(0, 3).forEach(([, q]) => out.push({ x: q.x, z: q.z, id, label: it.uno, alto: 1.2 }));
+        else if (it.plant === 'quila') { const t = world.findPlant('quila', p.x, p.z); if (t) out.push({ x: t.x, z: t.z, id, label: it.uno, alto: 2.2 }); } } // alto: a qué altura flota la hoja que lo marca en el mundo
       return out;
     },
     // A dónde hay que ir ahora para avanzar en una misión (para la línea de guía). Devuelve { x, z, label } o nada si no hay un lugar que marcar.
@@ -294,7 +418,7 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
       const lugar = (k, label) => ({ x: POI[k].x, z: POI[k].z, label: label || POI[k].name });
       const falta = (pairs) => cerca(pairs.filter(([nota]) => !has(nota)).map(([, fn]) => fn())); // de lo que aún no descubres, lo que quede más a mano
       const ave = (type, label) => { const b = cerca(world.life.birds.filter((q) => q.type === type && q.perch).map((q) => q.perch)); return b && { x: b.x, z: b.z, label }; };
-      const pudu = () => { const q = cerca(world.life.quads.filter((a) => a.kind === 'pudu')); return q && { x: q.x, z: q.z, label: 'un pudú' }; };
+      const pudu = () => { const q = cerca(world.life.quads.filter((a) => a.kind === 'pudu' && !a.caido && !a.fuera)); return q && { x: q.x, z: q.z, label: 'un pudú' }; };
       switch (id) {
         case 'm1': if (!f.m1) return (f.tu === 1 && !has('witral')) || (f.tu === 2 && !f.lana) ? TELAR : quien('millaray');
           return f.m1 === 1 && got < total ? cerca(world.items.filter((it) => !it.taken).map((it) => ({ x: it.base.x, z: it.base.z, label: 'un piñón' }))) : quien('millaray');
@@ -316,6 +440,13 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
         case 's14': return !f.huella ? cerca(HUELLAS.map(([x, z]) => ({ x, z, label: 'unas huellas' }))) : pudu();
         case 's15': return quien('rayen');
         case 's16': return { x: FOGON.x - 2.9, z: FOGON.z + 0.4, label: 'los troncos del fogón' };
+        case 's17': return !f.rm ? quien('machi') : f.rm === 1 ? (listo(['maqui', 'boldo']) ? quien('machi') : cerca(this.goals(p))) : null;
+        case 's18': {
+          if (!f.cz || f.cz === 4) return quien('namku');
+          if (f.cz === 1) return listo(['quila', 'pluma']) ? quien('namku') : cerca(this.goals(p));
+          if (f.cz === 2) return (f.blanco || 0) >= 3 ? quien('namku') : { x: BLANCO.x, z: BLANCO.z, label: 'el blanco de paja' };
+          if (f.cz === 3) { const c = world.life.quads.find((a) => a.caido && !a.fuera); if (c) return { x: c.x, z: c.z, label: 'el pudú' }; const q = pudu(); return q && d2(p, q.x, q.z) < 45 ? q : cerca(HUELLAS.map(([x, z]) => ({ x, z, label: 'unas huellas de pudú' }))); }
+          return null; }
         default: return null;
       }
     },

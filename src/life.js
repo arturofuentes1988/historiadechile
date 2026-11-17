@@ -462,7 +462,10 @@ export function buildLife({ scene, rng, emit, trees, physics, RAPIER }) {
       if (p.mark) { p.mark.position.set(p.x, gy + p.h + 0.36 + Math.sin(t * 2.2 + p.x) * 0.045, p.z); p.mark.material.rotation = Math.sin(t * 0.9) * 0.12; }
     }
     for (const q of quads) {
-      const dp = Math.hypot(pp.x - q.x, pp.z - q.z), flee = q.shy && dp < api.shyR * (speed > 4 ? 1 : 0.4); // corriendo los espantas de lejos; caminando puedes acercarte
+      if (q.fuera) continue; // ya no está en el monte
+      if (q.caido) { q.speed = 0; q.g.rotation.z += (1.5 - q.g.rotation.z) * Math.min(1, dt * 5); q.g.position.set(q.x, height(q.x, q.z) + 0.1, q.z); continue; } // cazado: queda tendido de costado
+      if (q.susto > 0) q.susto -= dt; // una flecha que pasó cerca: huye aunque nadie corra
+      const dp = Math.hypot(pp.x - q.x, pp.z - q.z), flee = q.shy && (dp < api.shyR * (speed > 4 ? 1 : 0.4) || q.susto > 0); // corriendo los espantas de lejos; caminando puedes acercarte
       if (flee) { q.tx = q.x + ((q.x - pp.x) / dp) * 14; q.tz = q.z + ((q.z - pp.z) / dp) * 14; q.wait = 0; }
       const d = Math.hypot(q.tx - q.x, q.tz - q.z), want = flee ? 5.2 : q.pace;
       if (q.wait > 0) { q.wait -= dt; q.speed += (0 - q.speed) * Math.min(1, dt * 6); q.neck.rotation.x += ((q.graze ? 1.7 : 0.3) - q.neck.rotation.x) * Math.min(1, dt * 3); q.headPivot.rotation.x = -q.neck.rotation.x * 0.6; q.tail.rotation.x = Math.sin(q.phase * 3 + q.x) * 0.25; }

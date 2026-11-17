@@ -202,10 +202,12 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
         SKILLS.map((x) => { const q = info(x); return `<button class="node${q.have ? ' have' : q.can ? ' can' : ''}${x.id === k.id ? ' on' : ''}" data-node="${x.id}" style="left:${POS[x.id][0]}%;top:${POS[x.id][1]}%"><i></i><span>${x.name}<small>${q.have ? 'aprendido' : '1 punto de saber'}</small></span></button>`; }).join('') + '</div>' +
         `<aside><small>${k.rama}</small><h3>${k.name}</h3><p>${k.text}</p><p class="muted">Lo enseña ${d.teacher.title}. Cuesta 1 punto de saber.</p>${d.can ? `<button class="btn main" data-skill="${k.id}">Aprender</button>` : `<em>${d.why}</em>`}</aside></div>`;
     } else if (open === 'bolsa') {
-      const ids = Object.keys(bag);
+      const ids = Object.keys(bag), cosa = (id) => BY[id] || api.cosas[id] || { title: id }, rec = api.recetas ? api.recetas() : [];
       $('panel-title').textContent = 'Bolsa';
-      body.innerHTML = '<p class="muted">Lo que Leftraru lleva consigo.</p><div class="grid">' + ids.map((id) => `<div class="slot">${thumb(BY[id])}<b>${BY[id].title}</b><i>× ${bag[id]}</i></div>`).join('') +
-        Array.from({ length: Math.max(0, 8 - ids.length) }, () => '<div class="slot empty"></div>').join('') + '</div>';
+      body.innerHTML = '<p class="muted">Lo que Leftraru lleva consigo.</p><div class="grid">' + ids.map((id) => { const c = cosa(id); return `<div class="slot">${BY[id] ? thumb(BY[id]) : `<span class="q cosa">${c.ico || '?'}</span>`}<b>${c.title}</b><i>× ${bag[id]}</i>${c.usar ? `<button class="btn mini" data-usar="${id}">${c.usar}</button>` : ''}</div>`; }).join('') +
+        Array.from({ length: Math.max(0, 8 - ids.length) }, () => '<div class="slot empty"></div>').join('') + '</div>' +
+        // lo que alguien le enseñó a preparar: qué pide cada cosa y un botón para hacerla (junto al fogón)
+        (rec.length ? '<h3 class="sec">Lo que sabes preparar</h3>' + rec.map((r) => `<div class="receta"><div><b>${r.title}</b><p>${r.text}</p><small>${r.lleva}</small></div><button class="btn" data-prep="${r.id}"${r.puede ? '' : ' disabled'}>${r.puede ? 'Preparar' : r.porque}</button></div>`).join('') : '');
     } else {
       $('panel-title').textContent = 'Cuaderno de Leftraru';
       const lv = level(), list = NOTES.filter((n) => n.cat === cat), cur = BY[sel] && BY[sel].cat === cat ? BY[sel] : null, have = found[sel] !== undefined;
@@ -223,6 +225,9 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
     open = which; document.exitPointerLock?.(); panel.classList.add('on'); if (which === 'notas') $('btn-notas').classList.remove('new'); if (which === 'misiones') $('btn-misiones').classList.remove('new'); render();
   }
   body.addEventListener('click', (e) => {
+    const pr = e.target.closest('[data-prep]'), us = e.target.closest('[data-usar]');
+    if (pr) { if (!pr.disabled && api.preparar) api.preparar(pr.dataset.prep); return render(); }
+    if (us) { if (api.usar) api.usar(us.dataset.usar); return render(); }
     const bm = e.target.closest('#bigmap'), gu = e.target.closest('[data-guia]');
     if (bm) { const r = bm.getBoundingClientRect(); return pickOnMap(B.x0 + ((e.clientX - r.left) / r.width) * (B.x1 - B.x0), B.z0 + ((e.clientY - r.top) / r.height) * (B.z1 - B.z0)); }
     if (e.target.closest('#guia-off')) return onGuide(null);
@@ -286,6 +291,7 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
       return act ? { id: act.id, title: act.title, prog: act.check(mctx), aviso: typeof act.aviso === 'function' ? act.aviso(mctx) : act.aviso, fijo: !!(act.fijo && act.fijo(mctx)) } : null;
     },
     marks: [], people: [], goals: [],
+    cosas: {}, recetas: null, preparar: null, usar: null, // las llena acciones.js: cómo se ven las cosas sin ficha, y lo que se sabe preparar
     guide: null, guideKey: '', // la línea de guía ({ pts, x, z, label, len }) y a qué apunta ('m:id' si es una misión)
     repaint: paintBase, done: (id) => !!done[id],
     state: { get found() { return found; }, bag, get skills() { return skills; }, get done() { return done; } },
