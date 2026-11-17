@@ -819,7 +819,9 @@ if (!ANTIGUO) import('three/examples/jsm/loaders/GLTFLoader.js').then(({ GLTFLoa
 // Así todo lo que la persona ya sabía hacer (tejer, revolver la olla, entregar, acariciar) sirve tal cual. De pie queda quieta:
 // la postura media de su movimiento de reposo, casi sin vaivén, con los pies juntos y una respiración leve.
 // cara: las medidas de sus ojos y su boca, para el pestañeo y los labios (ver haceCara).
-const GENTE3D = { Millaray: { archivo: 'millaray', mate: [0.2, 0.3], cara: { piel: 0x9c6240, boca: [[0.32, 5.6, 9.97], [-3.04, 5.53, 8.32], [3.41, 6.13, 7.86], [0.29, 6.28, 10.1], [0.37, 4.7, 9.94]],
+// movs: sus otros movimientos (archivos chicos, como los de Leftraru) y cuánto se deja de cada uno: mueve las manos al hablar,
+// escucha con atención cuando calla, y camina. paso: a qué velocidad avanza, en metros por segundo, el caminar tal como viene.
+const GENTE3D = { Millaray: { archivo: 'millaray', mate: [0.2, 0.3], movs: { habla: 0.6, escucha: 0.35, camina: 1 }, paso: 1.25, cara: { piel: 0x9c6240, boca: [[0.32, 5.6, 9.97], [-3.04, 5.53, 8.32], [3.41, 6.13, 7.86], [0.29, 6.28, 10.1], [0.37, 4.7, 9.94]],
   ojos: [[[-4.43, 11.85, 7.51], [-6.58, 11.64, 6.26], [-2.42, 11.62, 6.95], [-4.49, 12.86, 7.44], [-4.36, 10.77, 7.58]], [[3.62, 12.47, 6.9], [1.75, 11.93, 6.68], [5.7, 12.5, 5.39], [3.55, 13.48, 6.76], [3.69, 11.39, 6.91]]] } } }, gente3d = [];
 if (!ANTIGUO) import('three/examples/jsm/loaders/GLTFLoader.js').then(({ GLTFLoader }) => { for (const a of world.life.actors) { const def = GENTE3D[a.name]; if (!def) continue;
   new GLTFLoader().load(`assets/modelos/${def.archivo}.glb`, (gl) => {
@@ -832,9 +834,12 @@ if (!ANTIGUO) import('three/examples/jsm/loaders/GLTFLoader.js').then(({ GLTFLoa
 { float cl = dot(diffuseColor.rgb, vec3(0.3, 0.59, 0.11)); if (cl > ${def.mate[0].toFixed(3)}) diffuseColor.rgb *= (${def.mate[0].toFixed(3)} + (cl - ${def.mate[0].toFixed(3)}) * ${def.mate[1].toFixed(3)}) / cl; }`); }; } });
     for (const c of a.g.children) if (c.isSkinnedMesh) c.visible = false; // el cuerpo de siempre deja de verse
     a.g.add(m);
-    const mixer = new THREE.AnimationMixer(m); if (gl.animations[0]) { const q = mixer.clipAction(lazo(calma(gl.animations[0], QUIETUD), true)); q.timeScale = 0.55; q.play(); }
+    const mixer = new THREE.AnimationMixer(m), mov = {}; let quieta = null; if (gl.animations[0]) { quieta = mixer.clipAction(lazo(calma(gl.animations[0], QUIETUD), true)); quieta.timeScale = 0.55; quieta.play(); }
+    for (const k in def.movs || {}) fetch(`assets/modelos/${def.archivo}-${k}.json`).then((r) => (r.ok ? r.json() : null)).then((d) => { if (!d) return;
+      const clip = new THREE.AnimationClip(k, d.dura, d.pistas.map((q) => (q.que === 'giro' ? new THREE.QuaternionKeyframeTrack(`${q.hueso}.quaternion`, q.t, q.v) : new THREE.VectorKeyframeTrack(`${q.hueso}.position`, q.t, q.v))));
+      if (def.movs[k] < 1) calma(clip, def.movs[k]); mov[k] = mixer.clipAction(lazo(clip, true)); mov[k].play(); mov[k].setEffectiveWeight(0); }).catch(() => { /* sin ese movimiento, sigue con los que tenga */ });
     const H = {}; for (const n of ['RightArm', 'RightForeArm', 'RightHand', 'LeftArm', 'LeftForeArm', 'LeftHand', 'RightUpLeg', 'RightLeg', 'RightFoot', 'LeftUpLeg', 'LeftLeg', 'LeftFoot', 'Spine02', 'neck', 'Head', 'headfront']) H[n] = m.getObjectByName(n);
-    const P = { a, m, mixer, H, y0: m.position.y, pie: [0, 0], junta: 0, brazo: [0, 0], frente: H.headfront ? H.headfront.position.clone().normalize() : V3(0, 0, 1), fase: Math.random() * 6, parp: 1 + Math.random() * 3, habla: 0 }; // frente: hacia dónde mira la cara, en el espacio del hueso de la cabeza
+    const P = { a, m, mixer, H, quieta, mov, w: { habla: 0, escucha: 0, camina: 0 }, paso: def.paso || 1.2, y0: m.position.y, pie: [0, 0], junta: 0, brazo: [0, 0], frente: H.headfront ? H.headfront.position.clone().normalize() : V3(0, 0, 1), fase: Math.random() * 6, parp: 1 + Math.random() * 3, habla: 0 }; // frente: hacia dónde mira la cara, en el espacio del hueso de la cabeza
     if (def.cara) Object.assign(P, haceCara(H.Head, def.cara.ojos, def.cara.boca, def.cara.piel));
     a.c3 = P; gente3d.push(P); window.__g.gente3d = gente3d;
   }); } });
@@ -971,15 +976,20 @@ function ikBrazo(sup, inf, fin, T, polo, k) { // gira brazo y antebrazo para que
 }
 function updateGente3D(dt) {
   for (const P of gente3d) { const a = P.a, H = P.H; if (!a.g.visible) continue;
+    // qué movimiento toca: caminar si va andando; si conversa con Leftraru, las manos al hablar y la atención al callar
+    const conversa = !!(talk && talk.who === a && state === 'play'), anda = (a.speed || 0) > 0.12 && a.mode === 'lead', dice = conversa && P.habla > 0.15;
+    const meta = { camina: anda ? 1 : 0, habla: !anda && dice ? 1 : 0, escucha: !anda && conversa && !dice ? 1 : 0 }; let suma = 0;
+    for (const k in P.mov) { P.w[k] += (meta[k] - P.w[k]) * Math.min(1, dt * (k === 'camina' ? 6 : 2.5)); P.mov[k].setEffectiveWeight(P.w[k]); suma += P.w[k]; }
+    if (P.quieta) P.quieta.setEffectiveWeight(Math.max(0, 1 - suma)); if (P.mov.camina) P.mov.camina.timeScale = Math.max(0.5, (a.speed || 0) / P.paso);
     P.mixer.update(dt);
     if (H.Spine02) { const b = Math.sin(time * 1.25 + P.fase) * 0.012; H.Spine02.rotateX(b); if (H.neck) H.neck.rotateX(-b); } // respira
     a.g.updateMatrixWorld(true); // el cuerpo de siempre, ya con la postura de este cuadro
     const fx = Math.sin(a.face), fz = Math.cos(a.face);
-    pisa(P, dt, { suelo: a.g.position.y, apoyado: true, f: a.face, quieto: 1, slope: 0, h: a.h });
+    pisa(P, dt, { suelo: a.g.position.y, apoyado: true, f: a.face, quieto: 1 - P.w.camina, slope: 0, h: a.h });
     const inc = a.body.rotation.x; if (Math.abs(inc) > 0.004 && H.Spine02) tuerce(H.Spine02, QR.setFromAxisAngle(VC.set(fz, 0, -fx), inc), 1); // el tronco se inclina igual
     [['Left', a.armL, a.foreL, 1], ['Right', a.armR, a.foreR, -1]].forEach(([l, br, an, sx], i) => { // las manos van a donde están las del cuerpo de siempre; con los brazos caídos, se queda la postura de reposo
-      const uso = suave(0.06, 0.3, Math.abs(br.rotation.x) + Math.abs(an.rotation.x) + Math.abs(br.rotation.z - sx * 0.1)); P.brazo[i] += (uso - P.brazo[i]) * Math.min(1, dt * 8);
-      if (P.brazo[i] < 0.99) apunta(H[l + 'Arm'], fz * sx * 0.17 + fx * 0.04, -1, -fx * sx * 0.17 + fz * 0.04, 0.55 * (1 - P.brazo[i])); // en reposo, los brazos caen junto al cuerpo
+      const uso = suave(0.06, 0.3, Math.abs(br.rotation.x) + Math.abs(an.rotation.x) + Math.abs(br.rotation.z - sx * 0.1)) * (1 - P.w.camina); // caminando, los brazos los lleva el movimiento P.brazo[i] += (uso - P.brazo[i]) * Math.min(1, dt * 8);
+      if (P.brazo[i] < 0.99) apunta(H[l + 'Arm'], fz * sx * 0.17 + fx * 0.04, -1, -fx * sx * 0.17 + fz * 0.04, 0.55 * (1 - P.brazo[i]) * (1 - P.w.camina) * (1 - P.w.habla)); // en reposo, los brazos caen junto al cuerpo
       if (P.brazo[i] > 0.01) ikBrazo(H[l + 'Arm'], H[l + 'ForeArm'], H[l + 'Hand'], an.localToWorld(PT.set(0, -0.2, 0.03)), V3(fz * sx * 0.45 - fx * 0.5, -0.75, -fx * sx * 0.45 - fz * 0.5), P.brazo[i]); }); // el codo, hacia abajo, atrás y afuera
     if (H.Head) { VD.set(0, 0, 1).applyQuaternion(a.head.getWorldQuaternion(QD)).normalize(); const mira = PT.copy(VD); // la cabeza mira hacia donde mira la del cuerpo de siempre
       for (const [hueso, k] of [[H.neck, 0.4], [H.Head, 1]]) if (hueso) tuerce(hueso, QR.setFromUnitVectors(VC.copy(P.frente).applyQuaternion(H.Head.getWorldQuaternion(QF)).normalize(), VD.copy(mira)), k); }
