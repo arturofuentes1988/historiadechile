@@ -83,11 +83,12 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
   function hoja(g, x, y, k = 1) { g.save(); g.translate(x, y); g.rotate(-0.6); g.fillStyle = '#9fd66a'; g.strokeStyle = '#14110f'; g.lineWidth = 2.5 * k; g.beginPath(); g.moveTo(0, -11 * k); g.quadraticCurveTo(9 * k, -2 * k, 0, 11 * k); g.quadraticCurveTo(-9 * k, -2 * k, 0, -11 * k); g.fill(); g.stroke(); g.beginPath(); g.moveTo(0, -7 * k); g.lineTo(0, 8 * k); g.lineWidth = 1.2 * k; g.stroke(); g.restore(); }
   const FIJOS = { kutral: [FOGON.x, FOGON.z], rewe: [20, 19], witral: [-10.6, -4.2], ruka: [RUKAS[0].x, RUKAS[0].z], chemamull: [POI.antiguos.x, POI.antiguos.z], gigante: [POI.viejo.x, POI.viejo.z], weke: [CORRAL.x, CORRAL.z], palin: [POI.cancha.x, POI.cancha.z] };
   let rot = null, rotT = 0; // cuánto está girado el minimapa
-  function drawMap(pos, facing) {
+  function drawMap(pos, facing, vista = facing) { // vista: hacia dónde mira la cámara
     last = { x: pos.x, z: pos.z, f: facing };
     const [px, py] = P(pos.x, pos.z), R = S / 2 - 3, now = performance.now();
-    // El mapa gira para que lo que Leftraru tiene delante quede siempre arriba. Gira suave, para que una media vuelta no maree.
-    { const want = facing + Math.PI; if (rot === null) rot = want; let d = want - rot; d = Math.atan2(Math.sin(d), Math.cos(d)); rot += d * (1 - Math.exp(-Math.min(200, now - rotT) / 170)); rotT = now; }
+    // El mapa gira con la cámara: lo que el jugador tiene delante en la pantalla queda siempre arriba, también cuando
+    // gira la vista con el ratón sin caminar. Lo sigue casi al instante, con un mínimo de suavizado.
+    { const want = vista + Math.PI; if (rot === null) rot = want; let d = want - rot; d = Math.atan2(Math.sin(d), Math.cos(d)); rot += d * (1 - Math.exp(-Math.min(200, now - rotT) / 55)); rotT = now; }
     const cr = Math.cos(rot), sr = Math.sin(rot);
     const off = (x, z) => { const [a, c] = P(x, z), dx = (a - px) * ZOOM, dy = (c - py) * ZOOM; return [dx * cr - dy * sr, dx * sr + dy * cr]; }; // de un punto del mundo a su lugar en el minimapa, medido desde el centro
     const edge = (dx, dy, m) => { const d = Math.hypot(dx, dy), far = d > R - m; return far ? [dx * (R - m) / d, dy * (R - m) / d, true] : [dx, dy, false]; }; // lo que queda fuera se dibuja en el borde, en su dirección
@@ -105,8 +106,8 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
     for (const mk of api.marks) { const [dx, dy] = off(mk.x, mk.z); if (Math.hypot(dx, dy) < R - 14) { ctx.fillStyle = '#14110f'; ctx.beginPath(); ctx.arc(S / 2 + dx, S / 2 + dy, 9, 0, 7); ctx.fill(); ctx.fillStyle = '#e9dfc6'; ctx.font = 'bold 14px Georgia'; ctx.textAlign = 'center'; ctx.fillText('?', S / 2 + dx, S / 2 + dy + 5); } }
     // el banderín del destino va encima de todo lo demás; si queda fuera del minimapa, se ve en el borde, hacia donde está
     if (api.guide) { const [ex, ey, far] = edge(...off(api.guide.x, api.guide.z), 14); meta(ctx, S / 2 + ex, S / 2 + ey, far ? 0.95 : 1.15); }
-    // Leftraru: siempre al centro y con la flecha hacia arriba
-    ctx.translate(S / 2, S / 2); ctx.fillStyle = '#fff'; ctx.strokeStyle = '#14110f'; ctx.lineWidth = 3;
+    // Leftraru: siempre al centro. La flecha apunta hacia donde mira él: arriba si va hacia donde mira la cámara
+    ctx.translate(S / 2, S / 2); ctx.rotate(rot - Math.PI - facing); ctx.fillStyle = '#fff'; ctx.strokeStyle = '#14110f'; ctx.lineWidth = 3;
     ctx.beginPath(); ctx.moveTo(0, -20); ctx.lineTo(12, 13); ctx.lineTo(0, 6); ctx.lineTo(-12, 13); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.restore();
     // aro: una línea de cobre con cuatro marcas en los puntos cardinales, que giran con el mapa; la clara, con la N, es el norte
@@ -238,7 +239,7 @@ export function createUI({ world, onToast, onClose, onSkill, onGuide }) {
   $('btn-saberes').addEventListener('click', () => show('saberes'));
   $('panel-close').addEventListener('click', () => show(null));
   cv.addEventListener('click', () => show('mapa'));
-  $('mis-lista').addEventListener('click', (e) => { const r = e.target.closest('[data-guia]'); if (r) toggleGuide(r.dataset.guia); }); // un clic en una misión de la lista de arriba pone (o quita) su guía
+  $('mis-lista').addEventListener('click', (e) => { const r = e.target.closest('[data-guia]'); if (r) toggleGuide(r.dataset.guia); }); // un clic en una misión de la lista de la izquierda pone (o quita) su guía
   let actId = null; // la misión de la historia que está abierta
   refreshScore();
 

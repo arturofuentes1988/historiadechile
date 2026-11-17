@@ -238,7 +238,10 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
   }
   // la planta de este tipo más cercana en todo el mapa (para poder marcar dónde ir a buscarla)
   function findScatter(kind, x, z) { let best = null, bd = Infinity; for (const l of SCATTER[kind].cells.values()) for (const t of l) { if (t.picked) continue; const d = Math.hypot(t.x - x, t.z - z); if (d < bd) { bd = d; best = t; } } return best && { x: best.x, z: best.z }; }
+  // Un arbusto puesto a mano. No usa el azar del mundo, para no mover de lugar todo lo que se reparte después.
+  function bushAt(x, y, z, s, yaw = 0, v = 0) { const rec = { x, y, z, s, yaw, tint: 0.96, kind: 'bush', tree: true, rad: s }; SPEC.bush.inst[v % SPEC.bush.n].push(rec); physics.createCollider(RAPIER.ColliderDesc.cylinder(0.55 * s, 0.42 * s).setTranslation(x, y + 0.55 * s, z), fixed); return rec; }
+  function bushesIn(x, z, r) { const out = []; for (const l of SPEC.bush.inst) for (const t of l) if (Math.hypot(t.x - x, t.z - z) < r) out.push(t); return out; } // todos los arbustos a menos de r
   function nearBush(x, z, r) { let best = null; for (const l of SPEC.bush.inst) for (const t of l) { const d = Math.hypot(t.x - x, t.z - z); if (d < r && (!best || d < best.d)) best = { x: t.x, y: t.y, z: t.z, d, s: t.s, rec: t }; } return best; }
 
-  return { tree, scatter, rock, log, build, update, nearScatter, findScatter, nearBush, blockers, clearView, restoreView };
+  return { tree, scatter, rock, log, build, update, nearScatter, findScatter, nearBush, bushAt, bushesIn, blockers, clearView, restoreView };
 }

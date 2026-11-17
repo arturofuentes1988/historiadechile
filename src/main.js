@@ -89,7 +89,7 @@ function play() {
 function abrirPrologo() {
   state = 'cine'; prologo = true; const el = $('prologo'), ps = [...el.querySelectorAll('.papel p')];
   ps.forEach((q) => q.classList.remove('ya')); el.classList.remove('listo'); $('prologo-sigue').textContent = TACTIL ? 'Toca para ver todo' : 'Clic o Enter · ver todo'; el.classList.add('on');
-  let t = 1300; prologoT = ps.map((q) => { const id = setTimeout(() => q.classList.add('ya'), t); t += 800 + q.textContent.split(/\s+/).length * 175; return id; });
+  let t = 1300; prologoT = ps.map((q) => { const id = setTimeout(() => { q.classList.add('ya'); snd.play('tinta', 0.32, 0.92 + Math.random() * 0.16); }, t); t += 800 + q.textContent.split(/\s+/).length * 175; return id; });
   prologoT.push(setTimeout(prologoListo, t));
 }
 function prologoListo() { const el = $('prologo'); prologoT.forEach(clearTimeout); el.querySelectorAll('.papel p').forEach((q) => q.classList.add('ya')); el.classList.add('listo'); $('prologo-sigue').textContent = TACTIL ? 'Toca para continuar' : 'Haz clic para continuar'; }
@@ -162,7 +162,7 @@ const toggleFull = () => { if (document.fullscreenElement) document.exitFullscre
 $('btn-full').onclick = toggleFull; $('o-full').onchange = toggleFull;
 // En pantalla completa se le pide al navegador que Escape llegue al juego en vez de sacarte de ella
 // (funciona en Chrome y Edge; en otros navegadores Escape sigue saliendo de la pantalla completa).
-document.addEventListener('fullscreenchange', () => { const on = !!document.fullscreenElement; try { if (on) navigator.keyboard?.lock?.(['Escape'])?.catch?.(() => {}); else navigator.keyboard?.unlock?.(); } catch { /* sin soporte */ } if (on && state === 'play' && !menuOpen && !ui.open) lock(); $('o-full').checked = on; $('full-label').textContent = on ? 'Salir de pantalla completa' : 'Pantalla completa'; });
+document.addEventListener('fullscreenchange', () => { const on = !!document.fullscreenElement; try { if (on) navigator.keyboard?.lock?.(['Escape'])?.catch?.(() => {}); else navigator.keyboard?.unlock?.(); } catch { /* sin soporte */ } if (on && state === 'play' && !menuOpen && !ui.open) lock(); $('o-full').checked = on; $('btn-full').classList.toggle('on', on); $('btn-full').title = on ? 'Salir de pantalla completa' : 'Pantalla completa'; });
 if (!document.documentElement.requestFullscreen) { $('btn-full').style.display = 'none'; $('o-full').parentElement.style.display = 'none'; }
 // El ratón nunca queda atrapado: el puntero siempre se ve y se puede hacer clic en cualquier botón sin salir del juego.
 // La cámara se gira arrastrando con un botón apretado sobre el juego (o con sus teclas); la rueda acerca y aleja.
@@ -205,7 +205,7 @@ const herePhoto = () => { draw(); return grab(); };
 // ---------- observar y conversar (tecla E) ----------
 let near = null, scanT = 0, talk = null, misT = 0, lastAviso = null, still = 0;
 function applySkills() { explorer.reach = ui.skill('vista') ? 1.7 : 1; world.life.shyR = ui.skill('pudu') ? 3.5 : 9; }
-function say() { snd.play(talk.i ? 'hablar-sigue' : 'hablar', talk.i ? 0.4 : 0.55, 0.96 + Math.random() * 0.08); document.body.classList.add('talking'); const t = talk; $('dlg-name').textContent = t.name; $('dlg-text').textContent = t.lines[t.i]; $('dlg-more').textContent = `${keyName(opts.keys.observar)} · ${t.i < t.lines.length - 1 ? 'seguir' : 'cerrar'}`; $('dialogo').classList.add('on'); }
+function say() { snd.play('hablar-sigue', 0.4, 0.96 + Math.random() * 0.08); document.body.classList.add('talking'); const t = talk; $('dlg-name').textContent = t.name; $('dlg-text').textContent = t.lines[t.i]; $('dlg-more').textContent = `${keyName(opts.keys.observar)} · ${t.i < t.lines.length - 1 ? 'seguir' : 'cerrar'}`; $('dialogo').classList.add('on'); }
 function interact() {
   if (talk) { if (++talk.i < talk.lines.length) return say(); const t = talk; talk = null; $('dialogo').classList.remove('on'); document.body.classList.remove('talking'); snd.play('hablar-fin', 0.3); if (t.done) t.done(); return; }
   if (!near || state !== 'play' || ui.open || focus) return;
@@ -280,7 +280,10 @@ function toast(txt, secs = 5, sound = null, grande = GRANDE.includes(sound)) { i
 // en letra blanca y sin recuadro, para que no se confundan con los avisos de misión ni con los puntos.
 let ayudaT = 0, ayudaGap = 0; const ayudas = [];
 const teclasHTML = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])).replace(/\{(\w+)\}/g, (_, a) => `<kbd>${keyName(opts.keys[a] || a)}</kbd>`); // {observar} → la tecla, dibujada como tecla
-function showAyuda(txt, secs) { const el = $('ayuda'); el.innerHTML = teclasHTML(txt); el.classList.add('on'); ayudaT = secs; ayudaGap = 4; }
+function showAyuda(txt, secs) { // va en una sola línea si cabe en el espacio libre del centro (sin meterse sobre el panel de estado); si no, se reparte en dos o tres
+  const el = $('ayuda'); el.innerHTML = teclasHTML(txt.replace(/^\?/, '')); el.classList.remove('larga'); if (el.offsetWidth > Math.max(300, innerWidth - 2 * (Math.min(390, innerWidth * 0.4) + 32))) el.classList.add('larga');
+  el.classList.add('on'); ayudaT = secs; ayudaGap = 5;
+}
 function apunte(txt, sound) { // un renglón sobre el minimapa, que se va solo a los pocos segundos
   const el = document.createElement('div'); el.className = 'ap'; el.textContent = txt; $('apuntes').appendChild(el); vistos.push({ el, t: 5.5 });
   while (vistos.length > 4) vistos.shift().el.remove();
@@ -346,6 +349,16 @@ function updatePlayer(dt) {
   let dx = fx * iz + rx * ix, dz = fz * iz + rz * ix; if (andar) { dx = andar[0]; dz = andar[1]; } const l = Math.hypot(dx, dz);
   if (l > 0) { dx /= l; dz /= l; player.dirX = dx; player.dirZ = dz; let d = Math.atan2(dx, dz) - player.facing; d = Math.atan2(Math.sin(d), Math.cos(d)); player.facing += d * Math.min(1, dt * 12); }
   if (acc.sitting && (ix || iz || down('saltar'))) acc.stand(); // cualquier movimiento lo hace levantarse
+  // La mirada: Leftraru mira hacia donde mira la cámara. Primero vuelve la cabeza (y un poco los hombros); si la vista
+  // pasa más allá de su costado, se da vuelta entero con pasitos en el lugar, hasta quedar otra vez de frente a lo que miras.
+  { const libre = state === 'play' && !talk && !focus && !acc.sitting && !auto && desmayo <= 0;
+    let d = cam.yaw + Math.PI - player.facing; d = Math.atan2(Math.sin(d), Math.cos(d));
+    if (libre && l === 0 && player.grounded) {
+      if (Math.abs(d) > 1.15) player.girando = true; else if (Math.abs(d) < 0.22) player.girando = false; // una vez que empieza a girar, sigue hasta quedar casi de frente
+      if (player.girando) { const paso = Math.sign(d) * Math.min(Math.abs(d), dt * 3.4); player.facing += paso; d -= paso; }
+    } else player.girando = false;
+    const yaw = libre ? Math.max(-1.15, Math.min(1.15, d)) * Math.max(0, 1 - player.speed / 3) : 0, pit = libre ? Math.max(-0.2, Math.min(0.36, (cam.pitch - 0.2) * 0.45)) : 0;
+    player.miraY = (player.miraY || 0) + (yaw - (player.miraY || 0)) * Math.min(1, dt * 6); player.miraX = (player.miraX || 0) + (pit - (player.miraX || 0)) * Math.min(1, dt * 6); }
   if (player.grounded && state === 'play' && !ui.open && !talk && !focus && !acc.sitting && !auto && down('saltar')) { player.vy = 6.6 * (ui.skill('salto') ? 1.22 : 1); player.grounded = false; }
   player.vy = Math.max(-25, player.vy - 18 * dt);
   if (player.vy > 0) ctrl.disableSnapToGround(); else ctrl.enableSnapToGround(0.3);
@@ -367,7 +380,8 @@ function updatePlayer(dt) {
   const t = pp(); boy.g.position.set(t.x, t.y - FEET, t.z); boy.g.rotation.y = player.facing;
   player.phase += dt * (2.5 + player.speed * 1.9);
   player.slope = (player.slope || 0) + ((player.speed > 0.3 ? slopeAhead(t.x, t.z, player.facing) : 0) - (player.slope || 0)) * Math.min(1, dt * 5); // pendiente hacia donde camina, suavizada
-  animatePerson(boy, player.phase, Math.min(1, player.speed / 6.2) * 0.9 + (player.speed > 0.2 ? 0.25 : 0), !player.grounded, player.slope);
+  animatePerson(boy, player.phase, Math.max(player.girando ? 0.24 : 0, Math.min(1, player.speed / 6.2) * 0.9 + (player.speed > 0.2 ? 0.25 : 0)), !player.grounded, player.slope);
+  if (!acc.sitting) { boy.head.rotation.y = player.miraY * 0.8; boy.head.rotation.x = player.miraX; boy.body.rotation.y += player.miraY * 0.2; } // la cabeza lleva casi todo el giro de la mirada; los hombros, un poco
   for (const k in POI) if (state === 'play' && Math.hypot(t.x - POI[k].x, t.z - POI[k].z) < 20) { ui.place(k); if (!ui.has('l-' + k) && !talk && player.grounded) ui.discover('l-' + k, herePhoto()); }
   if ((misT -= dt) <= 0 && state === 'play' && !talk) { // misiones y ayudas de los saberes
     misT = 0.5; const m = ui.missions({ got, total: world.items.length, ...acc.ctx() });
@@ -375,10 +389,10 @@ function updatePlayer(dt) {
     destinoGuia(t);
     // cuando la historia avanza un paso, se avisa qué sigue (después de los avisos de lo recién logrado)
     const av = m ? m.aviso : 'Hasta aquí llega la historia por ahora: pronto llegarán los invitados de la costa. Mientras tanto, explora el valle y termina tus encargos.';
-    const crudo = Array.isArray(av) ? av : [av], key = crudo.map(teclas).join('|'), esAyuda = (t) => !!(m && m.fijo) || /\{\w+\}/.test(t); // los pasos del tutorial y lo que nombra teclas son instrucciones de cómo jugar
+    const crudo = Array.isArray(av) ? av : [av], key = crudo.map(teclas).join('|'), esAyuda = (t) => !!(m && m.fijo) || t[0] === '?' || /\{\w+\}/.test(t); // los pasos del tutorial y lo que nombra teclas son instrucciones de cómo jugar
     if (key !== lastAviso) { lastAviso = key; ayudas.length = 0; ayudaT = 0; ayudaGap = 0; $('ayuda').classList.remove('on'); let primero = true;
       for (const t of crudo) { if (esAyuda(t)) ayudas.push([t, 12]); else { toast(teclas(t), 10, primero ? 'mision' : null, true); primero = false; } } }
-    else if (m && m.fijo && ayudaT < 0.6 && !ayudas.length) showAyuda(crudo[0], 8); // el paso del tutorial sigue a la vista hasta que lo haces
+    else if (m && m.fijo && ayudaT < 0.6 && !ayudas.length) for (const t of crudo) ayudas.push([t, 12]); // el paso del tutorial sigue a la vista hasta que lo haces: sus instrucciones vuelven a pasar
     // La guía de la historia se pone sola: apunta a la misión principal abierta, salvo que el jugador haya marcado otra cosa o se la haya quitado.
     if (m && !guia && guiaNo !== m.id) setGuia({ kind: 'mision', id: m.id, auto: true }, 'sola');
     else if (guia && guia.auto && (!m || guia.id !== m.id)) setGuia(m && guiaNo !== m.id ? { kind: 'mision', id: m.id, auto: true } : null, 'sola');
@@ -481,6 +495,19 @@ function updateGuia() { // el trazo, cada cuadro, desde donde está ahora
   const p = pp(), r = route(p.x, p.z, guiaT.x, guiaT.z, guiaVia); guiaVia = r.via;
   ui.guide = { pts: r.pts, x: guiaT.x, z: guiaT.z, label: guiaT.label, len: r.len };
 }
+// ---------- hojas verdes que marcan en el mundo lo que hay que ir a recoger (las mismas del mapa) ----------
+// Flotan sobre cada planta pedida y se ven a través de los árboles, para encontrarla de lejos; al acercarse se achican.
+const hojaMat = (() => { // una hoja verde sobre un disco claro con borde oscuro: se distingue contra el follaje, el suelo y el cielo
+  const c = document.createElement('canvas'); c.width = c.height = 96; const g = c.getContext('2d'); g.translate(48, 48);
+  g.fillStyle = '#fff1d0'; g.strokeStyle = '#14110f'; g.lineWidth = 6; g.beginPath(); g.arc(0, 0, 41, 0, 7); g.fill(); g.stroke();
+  g.rotate(-0.6); g.fillStyle = '#5aa832'; g.lineWidth = 4; g.beginPath(); g.moveTo(0, -27); g.quadraticCurveTo(23, -4, 0, 27); g.quadraticCurveTo(-23, -4, 0, -27); g.fill(); g.stroke(); g.lineWidth = 2.5; g.beginPath(); g.moveTo(0, -17); g.lineTo(0, 19); g.stroke();
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return new THREE.SpriteMaterial({ map: t, fog: false, toneMapped: false, depthWrite: false, depthTest: false, transparent: true }); })();
+const hojas = Array.from({ length: 6 }, () => { const sp = new THREE.Sprite(hojaMat); sp.visible = false; sp.renderOrder = 6; scene.add(sp); return sp; });
+function updateHojas() {
+  const p = pp(), gl = state === 'play' && !focus ? ui.goals : [];
+  hojas.forEach((sp, i) => { const q = gl[i], d = q ? Math.hypot(q.x - p.x, q.z - p.z) : 0; sp.visible = !!q && d < 80; if (!sp.visible) return;
+    sp.scale.setScalar(0.5 + Math.min(1, d / 40) * 0.75); sp.position.set(q.x, height(q.x, q.z) + (q.alto || 2.6) + Math.sin(time * 2.2 + i * 1.3) * 0.07, q.z); });
+}
 // ---------- vida: baja con las caídas grandes y con el agua helada del río; vuelve sola, y más rápido sentado junto al fuego ----------
 let vida = acc.vida, fallV = 0, enSuelo = true, frio = false, desmayo = 0, vidaVista = -1;
 function updateVida(dt) {
@@ -501,7 +528,7 @@ function updateVida(dt) {
 }
 drawKeys(); applySkills();
 await assets.whenLoaded(); bar(1, 'Listo'); assets.onProgress = null; $('loading').classList.add('hide'); setTimeout(() => $('loading').remove(), 700);
-window.__g = { snd, height, ui, explorer, acc, story, toasts, murmur, setGuia, renderer, get vida() { return vida; }, set vida(v) { vida = v; }, camera, abrirPrologo, cerrarPrologo, get prologo() { return prologo; }, get acto() { return acto; }, cerrarActo, portadaMenu, avanzarPrologo, ayudas, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, get guia() { return guia; }, get guiaT() { return guiaT; }, outro, apuntes, sueltaTodo, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter() { portadaMenu(); coverT = 0; enter(); }, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
+window.__g = { snd, height, ui, explorer, acc, story, toasts, murmur, setGuia, renderer, get vida() { return vida; }, set vida(v) { vida = v; }, camera, abrirPrologo, cerrarPrologo, get prologo() { return prologo; }, get acto() { return acto; }, hojas, cerrarActo, portadaMenu, avanzarPrologo, ayudas, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, get guia() { return guia; }, get guiaT() { return guiaT; }, outro, apuntes, sueltaTodo, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter() { portadaMenu(); coverT = 0; enter(); }, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
   tp(x, y, z) { setPos(x, y, z); player.vy = 0; },
   view(x, y, z, lx, ly, lz) { camera.position.set(x, y, z); camera.lookAt(lx, ly, lz); world.update(0, time, camera.position, pp()); draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); },
   snap() { draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); } };
@@ -526,7 +553,8 @@ function tick(dt) {
     ripT -= dt; if (player.wade > 0.05 && player.speed > 0.5 && ripT <= 0) { ripT = 0.22; const r = ripples[ripI++ % ripples.length]; r.position.set(p.x, WATER_Y + 0.03, p.z); r.userData.t = 0; r.visible = true; }
     for (const r of ripples) if (r.visible) { const k = (r.userData.t += dt) / 1.6; r.scale.setScalar(0.4 + k * 2.6); r.material.opacity = 0.5 * (1 - k); if (k >= 1) r.visible = false; } }
   world.update(dt, time, camera.position, pp(), player.speed); lights.follow(fuera() ? { x: 0, y: 3, z: 0 } : cine.active ? camera.position : pp());
-  if (state === 'play') { updateGuia(); ui.drawMap(pp(), player.facing); }
+  if (state === 'play') { updateGuia(); ui.drawMap(pp(), player.facing, cam.yaw + Math.PI); }
+  updateHojas();
   if (hintT > 0 && (hintT -= dt) <= 0) $('hint').classList.remove('on');
   if (ayudaT > 0 && (ayudaT -= dt) <= 0) $('ayuda').classList.remove('on');
   ayudaGap -= dt; if (ayudas.length && ayudaGap <= 0 && state === 'play' && !talk) showAyuda(...ayudas.shift());

@@ -81,9 +81,9 @@
   #end { position: fixed; left: 0; right: 0; top: 9vh; text-align: center; font-style: italic; font-size: clamp(16px, 2.4vw, 26px); text-shadow: 0 2px 8px #000; opacity: 0; pointer-events: none; transition: opacity 1s; } #end.on { opacity: 1; }
 
   /* juego: marcadores */
-  #hudbox { position: fixed; top: 14px; right: 16px; width: min(390px, 40vw); display: flex; flex-direction: column; gap: 10px; opacity: 0; transition: opacity .6s; pointer-events: none; z-index: 2; }
+  #hudbox { position: fixed; top: 14px; left: 16px; width: min(390px, 40vw); display: flex; flex-direction: column; gap: 10px; opacity: 0; transition: opacity .6s; pointer-events: none; z-index: 2; }
   body.playing #hudbox { opacity: 1; }
-  #estado { display: flex; align-items: center; gap: 10px; filter: drop-shadow(0 6px 14px #000a); }
+  #estado { display: flex; flex-direction: row-reverse; align-items: center; gap: 10px; filter: drop-shadow(0 6px 14px #000a); }
   #retrato { width: 76px; height: 76px; flex: none; border-radius: 50%; overflow: hidden; border: 3px solid var(--copper); box-shadow: 0 0 0 3px var(--ink); background: #2a231b; }
   #retrato img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; display: block; }
   #barras { flex: 1; min-width: 0; background: var(--panel); clip-path: var(--step); padding: 10px 16px 9px 15px; display: flex; flex-direction: column; gap: 6px; }
@@ -92,9 +92,9 @@
   .medida { height: 10px; background: #ffffff1c; overflow: hidden; } .medida i { display: block; height: 100%; width: 0; transition: width .35s; }
   #vida-bar { background: linear-gradient(90deg, #8a2620, #d0523f); } #pts-bar { background: linear-gradient(90deg, #9a6a2e, #e9b03a); }
   #estado.poca #vida-bar { animation: late 1s infinite; } @keyframes late { 50% { filter: brightness(1.7); } }
-  #pts-txt { font-size: 12px; font-style: italic; color: var(--dim); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } #pts-txt.listo { color: #e9b03a; }
+  #pts-txt { font-size: 12px; font-style: italic; color: var(--dim); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } #pts-txt.listo { color: #e9b03a; }
   #hud { opacity: 0; transition: opacity .6s; } #hud.on { opacity: 1; }
-  #mis-lista { background: linear-gradient(#17130fa6, #17130f66); border-right: 3px solid var(--copper); padding: 10px 14px 11px 16px; font-size: 14.5px; text-shadow: 0 1px 3px #000, 0 0 2px #000; }
+  #mis-lista { background: linear-gradient(#17130fa6, #17130f66); border-left: 3px solid var(--copper); padding: 10px 16px 11px 14px; font-size: 14.5px; text-shadow: 0 1px 3px #000, 0 0 2px #000; }
   #mis-lista h5 { margin: 0 0 5px; font-weight: normal; letter-spacing: .18em; text-transform: uppercase; font-size: 11.5px; color: var(--copper); } #mis-lista h5:not(:first-child) { margin-top: 10px; }
   .ml { display: grid; grid-template-columns: 10px 1fr auto; gap: 9px; align-items: center; padding: 2px 0; } .ml i { width: 8px; height: 8px; transform: rotate(45deg); background: var(--copper); }
   .ml em { font-style: normal; color: var(--copper); font-size: 13px; }
@@ -107,8 +107,9 @@
   #hint { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); max-width: max(300px, min(44vw, calc(100vw - 860px))); background: var(--panel); clip-path: var(--step); padding: 10px 24px; font-size: 16px; text-align: center; opacity: 0; transition: opacity .5s; pointer-events: none; z-index: 3; box-shadow: inset 0 -2px 0 var(--copper); }
   #hint.on { opacity: 1; }
   /* instrucciones de cómo jugar: al centro, en blanco y sin recuadro, para distinguirlas de los demás avisos */
-  #ayuda { position: fixed; left: 50%; top: 34%; transform: translate(-50%, -50%); width: max(300px, min(700px, 84vw, calc(100vw - 2 * min(390px, 40vw) - 64px))); text-wrap: balance; text-align: center; color: #fff; font-size: clamp(17px, 2vw, 24px); line-height: 1.45; text-shadow: 0 2px 5px #000, 0 0 3px #000, 0 0 16px #000c; opacity: 0; transition: opacity .5s; pointer-events: none; z-index: 3; }
+  #ayuda { position: fixed; left: 50%; top: 34%; transform: translate(-50%, -50%); max-width: 94vw; white-space: nowrap; text-align: center; color: #fff; font-size: clamp(16px, 1.55vw, 22px); line-height: 1.45; text-shadow: 0 2px 5px #000, 0 0 3px #000, 0 0 16px #000c; opacity: 0; transition: opacity .5s; pointer-events: none; z-index: 3; }
   #ayuda.on { opacity: 1; } body.talking #ayuda { opacity: 0; }
+  #ayuda.larga { white-space: normal; text-wrap: balance; width: max(300px, min(700px, 84vw, calc(100vw - 2 * min(390px, 40vw) - 64px))); } /* las largas se reparten en varias líneas, sin meterse sobre el panel de estado */
   #ayuda kbd { font: inherit; font-size: .8em; font-weight: bold; padding: .08em .5em .12em; margin: 0 .14em; border: 1.5px solid #fff; border-radius: 6px; background: #0007; white-space: nowrap; text-shadow: none; }
   #hint.grande { font-size: 21px; line-height: 1.3; padding: 13px 30px; box-shadow: inset 0 -3px 0 #e9b03a; } /* los avisos de misión se leen de lejos */
   /* los puntos de investigación que se van ganando: renglones chicos, a la izquierda, sobre el minimapa */
@@ -118,23 +119,23 @@
   @keyframes ap-in { from { opacity: 0; transform: translateX(-12px); } }
   #minimap { position: fixed; left: 16px; bottom: 16px; width: 170px; height: 170px; border-radius: 50%; opacity: 0; transition: opacity .6s; pointer-events: none; cursor: pointer; filter: drop-shadow(0 6px 14px #000a); }
   body.playing #minimap { opacity: 1; pointer-events: auto; } body.nomini #minimap { display: none; }
-  #btns { position: fixed; right: 16px; bottom: 16px; display: flex; gap: 8px; opacity: 0; transition: opacity .6s; pointer-events: none; }
+  #btns { position: fixed; right: 16px; bottom: 16px; display: flex; gap: 6px; opacity: 0; transition: opacity .6s; pointer-events: none; }
   body.playing #btns { opacity: 1; pointer-events: auto; }
-  #corner { position: fixed; top: 14px; left: 16px; display: flex; gap: 8px; z-index: 5; } body.cine #corner { display: none; }
+  #corner { position: fixed; top: 14px; right: 16px; display: flex; gap: 8px; z-index: 5; } body.cine #corner { display: none; }
   #btn-menu { display: none; } body.playing #btn-menu { display: flex; }
-  .tool { position: relative; border: 0; color: var(--cream); background: var(--panel); clip-path: var(--step); padding: 10px 14px 8px; min-width: 74px; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 13px; letter-spacing: .06em; transition: background .15s, color .15s; }
-  .tool svg { width: 22px; height: 22px; color: var(--copper); transition: color .15s; } .tool kbd { font: inherit; font-size: 11px; color: var(--dim); }
+  .tool { position: relative; border: 0; color: var(--cream); background: var(--panel); clip-path: var(--step); padding: 7px 9px 6px; min-width: 54px; display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 10.5px; letter-spacing: .05em; transition: background .15s, color .15s; }
+  .tool svg { width: 16px; height: 16px; color: var(--copper); transition: color .15s; } .tool kbd { font: inherit; font-size: 9.5px; color: var(--dim); }
   .tool:hover { background: #c98a4a; color: var(--ink); } .tool:hover svg, .tool:hover kbd { color: var(--ink); }
   .tool.row { flex-direction: row; min-width: 0; padding: 10px 14px; gap: 8px; } .tool.row kbd { margin-left: 2px; } .tool.row svg { width: 18px; height: 18px; }
-  .tool.new::after { content: ''; position: absolute; top: 7px; right: 9px; width: 9px; height: 9px; background: #e9b03a; transform: rotate(45deg); }
+  .tool.ico { min-width: 0; width: 38px; height: 38px; padding: 0; justify-content: center; } .tool.ico svg { width: 18px; height: 18px; } /* menú y pantalla completa: solo el símbolo */
+  #btn-full .b, #btn-full.on .a { display: none; } #btn-full.on .b { display: block; }
+  .tool.new::after { content: ''; position: absolute; top: 5px; right: 6px; width: 7px; height: 7px; background: #e9b03a; transform: rotate(45deg); }
   #prompt2 { bottom: 150px !important; }
   #prompt, #prompt2 { position: fixed; left: 50%; bottom: 96px; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; background: var(--panel); clip-path: var(--step); padding: 10px 22px 10px 12px; font-size: 17px; opacity: 0; transition: opacity .2s; pointer-events: none; }
   #prompt.on, #prompt2.on { opacity: 1; }
   .key { display: inline-grid; place-items: center; width: 30px; height: 30px; background: var(--copper); color: var(--ink); font-weight: bold; font-size: 16px; clip-path: polygon(6px 0, calc(100% - 6px) 0, calc(100% - 6px) 3px, calc(100% - 3px) 3px, calc(100% - 3px) 6px, 100% 6px, 100% calc(100% - 6px), calc(100% - 3px) calc(100% - 6px), calc(100% - 3px) calc(100% - 3px), calc(100% - 6px) calc(100% - 3px), calc(100% - 6px) 100%, 6px 100%, 6px calc(100% - 3px), 3px calc(100% - 3px), 3px calc(100% - 6px), 0 calc(100% - 6px), 0 6px, 3px 6px, 3px 3px, 6px 3px); font-family: Georgia, serif; }
   #focus { position: fixed; left: 50%; bottom: 60px; transform: translateX(-50%); background: var(--panel); clip-path: var(--step); padding: 10px 24px; font-size: 17px; font-style: italic; opacity: 0; transition: opacity .4s; pointer-events: none; box-shadow: inset 0 -2px 0 var(--copper); z-index: 3; }
   #focus.on { opacity: 1; }
-  #mousehint { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); font-size: 13px; font-style: italic; color: var(--cream); text-shadow: 0 1px 4px #000, 0 0 2px #000; opacity: 0; pointer-events: none; transition: opacity .4s; }
-  body.playing.sin-raton #mousehint { opacity: .9; }
   body.playing canvas { cursor: grab; } body.playing.girando canvas { cursor: grabbing; }
   #aviso-error { position: fixed; left: 50%; top: 40%; transform: translate(-50%, -50%); max-width: min(520px, 84vw); background: var(--panel); clip-path: var(--stepL); padding: 22px 30px; font-size: 18px; line-height: 1.5; text-align: center; box-shadow: inset 0 3px 0 var(--red); z-index: 9; display: none; } #aviso-error.on { display: block; }
   #velo { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 1s; z-index: 5; } #velo.on { opacity: 1; }
@@ -229,7 +230,7 @@
   .lbox { width: min(460px, 80vw); text-align: center; } .lbox h1 { font-size: clamp(34px, 6vw, 64px); margin-bottom: 26px; text-shadow: none; }
   .ltrack { height: 8px; background: #ffffff14; clip-path: var(--step); } #load-bar { display: block; height: 100%; width: 4%; background: linear-gradient(90deg, var(--red), var(--copper)); transition: width .35s ease; }
   #load-text { margin: 14px 0 0; font-style: italic; color: var(--dim); font-size: 15px; }
-  @media (max-width: 760px) { .dex { grid-template-columns: 1fr; } #minimap { width: 120px; height: 120px; } #apuntes { bottom: 148px; } .tool { min-width: 58px; } }
+  @media (max-width: 760px) { .dex { grid-template-columns: 1fr; } #minimap { width: 120px; height: 120px; } #apuntes { bottom: 148px; } .tool { min-width: 46px; } }
 </style>
 </head>
 <body>
@@ -270,7 +271,6 @@
 <div id="prompt2" class="shadow"><span class="key" data-key="accion">R</span><span id="prompt2-text"></span></div>
 <div id="prompt" class="shadow"><span class="key" data-key="observar">E</span><span id="prompt-text"></span></div>
 <div id="focus"></div>
-<div id="mousehint">Mantén apretado el botón del ratón y arrastra para girar la cámara · la rueda acerca y aleja</div>
 <div id="dialogo"><div id="dlg-name"></div><div id="dlg-text"></div><div id="dlg-more"></div></div>
 <div id="btns" class="shadow">
   <button id="btn-notas" class="tool" title="Cuaderno: todo lo que has descubierto, con sus fotos"><svg viewBox='0 0 24 24'><polygon points='12.00,2.00 13.76,7.75 19.07,4.93 16.25,10.24 22.00,12.00 16.25,13.76 19.07,19.07 13.76,16.25 12.00,22.00 10.24,16.25 4.93,19.07 7.75,13.76 2.00,12.00 7.75,10.24 4.93,4.93 10.24,7.75' fill='currentColor'/></svg>Cuaderno<kbd data-key="cuaderno">N</kbd></button>
@@ -280,8 +280,8 @@
   <button id="btn-mapa" class="tool" title="Mapa: el territorio completo y los lugares visitados"><svg viewBox='0 0 24 24' fill='currentColor'><path d='M9 2h6v4h3v3h4v6h-4v3h-3v4H9v-4H6v-3H2V9h4V6h3z'/><rect x='10' y='10' width='4' height='4' fill='#14110f'/></svg>Mapa<kbd data-key="mapa">M</kbd></button>
 </div>
 <div id="corner" class="shadow">
-  <button id="btn-full" class="tool row" title="Pantalla completa"><svg viewBox='0 0 24 24' fill='currentColor'><path d='M3 3h7v3H6v4H3zM14 3h7v7h-3V6h-4zM3 14h3v4h4v3H3zM18 14h3v7h-7v-3h4z'/></svg><span id="full-label">Pantalla completa</span><kbd data-key="pantalla">F</kbd></button>
-  <button id="btn-menu" class="tool row" title="Pausa, opciones y controles"><svg viewBox='0 0 24 24' fill='currentColor'><path d='M3 5h18v3H3zM6 10.5h12v3H6zM3 16h18v3H3z'/></svg>Menú<kbd data-key="menu">P</kbd></button>
+  <button id="btn-full" class="tool ico" title="Pantalla completa" aria-label="Pantalla completa"><svg class="a" viewBox='0 0 24 24' fill='currentColor'><path d='M3 3h7v3H6v4H3zM14 3h7v7h-3V6h-4zM3 14h3v4h4v3H3zM18 14h3v7h-7v-3h4z'/></svg><svg class="b" viewBox='0 0 24 24' fill='currentColor'><path d='M7 3h3v7H3V7h4zM14 3h3v4h4v3h-7zM3 14h7v7H7v-4H3zM14 14h7v3h-4v4h-3z'/></svg></button>
+  <button id="btn-menu" class="tool ico" title="Menú: pausa, opciones y controles" aria-label="Menú"><svg viewBox='0 0 24 24' fill='currentColor'><path d='M3 5h18v3H3zM6 10.5h12v3H6zM3 16h18v3H3z'/></svg></button>
 </div>
 
 <div id="panel"><div id="sheet"><div class="head"><h2 id="panel-title">Cuaderno</h2><button id="panel-close" class="btn">Cerrar · Esc</button></div><div class="greca"></div><div id="panel-body"></div></div></div>

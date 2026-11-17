@@ -155,12 +155,14 @@ const met = (id) => (c) => c.has(id);
 export const MISSIONS = [
   // m1 parte con un tutorial dentro de la historia: f.tu 1 = mirar el telar, 2 = alcanzar la lana; después viene el encargo.
   // Los avisos pueden nombrar teclas entre llaves ({observar}); "fijo" deja el aviso a la vista mientras dure ese paso.
+  // Las instrucciones de cómo jugar van cortas, una idea por línea: si son varias, se muestran una después de otra.
+  // Una que no nombra teclas se marca con «?» al comienzo para que salga igual al centro, como instrucción.
   { id: 'm1', main: true, n: 1, title: 'Los piñones del pewen', who: 'Millaray, tu madre', pts: 40,
     text: (c) => (c.f.m1 ? (c.got < c.total ? 'Tu madre te mandó a reunir los últimos piñones para la celebración. Están en el bosque de pewenes, siguiendo el sendero hacia el norte. Uno quedó sobre unas rocas: hay que correr y saltar.' : 'Ya tienes todos los piñones. Llévaselos a tu madre: te espera junto al fogón, con el agua al fuego.')
       : !c.f.tu ? 'Faltan pocos días para el We Tripantu y toda la aldea se prepara. Tu madre, Millaray, te está llamando: teje en el telar, junto a la ruka de la familia.'
         : c.f.tu === 1 ? 'Tu madre quiere que mires bien su telar antes de mandarte al bosque. Obsérvalo y vuelve a hablar con ella.' : 'Tu madre necesita que le alcances la lana roja, junto al telar.'),
-    aviso: (c) => (c.f.m1 ? (c.got < c.total ? ['Nueva misión: Los piñones del pewen. Arriba a la derecha ves tu misión y cuánto llevas; la línea roja del minimapa te muestra el camino.', 'Sigue el sendero del norte hasta el bosque de pewenes. {correr} para correr, {saltar} para saltar. {misiones} abre la lista de misiones y {mapa}, el mapa.'] : 'Ya tienes todos los piñones. Llévaselos a tu madre: te espera junto al fogón, con el agua al fuego.')
-      : !c.f.tu ? 'Camina con {adelante} {izquierda} {atras} {derecha}; para girar la cámara, arrastra con el ratón. Tu madre te llama: ve hacia la estrella dorada y pulsa {observar} para hablarle.'
+    aviso: (c) => (c.f.m1 ? (c.got < c.total ? ['Nueva misión: Los piñones del pewen. Sigue el sendero del norte hasta el bosque de pewenes: la línea roja del minimapa te muestra el camino.', '?Arriba a la izquierda ves tu misión y cuánto llevas', '{correr} para correr y {saltar} para saltar', '{misiones} abre las misiones y {mapa}, el mapa'] : 'Ya tienes todos los piñones. Llévaselos a tu madre: te espera junto al fogón, con el agua al fuego.')
+      : !c.f.tu ? ['Camina con {adelante} {izquierda} {atras} {derecha}', 'Arrastra con el ratón para girar la cámara', 'Ve hacia la estrella dorada y pulsa {observar} para hablar con tu madre']
         : c.f.tu === 1 ? (c.has('witral') ? 'Lo que observas queda en tu cuaderno ({cuaderno}). Ahora vuelve a hablar con tu madre.' : 'Acércate al telar y pulsa {observar} para observarlo.')
           : c.f.lana ? 'Vuelve a hablar con tu madre.' : 'Junto al telar, pulsa {accion} para alcanzarle la lana. Con {accion} recoges cosas y ayudas.'),
     fijo: (c) => !c.f.m1,
@@ -173,7 +175,7 @@ export const MISSIONS = [
     check: (c) => [c.f.m2 === 2, c.f.m2 === 2 ? 1 : 0, 1] },
   { id: 'm3', main: true, n: 3, title: 'Las plantas de la machi', who: 'la machi', pts: 50, pide: 'm2',
     text: (c) => (!c.f.m3 ? 'Ñamku, el anciano, amaneció enfermo y la machi pregunta por ti. Búscala junto al rewe, al suroriente de la aldea.' : c.f.m3 === 1 ? 'La machi necesita hojas de canelo de dos árboles, un trozo de corteza de quillay y hojas de maqui para prepararle un lawen a Ñamku. Reúne las plantas con la tecla de acción y vuelve con ella.' : 'La machi preparó el lawen. Llévaselo a Ñamku, en su ruka al oriente de la aldea, mientras está tibio.'),
-    aviso: (c) => (!c.f.m3 ? 'Nueva misión: Las plantas de la machi. Baja a la aldea y búscala junto al rewe, al suroriente.' : c.f.m3 === 1 ? (c.hierbas < 5 ? 'Reúne hojas de canelo, corteza de quillay y hojas de maqui: las hojas verdes del mapa ({mapa}) marcan dónde buscar. Junto a cada planta, pulsa {accion}.' : 'Ya tienes las plantas. Vuelve con la machi.') : 'Recibiste el lawen. Llévaselo a Ñamku, en su ruka al oriente de la aldea.'),
+    aviso: (c) => (!c.f.m3 ? 'Nueva misión: Las plantas de la machi. Baja a la aldea y búscala junto al rewe, al suroriente.' : c.f.m3 === 1 ? (c.hierbas < 5 ? 'Reúne hojas de canelo, corteza de quillay y hojas de maqui: una hoja verde marca cada planta, en el mundo y en el mapa ({mapa}). Junto a ella, pulsa {accion}.' : 'Ya tienes las plantas. Vuelve con la machi.') : 'Recibiste el lawen. Llévaselo a Ñamku, en su ruka al oriente de la aldea.'),
     paso: (c) => (!c.f.m3 ? 'Busca a la machi, junto al rewe' : c.f.m3 === 1 ? (c.hierbas < 5 ? `Canelo ${c.llevo.canelo}/2 · quillay ${c.llevo.quillay}/1 · maqui ${c.llevo.maqui}/2 (hojas verdes en el mapa)` : 'Vuelve con la machi') : 'Lleva el lawen a Ñamku'),
     check: (c) => { const s = c.f.m3 || 0; return [s >= 3, s >= 2 ? s + 4 : s === 1 ? 1 + c.hierbas : 0, 7]; } },
   { id: 'm4', main: true, n: 4, title: 'Los invitados', pide: 'm3', soon: true },

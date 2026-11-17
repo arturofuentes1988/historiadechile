@@ -157,8 +157,10 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
   function source(id, p) {
     const it = ITEMS[id]; let s = null;
     if (it.plant) s = world.nearPlant(it.plant, p.x, p.z, 1.6);
-    else if (it.bush) s = d2(p, POI.maqui.x, POI.maqui.z) < 30 ? world.nearBush(p.x, p.z, 2.4) : null;
-    else { const t = world.nearTree(p.x, p.z, 3.2); if (t && t.kind === it.tree) s = { d: t.d, rec: t.rec }; }
+    // De lo que sirve, lo más cercano que aún no se ha cortado: una mata ya cortada o un árbol de otra especie que
+    // quede más a mano no deben tapar al que sí se puede recoger.
+    else if (it.bush) { if (d2(p, POI.maqui.x, POI.maqui.z) < 32) for (const t of world.bushesIn(p.x, p.z, 2.8)) { const d = d2(p, t.x, t.z); if (!t.picked && (!s || d < s.d)) s = { d, rec: t }; } }
+    else for (const t of world.trees) { if (t.kind !== it.tree || t.rec.picked) continue; const d = d2(p, t.x, t.z); if (d < 3.2 && (!s || d < s.d)) s = { d, rec: t.rec }; }
     return s && !s.rec.picked ? s : null;
   }
   function pick(id, rec) { rec.picked = true; give(id); snd.play('arbusto-1', 0.35); const n = needs()[id] || 0; hint(n ? `Recogiste ${ITEMS[id].uno}. Faltan ${n}.` : `Recogiste ${ITEMS[id].uno}. Ya tienes lo necesario.`, 4); }
@@ -274,12 +276,12 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
   return { scan, talk, wants, update, pose, stand, madreCocina, f, pins: S.pin, pin(i) { if (!S.pin.includes(i)) { S.pin.push(i); save(); } },
     get sitting() { return !!sit; }, get busy() { return !!sit && sit.st !== 'on'; }, // busy: está sentándose o levantándose
     ctx: () => ({ f, hierbas: Math.min(2, have('canelo')) + Math.min(1, have('quillay')) + Math.min(2, have('maqui')), llevo: { canelo: Math.min(2, have('canelo')), quillay: Math.min(1, have('quillay')), maqui: Math.min(2, have('maqui')) } }),
-    // Dónde ir a buscar lo que falta para las misiones abiertas: los árboles más cercanos de cada especie y el claro del maqui.
+    // Dónde ir a buscar lo que falta para las misiones abiertas: los árboles más cercanos de cada especie y las matas de maqui del claro.
     goals(p) {
       const n = needs(), out = [];
       for (const id in n) { if (n[id] <= 0) continue; const it = ITEMS[id];
-        if (it.tree) world.trees.filter((t) => t.kind === it.tree && !t.rec.picked).map((t) => [d2(p, t.x, t.z), t]).sort((a, b) => a[0] - b[0]).slice(0, Math.max(2, n[id])).forEach(([, t]) => out.push({ x: t.x, z: t.z, id, label: it.uno }));
-        else if (it.bush) out.push({ x: POI.maqui.x, z: POI.maqui.z, id, label: it.uno }); }
+        if (it.tree) world.trees.filter((t) => t.kind === it.tree && !t.rec.picked).map((t) => [d2(p, t.x, t.z), t]).sort((a, b) => a[0] - b[0]).slice(0, Math.max(2, n[id])).forEach(([, t]) => out.push({ x: t.x, z: t.z, id, label: it.uno, alto: 3 }));
+        else if (it.bush) world.bushesIn(POI.maqui.x, POI.maqui.z, 30).filter((t) => !t.picked).map((t) => [d2(p, t.x, t.z), t]).sort((a, b) => a[0] - b[0]).slice(0, Math.max(2, n[id])).forEach(([, t]) => out.push({ x: t.x, z: t.z, id, label: it.uno, alto: 2.1 * t.s + 0.45 })); } // alto: a qué altura flota la hoja que lo marca en el mundo
       return out;
     },
     // A dónde hay que ir ahora para avanzar en una misión (para la línea de guía). Devuelve { x, z, label } o nada si no hay un lugar que marcar.
