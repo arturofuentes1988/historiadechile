@@ -58,11 +58,17 @@ export function buildWorld(scene, RAPIER, physics) {
   }
   // volcán nevado al oriente
   const VOL = { x: 1500, z: -520, H: 640, R: 620 };
-  { const pts = []; for (let i = 0; i <= 24; i++) { const u = i / 24; pts.push(new THREE.Vector2(VOL.R * Math.pow(1 - u, 1.5) + 14 * (1 - u), u * VOL.H)); }
-    const g = new THREE.LatheGeometry(pts, 48), P = g.attributes.position, C = [], c = new THREE.Color();
-    for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i), a = Math.atan2(z, x), k = 1 + 0.07 * Math.sin(a * 9 + y * 0.01) + 0.04 * Math.sin(a * 23); P.setX(i, x * k); P.setZ(i, z * k); c.set(y / VOL.H > 0.38 + 0.1 * Math.sin(a * 7) + 0.05 * Math.sin(a * 19) ? 0xf2f4f6 : 0x4a5262).lerp(FOG.color, 0.42); C.push(c.r, c.g, c.b); } // la bruma se mezcla a mano: a esta distancia la niebla lo borraría
-    g.setAttribute('color', new THREE.Float32BufferAttribute(C, 3)); g.computeVertexNormals();
-    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.9, fog: false })); m.position.set(VOL.x, 20, VOL.z); scene.add(m);
+  // Un cono de faldas cóncavas con quebradas y costillas que bajan desde la cumbre, un cráter arriba y su fumarola.
+  // La roca, la nieve y la bruma de la distancia van pintadas en la textura (a esta distancia la niebla lo borraría).
+  const plume = [];
+  { const pts = [], N = 40; for (let i = 0; i <= N; i++) { const u = i / N; pts.push(new THREE.Vector2(VOL.R * Math.pow(1 - u, 1.55) + 26 * (1 - u) + 20, u * VOL.H)); }
+    pts.push(new THREE.Vector2(13, VOL.H - 9), new THREE.Vector2(0, VOL.H - 16)); // el cráter: el borde y el hueco
+    const g = new THREE.LatheGeometry(pts, 96), P = g.attributes.position, U = g.attributes.uv;
+    for (let i = 0; i < P.count; i++) { const x = P.getX(i), y = P.getY(i), z = P.getZ(i), a = Math.atan2(z, x), u = y / VOL.H, k = 1 + (0.075 * Math.sin(a * 9 + u * 2) + 0.045 * Math.sin(a * 23 + 1.3) + 0.022 * Math.sin(a * 46 + u * 5)) * (0.35 + 0.65 * (1 - u)); P.setX(i, x * k); P.setZ(i, z * k); U.setY(i, Math.min(1, u)); }
+    g.computeVertexNormals();
+    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: TEX.volcan, roughness: 0.95, fog: false, emissiveMap: TEX.volcan, emissive: 0xffffff, emissiveIntensity: 0.3 })); m.position.set(VOL.x, 20, VOL.z); scene.add(m);
+    // la fumarola: el pillán respira. Unas nubes suaves que suben del cráter y se las lleva el viento
+    for (let i = 0; i < 7; i++) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.soft, color: 0xf2f0ea, transparent: true, opacity: 0.5 - i * 0.06, depthWrite: false, fog: false })); sp.position.set(VOL.x + i * i * 10, 20 + VOL.H + 6 + i * 38, VOL.z - i * 12); sp.scale.setScalar(80 + i * 52); sp.userData = { i, x: sp.position.x, y: sp.position.y }; scene.add(sp); plume.push(sp); }
   }
 
   // ---------- agua ----------
@@ -160,6 +166,6 @@ export function buildWorld(scene, RAPIER, physics) {
     items, trees, life, strokes: Math.round(tris),
     nearTree(x, z, r) { const ci = Math.floor(x / 8), cj = Math.floor(z / 8); let best = null; for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) { const l = grid.get(ci + i + ',' + (cj + j)); if (l) for (const t of l) { const d = Math.hypot(t.x - x, t.z - z); if (d < r && (!best || d < best.d)) best = { ...t, d }; } } return best; },
     nearPlant: flora.nearScatter, nearBush: flora.nearBush, blockers: flora.blockers, clearView: flora.clearView, restoreView: flora.restoreView, volcano: new THREE.Vector3(VOL.x, 380, VOL.z),
-    update(dt, t, camPos, playerPos, speed) { flora.update(camPos); life.update(dt, t, playerPos, speed); if (emit.glow) { emit.glow.intensity = 12 + Math.sin(t * 11) * 2.5 + Math.sin(t * 23.7) * 1.5; emit.ember.emissiveIntensity = 1.8 + Math.sin(t * 3.1) * 0.5 + Math.sin(t * 7.3) * 0.25; } },
+    update(dt, t, camPos, playerPos, speed) { flora.update(camPos); life.update(dt, t, playerPos, speed); for (const sp of plume) { sp.position.x = sp.userData.x + Math.sin(t * 0.13 + sp.userData.i * 2) * 9; sp.position.y = sp.userData.y + Math.sin(t * 0.21 + sp.userData.i) * 5; } if (emit.glow) { emit.glow.intensity = 12 + Math.sin(t * 11) * 2.5 + Math.sin(t * 23.7) * 1.5; emit.ember.emissiveIntensity = 1.8 + Math.sin(t * 3.1) * 0.5 + Math.sin(t * 7.3) * 0.25; } },
   };
 }

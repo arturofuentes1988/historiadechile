@@ -257,6 +257,15 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
 
   return { scan, talk, wants, update, pose, stand, f, pins: S.pin, pin(i) { if (!S.pin.includes(i)) { S.pin.push(i); save(); } },
     get sitting() { return !!sit; }, get busy() { return !!sit && sit.st !== 'on'; }, // busy: está sentándose o levantándose
-    ctx: () => ({ f, hierbas: Math.min(2, have('canelo')) + Math.min(1, have('quillay')) + Math.min(2, have('maqui')) }),
+    ctx: () => ({ f, hierbas: Math.min(2, have('canelo')) + Math.min(1, have('quillay')) + Math.min(2, have('maqui')), llevo: { canelo: Math.min(2, have('canelo')), quillay: Math.min(1, have('quillay')), maqui: Math.min(2, have('maqui')) } }),
+    // Dónde ir a buscar lo que falta para las misiones abiertas: los árboles más cercanos de cada especie y el claro del maqui.
+    goals(p) {
+      const n = needs(), out = [];
+      for (const id in n) { if (n[id] <= 0) continue; const it = ITEMS[id];
+        if (it.tree) world.trees.filter((t) => t.kind === it.tree && !t.rec.picked).map((t) => [d2(p, t.x, t.z), t]).sort((a, b) => a[0] - b[0]).slice(0, Math.max(2, n[id])).forEach(([, t]) => out.push({ x: t.x, z: t.z, id, label: it.uno }));
+        else if (it.bush) out.push({ x: POI.maqui.x, z: POI.maqui.z, id, label: it.uno }); }
+      return out;
+    },
+    get vida() { return S.vida ?? 100; }, set vida(v) { S.vida = v; save(); },
     reset() { localStorage.removeItem(KEY); } };
 }

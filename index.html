@@ -37,7 +37,11 @@
   /* cine */
   .bar { position: fixed; left: 0; right: 0; height: 0; background: #0c0b09; transition: height .8s ease; z-index: 2; }
   .bar.top { top: 0; } .bar.bot { bottom: 0; } body.cine .bar { height: 11vh; }
-  #sub { position: fixed; left: 8%; right: 8%; bottom: 13vh; text-align: center; font-size: clamp(16px, 2.3vw, 28px); font-style: italic; text-shadow: 0 2px 8px #000, 0 0 2px #000; opacity: 0; transition: opacity .8s; z-index: 3; pointer-events: none; }
+  #sub { position: fixed; left: 50%; bottom: 190px; transform: translateX(-50%); width: min(720px, 86vw); box-sizing: border-box; background: var(--panel); clip-path: var(--stepL); padding: 16px 30px 17px; box-shadow: inset 0 3px 0 var(--copper);
+    font-size: clamp(16px, 1.9vw, 20px); line-height: 1.5; opacity: 0; transition: opacity .5s; z-index: 3; pointer-events: none; }
+  body.cine #sub { bottom: 13vh; }
+  #sub b { display: block; color: var(--copper); letter-spacing: .14em; text-transform: uppercase; font-size: 14px; font-weight: normal; margin-bottom: 7px; } #sub b:empty { display: none; }
+  #sub.relato { font-style: italic; text-align: center; }
   #sub.on { opacity: 1; }
   /* prólogo: una hoja escrita que va pasando y se aleja hacia el fondo, sobre la aldea a oscuras */
   #prologo { position: fixed; inset: 0; z-index: 6; overflow: hidden; opacity: 0; pointer-events: none; transition: opacity 1.4s; perspective: 460px; perspective-origin: 50% 12%;
@@ -59,19 +63,33 @@
   #end { position: fixed; left: 0; right: 0; top: 9vh; text-align: center; font-style: italic; font-size: clamp(16px, 2.4vw, 26px); text-shadow: 0 2px 8px #000; opacity: 0; pointer-events: none; transition: opacity 1s; } #end.on { opacity: 1; }
 
   /* juego: marcadores */
-  #hudbox { position: fixed; top: 14px; left: 16px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; opacity: 0; transition: opacity .6s; pointer-events: none; }
+  #hudbox { position: fixed; top: 14px; right: 16px; width: min(340px, 36vw); display: flex; flex-direction: column; gap: 10px; opacity: 0; transition: opacity .6s; pointer-events: none; z-index: 2; }
   body.playing #hudbox { opacity: 1; }
-  .chip { background: var(--panel); clip-path: var(--step); padding: 9px 18px 9px 14px; font-size: 16px; letter-spacing: .05em; display: flex; align-items: center; gap: 9px; }
-  .chip::before { content: ''; width: 16px; height: 16px; background: var(--star) center / contain no-repeat; }
-  .chip b { color: var(--copper); font-size: 18px; } .chip small { color: var(--dim); }
+  #estado { display: flex; align-items: center; gap: 10px; filter: drop-shadow(0 6px 14px #000a); }
+  #retrato { width: 76px; height: 76px; flex: none; border-radius: 50%; overflow: hidden; border: 3px solid var(--copper); box-shadow: 0 0 0 3px var(--ink); background: #2a231b; }
+  #retrato img { width: 100%; height: 100%; object-fit: cover; object-position: 50% 18%; display: block; }
+  #barras { flex: 1; min-width: 0; background: var(--panel); clip-path: var(--step); padding: 10px 16px 9px 15px; display: flex; flex-direction: column; gap: 6px; }
+  .fila { display: grid; grid-template-columns: 62px 1fr 36px; align-items: center; gap: 8px; font-size: 11.5px; letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+  .fila b { color: var(--cream); font-size: 15px; text-align: right; letter-spacing: 0; }
+  .medida { height: 10px; background: #ffffff1c; overflow: hidden; } .medida i { display: block; height: 100%; width: 0; transition: width .35s; }
+  #vida-bar { background: linear-gradient(90deg, #8a2620, #d0523f); } #pts-bar { background: linear-gradient(90deg, #9a6a2e, #e9b03a); }
+  #estado.poca #vida-bar { animation: late 1s infinite; } @keyframes late { 50% { filter: brightness(1.7); } }
+  #pts-txt { font-size: 12px; font-style: italic; color: var(--dim); text-align: right; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } #pts-txt.listo { color: #e9b03a; }
   #hud { opacity: 0; transition: opacity .6s; } #hud.on { opacity: 1; }
-  #hint { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); max-width: 56vw; background: var(--panel); clip-path: var(--step); padding: 10px 24px; font-size: 16px; text-align: center; opacity: 0; transition: opacity .5s; pointer-events: none; z-index: 3; box-shadow: inset 0 -2px 0 var(--copper); }
+  #mis-lista { background: linear-gradient(#17130fa6, #17130f66); border-right: 3px solid var(--copper); padding: 10px 14px 11px 16px; font-size: 14.5px; text-shadow: 0 1px 3px #000, 0 0 2px #000; }
+  #mis-lista h5 { margin: 0 0 5px; font-weight: normal; letter-spacing: .18em; text-transform: uppercase; font-size: 11.5px; color: var(--copper); } #mis-lista h5:not(:first-child) { margin-top: 10px; }
+  .ml { display: grid; grid-template-columns: 10px 1fr auto; gap: 9px; align-items: center; padding: 2px 0; } .ml i { width: 8px; height: 8px; transform: rotate(45deg); background: var(--copper); }
+  .ml em { font-style: normal; color: var(--copper); font-size: 13px; }
+  .ml.hecha { color: var(--dim); } .ml.hecha span { text-decoration: line-through; } .ml.hecha i { background: #6a9a58; }
+  .ml.actual { color: #fff; font-size: 16.5px; padding-top: 4px; } .ml.actual i { background: #f2b441; box-shadow: 0 0 8px #f2b441; }
+  .paso { margin: 1px 0 3px 19px; font-size: 13.5px; font-style: italic; color: var(--cream); }
+  #hint { position: fixed; top: 16px; left: 50%; transform: translateX(-50%); max-width: max(300px, min(44vw, calc(100vw - 760px))); background: var(--panel); clip-path: var(--step); padding: 10px 24px; font-size: 16px; text-align: center; opacity: 0; transition: opacity .5s; pointer-events: none; z-index: 3; box-shadow: inset 0 -2px 0 var(--copper); }
   #hint.on { opacity: 1; }
   #minimap { position: fixed; left: 16px; bottom: 16px; width: 170px; height: 170px; border-radius: 50%; opacity: 0; transition: opacity .6s; pointer-events: none; cursor: pointer; filter: drop-shadow(0 6px 14px #000a); }
   body.playing #minimap { opacity: 1; pointer-events: auto; } body.nomini #minimap { display: none; }
   #btns { position: fixed; right: 16px; bottom: 16px; display: flex; gap: 8px; opacity: 0; transition: opacity .6s; pointer-events: none; }
   body.playing #btns { opacity: 1; pointer-events: auto; }
-  #corner { position: fixed; top: 14px; right: 16px; display: flex; gap: 8px; z-index: 5; } body.cine #corner { display: none; }
+  #corner { position: fixed; top: 14px; left: 16px; display: flex; gap: 8px; z-index: 5; } body.cine #corner { display: none; }
   #btn-menu { display: none; } body.playing #btn-menu { display: flex; }
   .tool { position: relative; border: 0; color: var(--cream); background: var(--panel); clip-path: var(--step); padding: 10px 14px 8px; min-width: 74px; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 13px; letter-spacing: .06em; transition: background .15s, color .15s; }
   .tool svg { width: 22px; height: 22px; color: var(--copper); transition: color .15s; } .tool kbd { font: inherit; font-size: 11px; color: var(--dim); }
@@ -86,6 +104,8 @@
   #focus.on { opacity: 1; }
   #mousehint { position: fixed; left: 50%; bottom: 22px; transform: translateX(-50%); font-size: 13px; font-style: italic; color: var(--cream); text-shadow: 0 1px 4px #000, 0 0 2px #000; opacity: 0; pointer-events: none; transition: opacity .4s; }
   body.playing.sin-raton #mousehint { opacity: .9; }
+  body.playing canvas { cursor: grab; } body.playing.girando canvas { cursor: grabbing; }
+  #velo { position: fixed; inset: 0; background: #000; opacity: 0; pointer-events: none; transition: opacity 1s; z-index: 5; } #velo.on { opacity: 1; }
   #dialogo { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); width: min(720px, 88vw); background: var(--panel); clip-path: var(--stepL); padding: 20px 30px 18px; display: none; cursor: pointer; z-index: 3; box-shadow: inset 0 3px 0 var(--copper); }
   #dialogo.on { display: block; }
   #dlg-name { color: var(--copper); letter-spacing: .14em; text-transform: uppercase; font-size: 14px; margin-bottom: 8px; }
@@ -189,9 +209,17 @@
   <div id="cover-2" class="cover shadow" hidden><button id="c-historia" class="btn main">Historia<small>Capítulo 1 · El mundo de Leftraru</small></button><button id="c-volver" class="btn">Volver<small>A la portada</small></button></div>
   <p class="place">Nahuelbuta, invierno de 1545</p></div>
 
-<div id="hudbox" class="shadow"><div id="hud" class="chip"><span><small>Misión ·</small> <span id="mis-title"></span> <b id="mis-prog"></b></span></div><div class="chip"><span><b id="score-n">0</b> <small>puntos para gastar en saberes</small></span></div></div>
+<div id="hudbox">
+  <div id="estado"><div id="barras">
+    <div class="fila"><span>Vida</span><div class="medida"><i id="vida-bar"></i></div><b id="vida-n">100</b></div>
+    <div class="fila"><span>Saberes</span><div class="medida"><i id="pts-bar"></i></div><b id="score-n">0</b></div>
+    <div id="pts-txt"></div>
+  </div><div id="retrato"><img src="assets/cuaderno/leftraru.webp" alt="Leftraru"></div></div>
+  <div id="hud"><div id="mis-lista"></div></div>
+</div>
+<div id="velo"></div>
 <div id="hint"></div>
-<div id="sub"></div>
+<div id="sub"><b id="sub-name"></b><span id="sub-text"></span></div>
 <div id="prologo"><div class="hoja"><div class="papel">
   <small>Capítulo I</small><h2>El mundo de Leftraru</h2>
   <p>Año 1545. Al sur del mundo, entre la cordillera y el mar, está la tierra de los mapuche, la gente de la tierra.</p>
@@ -207,7 +235,7 @@
 <div id="prompt2" class="shadow"><span class="key" data-key="accion">R</span><span id="prompt2-text"></span></div>
 <div id="prompt" class="shadow"><span class="key" data-key="observar">E</span><span id="prompt-text"></span></div>
 <div id="focus"></div>
-<div id="mousehint">Haz clic en el juego para girar la cámara con el ratón</div>
+<div id="mousehint">Mantén apretado el botón del ratón y arrastra para girar la cámara · la rueda acerca y aleja</div>
 <div id="dialogo"><div id="dlg-name"></div><div id="dlg-text"></div><div id="dlg-more"></div></div>
 <div id="btns" class="shadow">
   <button id="btn-notas" class="tool" title="Cuaderno: todo lo que has descubierto, con sus fotos"><svg viewBox='0 0 24 24'><polygon points='12.00,2.00 13.76,7.75 19.07,4.93 16.25,10.24 22.00,12.00 16.25,13.76 19.07,19.07 13.76,16.25 12.00,22.00 10.24,16.25 4.93,19.07 7.75,13.76 2.00,12.00 7.75,10.24 4.93,4.93 10.24,7.75' fill='currentColor'/></svg>Cuaderno<kbd data-key="cuaderno">N</kbd></button>

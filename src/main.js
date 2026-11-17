@@ -85,7 +85,7 @@ function intro() {
   const front = (d, side, up) => V3(b.x + fx * d + fz * side, b.y - FEET + up, b.z + fz * d - fx * side);
   cine.play([
     { dur: 5.5, from: front(3.6, 0.9, 1.35), to: front(2.2, 0.4, 1.1), lookFrom: eye, text: 'Leftraru.' },
-    { dur: 6.5, from: G(-6.7, 1.75, -1.9), to: G(-7.9, 1.45, -3.5), lookFrom: G(-9.9, 1.15, -5.1), text: '—¡Leftraru! Ven acá, que te necesito.' },
+    { dur: 6.5, from: G(-6.7, 1.75, -1.9), to: G(-7.9, 1.45, -3.5), lookFrom: G(-9.9, 1.15, -5.1), who: 'Millaray', text: '¡Leftraru! Ven acá, que te necesito.' },
   ], play);
 }
 
@@ -146,19 +146,16 @@ $('btn-full').onclick = toggleFull; $('o-full').onchange = toggleFull;
 // (funciona en Chrome y Edge; en otros navegadores Escape sigue saliendo de la pantalla completa).
 document.addEventListener('fullscreenchange', () => { const on = !!document.fullscreenElement; try { if (on) navigator.keyboard?.lock?.(['Escape'])?.catch?.(() => {}); else navigator.keyboard?.unlock?.(); } catch { /* sin soporte */ } if (on && state === 'play' && !menuOpen && !ui.open) lock(); $('o-full').checked = on; $('full-label').textContent = on ? 'Salir de pantalla completa' : 'Pantalla completa'; });
 if (!document.documentElement.requestFullscreen) { $('btn-full').style.display = 'none'; $('o-full').parentElement.style.display = 'none'; }
-// al soltar el ratón con Escape durante el juego, se abre el menú
-// El ratón: al entrar al mundo queda tomado para girar la cámara. Escape lo suelta y abre el menú.
-// Si el navegador no deja tomarlo, también se puede girar arrastrando con el botón apretado.
-let dragging = false, lockWanted = 0;
-function lock() { lockWanted = performance.now(); try { const r = renderer.domElement.requestPointerLock?.(); r?.catch?.(() => {}); } catch { /* el navegador no lo permitió */ } }
-const locked = () => document.pointerLockElement === renderer.domElement;
-document.addEventListener('pointerlockchange', () => {
-  document.body.classList.toggle('sin-raton', !locked());
-  if (!locked() && state === 'play' && !ui.open && !menuOpen && performance.now() - lockWanted > 400) setMenu(true);
-});
-document.body.classList.add('sin-raton');
-renderer.domElement.addEventListener('mousedown', () => { dragging = true; if (state === 'play' && !ui.open && !menuOpen && !locked()) lock(); });
-addEventListener('mouseup', () => { dragging = false; });
+// El ratón nunca queda atrapado: el puntero siempre se ve y se puede hacer clic en cualquier botón sin salir del juego.
+// La cámara se gira arrastrando con un botón apretado sobre el juego (o con sus teclas); la rueda acerca y aleja.
+let dragging = false;
+function lock() { /* ya no se captura el ratón */ }
+const locked = () => false;
+document.body.classList.add('sin-raton'); // deja a la vista la ayuda de cómo girar, hasta que se arrastra por primera vez
+renderer.domElement.addEventListener('mousedown', (e) => { if (state !== 'play') return; dragging = true; document.body.classList.add('girando'); e.preventDefault(); });
+renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
+addEventListener('mouseup', () => { dragging = false; document.body.classList.remove('girando'); });
+renderer.domElement.addEventListener('wheel', (e) => { if (state === 'play' && !focus) cam.dist = Math.min(9, Math.max(2.6, cam.dist + Math.sign(e.deltaY) * 0.6)); }, { passive: true });
 
 // ---------- fotos para el cuaderno: se toman del elemento real, en el momento de descubrirlo ----------
 const shot = document.createElement('canvas'); shot.width = 480; shot.height = 300;
@@ -234,15 +231,20 @@ function story(kind, after) {
     pBody.setTranslation({ x: bx, y: height(bx, bz) + FEET + 0.05, z: bz }, true); player.vy = 0; player.speed = 0; player.facing = f; pa.face = f; pa.quieto = true;
   };
   const back = ([dx, dz], d, up) => V3(sx - dz * 0.45 - dx * d, sy + up, sz + dx * 0.45 - dz * d); // detrás de ellos, entre los dos
+  // el traro: que esté volando desde el comienzo, para que al mostrarlo ya vaya planeando sobre el cerro
+  const tr = world.life.birds.find((b) => b.type === 'traro'), vuela = () => { const g = tr.grp; if (g.st !== 'fly') { g.st = 'fly'; g.tm = 0; } g.dur = 90; };
+  // la cámara lo acompaña por fuera de su vuelta y desde arriba: se lo ve de cerca, con la cima y los dos allá abajo
+  const conTraro = (camera) => { const o = tr.g.position, fx = Math.sin(tr.yaw), fz = Math.cos(tr.yaw); camera.position.set(o.x + fx * 1.3 + fz * 2.4, o.y + 1.8, o.z + fz * 1.3 - fx * 2.4); camera.lookAt(o.x + fx * 0.35, o.y - 0.05, o.z + fz * 0.35); };
   playScene([
-    { dur: 8, on: turn(dA), from: back(dA, 4.4, 2.3), to: back(dA, 3.3, 2.0), lookFrom: V3(sx + dA[0] * 60, sy - 7, sz + dA[1] * 60), text: '—Mira. Hacia donde se esconde el sol está el lafken, el mar. Y allá abajo, el humo de nuestras rukas.' },
-    { dur: 9, on: turn(dV), from: back(dV, 7.2, 2.75), to: back(dV, 5.6, 2.4), lookFrom: V3(vol.x, 140, vol.z), lookTo: V3(vol.x, 185, vol.z), text: '—Hacia donde nace, el volcán, la casa del pillán. Todo lo que hay entre uno y otro es tu mundo.' },
-    { dur: 9, from: back(dV, -3.0, 1.25), to: back(dV, -2.3, 1.2), lookFrom: V3(sx - dV[1] * 0.45, sy + 1.25, sz + dV[0] * 0.45), text: '—¿Ves al traro, dando vueltas sobre el cerro? Mira mucho antes de bajar, y cuando baja, no falla. Por él te llamas Leftraru: traro veloz.' },
+    { dur: 8, on: () => { turn(dA)(); vuela(); }, from: back(dA, 4.4, 2.3), to: back(dA, 3.3, 2.0), lookFrom: V3(sx + dA[0] * 60, sy - 7, sz + dA[1] * 60), who: 'Curiñancu', text: 'Mira. Hacia donde se esconde el sol está el lafken, el mar. Y allá abajo, el humo de nuestras rukas.' },
+    { dur: 9, on: turn(dV), from: back(dV, 7.2, 2.75), to: back(dV, 5.6, 2.4), lookFrom: V3(vol.x, 140, vol.z), lookTo: V3(vol.x, 185, vol.z), who: 'Curiñancu', text: 'Hacia donde nace, el volcán, la casa del pillán. Todo lo que hay entre uno y otro es tu mundo.' },
+    { dur: 9, cam: conTraro, fov: 34, who: 'Curiñancu', text: '¿Ves al traro, dando vueltas sobre el cerro? Mira mucho antes de bajar, y cuando baja, no falla.' },
+    { dur: 7, from: back(dV, -3.0, 1.25), to: back(dV, -2.3, 1.2), lookFrom: V3(sx - dV[1] * 0.45, sy + 1.25, sz + dV[0] * 0.45), who: 'Curiñancu', text: 'Por él te llamas Leftraru: traro veloz.' },
   ], after);
 }
 // Lo que alguien dice al pasar, sin detener el juego (el padre mientras suben al cerro): aparece abajo unos segundos.
 let subT = 0;
-function murmur(name, text, secs = 7) { const s = $('sub'); s.textContent = `${name}: ${text}`; s.classList.add('on'); subT = secs; snd.play('hablar-sigue', 0.35, 0.9); }
+function murmur(name, text, secs = 7) { $('sub-name').textContent = name; $('sub-text').textContent = text; const s = $('sub'); s.classList.remove('relato'); s.classList.add('on'); subT = secs; snd.play('hablar-sigue', 0.35, 0.9); }
 // Mensajes de arriba. hint lo muestra de inmediato; los avisos que llegan juntos (un hallazgo, una misión
 // cumplida, la misión que sigue) hacen fila para que cada uno alcance a leerse.
 let hintT = 0, toastGap = 0; const toasts = [];
@@ -274,7 +276,8 @@ addEventListener('keydown', (e) => {
 addEventListener('keyup', (e) => { keys[e.code] = false; });
 addEventListener('mousemove', (e) => {
   if (focus || (!locked() && !(dragging && state === 'play'))) return;
-  cam.yaw -= e.movementX * 0.0028 * opts.sens; cam.pitch = Math.min(1.2, Math.max(-0.25, cam.pitch + e.movementY * 0.0022 * opts.sens * (opts.inv ? -1 : 1)));
+  document.body.classList.remove('sin-raton');
+  cam.yaw -= e.movementX * 0.0042 * opts.sens; cam.pitch = Math.min(1.2, Math.max(-0.25, cam.pitch + e.movementY * 0.0032 * opts.sens * (opts.inv ? -1 : 1)));
 });
 
 let doable = null, actT = 0;
@@ -282,7 +285,7 @@ const ripples = Array.from({ length: 10 }, () => { const m = new THREE.Mesh(new 
 let ripT = 0, ripI = 0;
 function updatePlayer(dt) {
   let ix = 0, iz = 0;
-  if (state === 'play' && !ui.open && !talk && !focus && !acc.busy) {
+  if (state === 'play' && !ui.open && !talk && !focus && !acc.busy && desmayo <= 0) {
     ix = (down('derecha') || keys.ArrowRight ? 1 : 0) - (down('izquierda') || keys.ArrowLeft ? 1 : 0);
     iz = (down('adelante') || keys.ArrowUp ? 1 : 0) - (down('atras') || keys.ArrowDown ? 1 : 0);
     cam.yaw += ((down('camIzq') ? 1 : 0) - (down('camDer') ? 1 : 0)) * dt * 1.8;
@@ -314,7 +317,7 @@ function updatePlayer(dt) {
   for (const k in POI) if (state === 'play' && Math.hypot(t.x - POI[k].x, t.z - POI[k].z) < 20) { ui.place(k); if (!ui.has('l-' + k) && !talk && player.grounded) ui.discover('l-' + k, herePhoto()); }
   if ((misT -= dt) <= 0 && state === 'play' && !talk) { // misiones y ayudas de los saberes
     misT = 0.5; const m = ui.missions({ got, total: world.items.length, ...acc.ctx() });
-    $('mis-title').textContent = m ? m.title : 'Explora libremente'; $('mis-prog').textContent = m && m.prog[2] > 1 ? `${m.prog[1]} / ${m.prog[2]}` : '';
+    ui.goals = acc.goals(t); // dónde buscar lo que falta: se marca en el minimapa y en el mapa
     // cuando la historia avanza un paso, se avisa qué sigue (después de los avisos de lo recién logrado)
     const av = m ? m.aviso : 'Hasta aquí llega la historia por ahora: pronto llegarán los invitados de la costa. Mientras tanto, explora el valle y termina tus encargos.';
     const list = (Array.isArray(av) ? av : [av]).map(teclas), key = list.join('|');
@@ -395,9 +398,27 @@ const acc = createActions({ world, ui, snd, scene, hint, murmur, player, story, 
   ripple: (x, z) => { const r = ripples[ripI++ % ripples.length]; r.position.set(x, WATER_Y + 0.03, z); r.userData.t = 0; r.visible = true; } });
 const explorer = createExplorer({ world, ui }); explorer.urgent = (id) => acc.wants(id);
 for (const i of acc.pins) { const it = world.items[i]; if (it && !it.taken) { it.taken = true; it.mesh.visible = false; got++; if (acc.f.m1 === 1) ui.addItem('pinon'); } } // piñones recogidos en una sesión anterior
+// ---------- vida: baja con las caídas grandes y con el agua helada del río; vuelve sola, y más rápido sentado junto al fuego ----------
+let vida = acc.vida, fallV = 0, enSuelo = true, frio = false, desmayo = 0, vidaVista = -1;
+function updateVida(dt) {
+  if (state !== 'play') return;
+  if (desmayo > 0) { // se desmayó: la pantalla se oscurece y despierta junto al fogón
+    const antes = desmayo; desmayo -= dt;
+    if (antes > 1.6 && desmayo <= 1.6) { pBody.setTranslation({ x: -2.3, y: height(-2.3, 1.5) + FEET + 0.05, z: 1.5 }, true); player.vy = 0; player.speed = 0; vida = 60; $('velo').classList.remove('on'); hint('Te desmayaste. Despiertas junto al fogón: alguien te trajo y te abrigó.', 9); }
+    return;
+  }
+  if (!player.grounded) fallV = Math.min(fallV, player.vy);
+  else { if (!enSuelo && fallV < -13) { vida -= (-fallV - 13) * 5; hint('Caíste desde muy alto y te golpeaste.', 5); snd.play('ui-menu', 0.6, 0.7); } fallV = 0; }
+  enSuelo = player.grounded;
+  const helada = player.wade > 0.85; // con el agua al pecho, en pleno invierno
+  if (helada) { vida -= 5 * dt; if (!frio) hint('El agua está helada: no te quedes mucho rato adentro.', 6); } else vida = Math.min(100, vida + dt * (acc.sitting ? 5 : 1.2));
+  frio = helada;
+  if (vida <= 0) { vida = 0; desmayo = 3; $('velo').classList.add('on'); }
+  const v = Math.round(vida); if (v !== vidaVista) { vidaVista = v; $('vida-bar').style.width = `${v}%`; $('vida-n').textContent = v; $('estado').classList.toggle('poca', v < 30); acc.vida = v; }
+}
 drawKeys(); applySkills();
 await assets.whenLoaded(); bar(1, 'Listo'); assets.onProgress = null; $('loading').classList.add('hide'); setTimeout(() => $('loading').remove(), 700);
-window.__g = { snd, height, ui, explorer, acc, story, toasts, murmur, abrirPrologo, cerrarPrologo, get prologo() { return prologo; }, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
+window.__g = { snd, height, ui, explorer, acc, story, toasts, murmur, get vida() { return vida; }, set vida(v) { vida = v; }, camera, abrirPrologo, cerrarPrologo, get prologo() { return prologo; }, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
   tp(x, y, z) { pBody.setTranslation({ x, y, z }, true); player.vy = 0; },
   view(x, y, z, lx, ly, lz) { camera.position.set(x, y, z); camera.lookAt(lx, ly, lz); world.update(0, time, camera.position, pp()); draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); },
   snap() { draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); } };
@@ -406,7 +427,7 @@ const clock = new THREE.Clock(); let fpsT = 0, fpsN = 0;
 applyOpts();
 function tick(dt) {
   time += dt; uTime.value = time;
-  updatePlayer(dt);
+  updatePlayer(dt); updateVida(dt);
   if (cine.active) cine.update(dt);
   else if (state === 'title' || prologo) { const a = time * 0.04 + 2.4; camera.position.set(Math.sin(a) * 31, 12, Math.cos(a) * 31); camera.lookAt(0, 4, 0); }
   else if (focus) updateFocus(dt);

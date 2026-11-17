@@ -13,8 +13,9 @@ npm run dev
 
 Abre la dirección que aparece en la terminal.
 
-- **WASD:** caminar · **Shift:** correr · **Espacio:** saltar · **Ratón:** girar la cámara
-- **E:** observar lo que tienes cerca o hablar con alguien
+- **WASD:** caminar · **Shift:** correr · **Espacio:** saltar
+- **Ratón:** el puntero queda siempre a la vista. Para girar la cámara, arrastra con un botón apretado (o usa Z y C); la rueda acerca y aleja
+- **E:** observar lo que tienes cerca o hablar con alguien · **R:** recoger, usar, ayudar
 - **N:** cuaderno · **J:** misiones · **K:** saberes · **B:** bolsa · **M:** mapa
 - **F:** pantalla completa · **P** o **Esc:** menú
 - Todas las teclas se pueden cambiar en Menú → Controles.

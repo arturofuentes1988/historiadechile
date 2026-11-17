@@ -13,6 +13,7 @@ export function createUI({ world, onToast, onClose, onSkill }) {
   let found = data.found, skills = data.skills || [], done = data.done || {}, extra = data.extra || 0, seen = data.seen || {}, mctx = null; // seen: encargos secundarios que ya te dieron
   for (const id in found) if (!BY[id]) delete found[id];
   const SK = Object.fromEntries(SKILLS.map((k) => [k.id, k]));
+  const recien = {}; let lista = '';
   const bag = {}; let open = null, cat = 'flora', sel = null, selM = null, selK = null;
   const save = () => { try { localStorage.setItem(SAVE, JSON.stringify({ found, skills, done, extra, seen })); } catch { /* sin espacio: se pierde al recargar */ } };
   // puntos ganados (cuaderno + misiones + extras) y puntos disponibles (ganados menos lo gastado en saberes)
@@ -21,7 +22,11 @@ export function createUI({ world, onToast, onClose, onSkill }) {
   const points = (c) => NOTES.reduce((s, n) => s + (found[n.id] !== undefined && (!c || n.cat === c) ? CATS[n.cat].pts : 0), 0);
   const total = NOTES.reduce((s, n) => s + CATS[n.cat].pts, 0);
   const level = () => { const p = points(); let l = LEVELS[0]; for (const x of LEVELS) if (p >= x[0]) l = x; const nx = LEVELS[LEVELS.indexOf(l) + 1]; return { name: l[1], next: nx ? nx[0] : null }; };
-  const refreshScore = () => { $('score-n').textContent = avail(); };
+  const refreshScore = () => {
+    const a = avail(), next = SKILLS.filter((k) => !skills.includes(k.id)).sort((x, y) => x.cost - y.cost)[0], txt = $('pts-txt');
+    $('score-n').textContent = a; $('pts-bar').style.width = `${next ? Math.min(100, (a / next.cost) * 100) : 100}%`;
+    txt.textContent = !next ? 'Ya aprendiste todos los saberes' : a >= next.cost ? `Puedes aprender «${next.name}»` : `${next.cost - a} puntos más para «${next.name}»`; txt.classList.toggle('listo', !!next && a >= next.cost);
+  };
 
   // ---------- minimapa: se pinta a partir del terreno real ----------
   const cv = $('minimap'), S = cv.width, ctx = cv.getContext('2d'), k = 2; // 2 píxeles por metro
@@ -55,6 +60,8 @@ export function createUI({ world, onToast, onClose, onSkill }) {
     else { g.fillStyle = '#c89a4a'; g.beginPath(); g.arc(0, 3 * k, 12 * k, Math.PI, 0); g.lineTo(12 * k, 8 * k); g.lineTo(-12 * k, 8 * k); g.closePath(); g.fill(); g.stroke(); g.fillStyle = '#14110f'; g.fillRect(-3 * k, 0, 6 * k, 8 * k); g.beginPath(); g.moveTo(-3 * k, -12 * k); g.lineTo(3 * k, -6 * k); g.moveTo(3 * k, -12 * k); g.lineTo(-3 * k, -6 * k); g.stroke(); }
     g.restore();
   }
+  // hoja verde: aquí hay algo que te pidieron ir a buscar
+  function hoja(g, x, y, k = 1) { g.save(); g.translate(x, y); g.rotate(-0.6); g.fillStyle = '#9fd66a'; g.strokeStyle = '#14110f'; g.lineWidth = 2.5 * k; g.beginPath(); g.moveTo(0, -11 * k); g.quadraticCurveTo(9 * k, -2 * k, 0, 11 * k); g.quadraticCurveTo(-9 * k, -2 * k, 0, -11 * k); g.fill(); g.stroke(); g.beginPath(); g.moveTo(0, -7 * k); g.lineTo(0, 8 * k); g.lineWidth = 1.2 * k; g.stroke(); g.restore(); }
   function drawMap(pos, facing) {
     last = { x: pos.x, z: pos.z, f: facing };
     const [px, py] = P(pos.x, pos.z), R = S / 2 - 3;
@@ -70,6 +77,7 @@ export function createUI({ world, onToast, onClose, onSkill }) {
     }
     // la aldea y la gente con algo pendiente: si quedan fuera de la vista, se dibujan en el borde, en su dirección
     for (const mk of [{ x: 0, z: 0, kind: 'aldea' }, ...api.people]) { const [x, y] = P(mk.x, mk.z); let dx = (x - px) * ZOOM, dy = (y - py) * ZOOM; const d = Math.hypot(dx, dy), far = d > R - 18; if (far && mk.kind === 'nuevo') continue; if (far) { dx *= (R - 18) / d; dy *= (R - 18) / d; } sym(ctx, S / 2 + dx, S / 2 + dy, mk.kind, far ? 0.75 : 1); }
+    for (const gl of api.goals) { const [x, y] = P(gl.x, gl.z); let dx = (x - px) * ZOOM, dy = (y - py) * ZOOM; const d = Math.hypot(dx, dy), far = d > R - 20; if (far) { dx *= (R - 20) / d; dy *= (R - 20) / d; } hoja(ctx, S / 2 + dx, S / 2 + dy, far ? 0.8 : 1.15); }
     for (const mk of api.marks) { const [x, y] = P(mk.x, mk.z), dx = (x - px) * ZOOM, dy = (y - py) * ZOOM; if (Math.hypot(dx, dy) < R - 14) { ctx.fillStyle = '#14110f'; ctx.beginPath(); ctx.arc(S / 2 + dx, S / 2 + dy, 9, 0, 7); ctx.fill(); ctx.fillStyle = '#e9dfc6'; ctx.font = 'bold 14px Georgia'; ctx.textAlign = 'center'; ctx.fillText('?', S / 2 + dx, S / 2 + dy + 5); } }
     ctx.translate(S / 2, S / 2); ctx.rotate(-facing); // la flecha apunta hacia donde camina
     ctx.fillStyle = '#fff'; ctx.strokeStyle = '#14110f'; ctx.lineWidth = 3;
@@ -89,12 +97,13 @@ export function createUI({ world, onToast, onClose, onSkill }) {
     panel.dataset.kind = open;
     if (open === 'mapa') {
       $('panel-title').textContent = 'Mapa del territorio';
-      body.innerHTML = '<canvas id="bigmap"></canvas><p class="muted">Los lugares muestran su nombre cuando los visitas. Los puntos dorados son los piñones que faltan por recoger. La ruka marca la aldea; la estrella dorada, una misión principal; el rombo celeste, un encargo; el círculo, alguien que aún no conoces.</p>';
+      body.innerHTML = '<canvas id="bigmap"></canvas><p class="muted">Los lugares muestran su nombre cuando los visitas. Los puntos dorados son los piñones que faltan por recoger. La ruka marca la aldea; la estrella dorada, una misión principal; el rombo celeste, un encargo; el círculo, alguien que aún no conoces; la hoja verde, algo que te pidieron ir a buscar.</p>';
       const c = $('bigmap'); c.width = base.width; c.height = base.height; const g = c.getContext('2d'); g.drawImage(base, 0, 0);
       g.textAlign = 'center'; g.font = 'italic bold 19px Georgia'; g.lineWidth = 5; g.strokeStyle = '#efe6cf'; g.fillStyle = '#2a2018';
       for (const key in POI) { const [x, y] = P(POI[key].x, POI[key].z), t = places.has(key) ? POI[key].name : '?'; g.strokeText(t, x, y - 14); g.fillText(t, x, y - 14); }
       for (const it of world.items) if (!it.taken && !it.off) { const [x, y] = P(it.base.x, it.base.z); g.fillStyle = '#f2b441'; g.strokeStyle = '#3a2408'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 6, 0, 7); g.fill(); g.stroke(); }
       { const [x, y] = P(0, 0); sym(g, x, y + 6, 'aldea', 1.2); } for (const mk of api.people) { const [x, y] = P(mk.x, mk.z); sym(g, x, y, mk.kind, 1.1); }
+      g.font = 'italic bold 15px Georgia'; for (const gl of api.goals) { const [x, y] = P(gl.x, gl.z); hoja(g, x, y, 1.3); g.lineWidth = 4; g.strokeStyle = '#efe6cf'; g.fillStyle = '#2a4a18'; g.strokeText(gl.label, x, y + 28); g.fillText(gl.label, x, y + 28); }
       const [px, py] = P(last.x, last.z); g.translate(px, py); g.rotate(-last.f); g.fillStyle = '#fff'; g.strokeStyle = '#14110f'; g.lineWidth = 3;
       g.beginPath(); g.moveTo(0, 18); g.lineTo(11, -12); g.lineTo(0, -5); g.lineTo(-11, -12); g.closePath(); g.fill(); g.stroke();
     } else if (open === 'misiones') {
@@ -193,10 +202,18 @@ export function createUI({ world, onToast, onClose, onSkill }) {
       if (fresh.length) { onToast(fresh.length > 3 ? `Tienes ${fresh.length} encargos nuevos: míralos en Misiones` : `${fresh.length === 1 ? 'Nuevo encargo' : 'Nuevos encargos'}: ${fresh.join(' · ')}`, 'encargo'); $('btn-misiones').classList.add('new'); }
       for (const m of won) onToast(`Misión completada: ${m.title} · +${m.pts} puntos`, 'logro');
       if (fresh.length || won.length) { save(); refreshScore(); if (open) render(); }
+      for (const m of won) recien[m.id] = performance.now();
       const act = MISSIONS.find((m) => m.main && m.check && !done[m.id] && (!m.pide || done[m.pide]));
+      const now = performance.now(), row = (m, cls) => { const r = m.check(mctx); return `<div class="ml ${cls}"><i></i><span>${m.title}</span><em>${cls !== 'hecha' && r[2] > 1 ? `${r[1]} / ${r[2]}` : ''}</em></div>`; };
+      let h = '<h5>Historia</h5>';
+      for (const m of MISSIONS) if (m.main && m.check) { if (done[m.id]) h += row(m, 'hecha'); else if (m === act) h += row(m, 'actual') + `<div class="paso">${act.paso ? act.paso(mctx) : ''}</div>`; }
+      if (!act) h += '<div class="paso">Continuará…</div>';
+      const enc = MISSIONS.filter((m) => !m.main && seen[m.id] && (!done[m.id] || now - (recien[m.id] || 0) < 15000)); // un encargo recién cumplido se ve tachado un momento
+      if (enc.length) h += '<h5>Encargos</h5>' + enc.slice(0, 5).map((m) => row(m, done[m.id] ? 'hecha' : '')).join('') + (enc.length > 5 ? `<div class="paso">y ${enc.length - 5} más</div>` : '');
+      if (h !== lista) { lista = h; $('mis-lista').innerHTML = h; }
       return act ? { title: act.title, prog: act.check(mctx), aviso: typeof act.aviso === 'function' ? act.aviso(mctx) : act.aviso, fijo: !!(act.fijo && act.fijo(mctx)) } : null;
     },
-    marks: [], people: [],
+    marks: [], people: [], goals: [],
     state: { get found() { return found; }, bag, get skills() { return skills; }, get done() { return done; } },
   };
   return api;

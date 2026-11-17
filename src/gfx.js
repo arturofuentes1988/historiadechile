@@ -193,6 +193,36 @@ function pinonCanvas() {
   return c;
 }
 
+// El volcán visto de lejos. La textura da una vuelta entera al cono (cierra sin costura) y va de la base, abajo, al cráter, arriba:
+// roca con quebradas que bajan desde la cumbre, nieve en lo alto con lenguas que descienden por las quebradas y costillas
+// de roca que asoman, bosque al pie, y la bruma de la distancia ya mezclada en el color.
+function volcanoCanvas() {
+  const W = 2048, H = 1024, [c, x] = canvas(W, H), TAU = Math.PI * 2;
+  const wrap = (fn) => { for (const ox of [-W, 0, W]) { x.save(); x.translate(ox, 0); fn(); x.restore(); } };
+  const g = x.createLinearGradient(0, 0, 0, H); g.addColorStop(0, rgb(70, 66, 76)); g.addColorStop(0.5, rgb(96, 86, 88)); g.addColorStop(0.8, rgb(80, 84, 74)); g.addColorStop(1, rgb(50, 70, 54)); x.fillStyle = g; x.fillRect(0, 0, W, H);
+  x.save(); x.globalAlpha = 0.6; x.globalCompositeOperation = 'multiply'; for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++) x.drawImage(grain, i * 512, j * 512, 512, 512); x.restore(); // coladas y escoria
+  // quebradas: dónde nace cada una y cómo serpentea al bajar
+  const Q = []; for (let i = 0; i < 46; i++) Q.push({ x: (i + R(0.15, 0.85)) * (W / 46), y0: H * R(0.03, 0.22), a: R(8, 26), f: R(1.5, 4), p: R(0, 6.28) });
+  const gx = (q, y) => q.x + Math.sin((y / H) * q.f * 3 + q.p) * q.a * (y / H);
+  wrap(() => { for (const q of Q) for (const [off, col, wd] of [[0, rgb(24, 22, 30, 0.5), 1], [5, rgb(196, 182, 174, 0.22), 0.7]]) { x.strokeStyle = col; for (let y = q.y0; y < H; y += 6) { x.lineWidth = (1 + (y / H) * 7) * wd; x.beginPath(); x.moveTo(gx(q, y) + off, y); x.lineTo(gx(q, y + 6) + off, y + 6.5); x.stroke(); } } });
+  // la nieve: su borde sube y baja al dar la vuelta
+  const line = (px) => H * (0.5 + 0.05 * Math.sin((px / W) * TAU * 3 + 1) + 0.035 * Math.sin((px / W) * TAU * 7 + 2) + 0.02 * Math.sin((px / W) * TAU * 19));
+  x.beginPath(); x.moveTo(0, 0); for (let px = 0; px <= W; px += 4) x.lineTo(px, line(px)); x.lineTo(W, 0); x.closePath();
+  const sg = x.createLinearGradient(0, 0, 0, H * 0.6); sg.addColorStop(0, rgb(250, 252, 255)); sg.addColorStop(1, rgb(222, 231, 244)); x.fillStyle = sg; x.fill();
+  wrap(() => {
+    for (const q of Q) { const y1 = line(q.x), len = R(50, 190), w0 = R(10, 26); // lenguas de nieve que bajan por las quebradas
+      x.fillStyle = rgb(236, 242, 250, 0.92); x.beginPath(); x.moveTo(gx(q, y1 - 12) - w0, y1 - 12); x.quadraticCurveTo(gx(q, y1 + len * 0.5) - w0 * 0.5, y1 + len * 0.5, gx(q, y1 + len), y1 + len); x.quadraticCurveTo(gx(q, y1 + len * 0.5) + w0 * 0.5, y1 + len * 0.5, gx(q, y1 - 12) + w0, y1 - 12); x.fill(); }
+    for (let i = 0; i < 64; i++) { const px = R(0, W), y1 = line(px), len = R(30, 150), w0 = R(5, 16); // costillas de roca que asoman entre la nieve
+      x.fillStyle = rgb(68, 62, 70, R(0.45, 0.8)); x.beginPath(); x.moveTo(px - w0, y1 + 6); x.lineTo(px + R(-6, 6), y1 - len); x.lineTo(px + w0, y1 + 6); x.fill(); }
+    for (const q of Q) { x.strokeStyle = rgb(148, 170, 206, 0.34); x.lineWidth = 5; x.beginPath(); for (let y = q.y0, n = 0; y < line(q.x) - 10; y += 8, n++) { if (n) x.lineTo(gx(q, y) + 3, y); else x.moveTo(gx(q, y) + 3, y); } x.stroke(); } // sombras azules en los pliegues de la nieve
+  });
+  for (let i = 0; i < 5200; i++) { const px = R(0, W), y1 = line(px), py = y1 + R(-70, 90); x.fillStyle = py > y1 ? rgb(240, 245, 252, R(0.3, 0.8)) : rgb(84, 78, 84, R(0.2, 0.55)); x.fillRect(px, py, R(2, 7), R(2, 9)); } // el borde de la nieve, deshilachado
+  x.fillStyle = rgb(58, 54, 60, 0.55); x.fillRect(0, 0, W, H * 0.018); // el borde oscuro del cráter
+  const fc = FOG.color.getHex(), fr = fc >> 16, fg2 = (fc >> 8) & 255, fb = fc & 255, hz = x.createLinearGradient(0, 0, 0, H); // la bruma: más espesa hacia la base
+  hz.addColorStop(0, rgb(fr, fg2, fb, 0.2)); hz.addColorStop(0.6, rgb(fr, fg2, fb, 0.34)); hz.addColorStop(1, rgb(fr, fg2, fb, 0.82)); x.fillStyle = hz; x.fillRect(0, 0, W, H);
+  return c;
+}
+
 const grain = noiseCanvas(512, { oct: 7, lo: 95, hi: 255, base: 6 });
 export const TEX = {
   grain: tex(grain), grainBump: tex(grain, { srgb: false }),
@@ -222,7 +252,7 @@ export const TEX = {
   textile: tex(textileCanvas()), soft: tex(softCanvas(), { wrap: false }),
   strand: (() => { const [c, x] = canvas(256, 256); x.fillStyle = '#000'; x.fillRect(0, 0, 256, 256); for (let i = 0; i < 9000; i++) { const v = (40 + rnd() * 215) | 0; x.fillStyle = rgb(v, v, v); x.beginPath(); x.arc(R(0, 256), R(0, 256), R(0.7, 1.5), 0, 6.3); x.fill(); } return tex(c, { srgb: false }); })(), // puntas de pelo: cada punto es una hebra, más clara mientras más larga
   fur: tex(streakCanvas(256, 256, [[236, 236, 236], [205, 205, 205], [255, 255, 255], [176, 176, 176]], 2200, { lw: [0.6, 1.6] })), // pelaje: pelos cortos en la dirección del cuerpo
-  greda: tex(clayCanvas()), gredaPintada: tex(clayCanvas({ base: [176, 100, 62], band: true })), gredaHollin: tex(clayCanvas({ base: [140, 80, 54], soot: 0.62 })), pinon: tex(pinonCanvas()),
+  greda: tex(clayCanvas()), gredaPintada: tex(clayCanvas({ base: [176, 100, 62], band: true })), gredaHollin: tex(clayCanvas({ base: [140, 80, 54], soot: 0.62 })), pinon: tex(pinonCanvas()), volcan: tex(volcanoCanvas()),
 };
 
 // ---------- texturas fotográficas (generadas aparte y guardadas en public/assets/tex) ----------

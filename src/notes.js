@@ -146,18 +146,21 @@ export const MISSIONS = [
       : !c.f.tu ? 'Faltan pocos días para el We Tripantu y toda la aldea se prepara. Tu madre, Millaray, te está llamando: teje en el telar, junto a la ruka de la familia.'
         : c.f.tu === 1 ? 'Tu madre quiere que mires bien su telar antes de mandarte al bosque. Obsérvalo y vuelve a hablar con ella.' : 'Tu madre necesita que le alcances la lana roja, junto al telar.'),
     aviso: (c) => (c.f.m1 ? (c.got < c.total ? ['Nueva misión: Los piñones del pewen. Arriba a la izquierda ves tu misión y cuánto llevas; {misiones} abre la lista y {mapa}, el mapa.', 'Sigue el sendero del norte hasta el bosque de pewenes. {correr} para correr, {saltar} para saltar.'] : 'Ya tienes todos los piñones. Llévaselos a tu madre, en el telar.')
-      : !c.f.tu ? 'Camina con {adelante} {izquierda} {atras} {derecha} y mira alrededor con el ratón. Tu madre te llama: ve hacia la estrella dorada y pulsa {observar} para hablarle.'
+      : !c.f.tu ? 'Camina con {adelante} {izquierda} {atras} {derecha}; para girar la cámara, arrastra con el ratón. Tu madre te llama: ve hacia la estrella dorada y pulsa {observar} para hablarle.'
         : c.f.tu === 1 ? (c.has('witral') ? 'Lo que observas queda en tu cuaderno ({cuaderno}). Ahora vuelve a hablar con tu madre.' : 'Acércate al telar y pulsa {observar} para observarlo.')
           : c.f.lana ? 'Vuelve a hablar con tu madre.' : 'Junto al telar, pulsa {accion} para alcanzarle la lana. Con {accion} recoges cosas y ayudas.'),
     fijo: (c) => !c.f.m1,
+    paso: (c) => (c.f.m1 ? (c.got < c.total ? 'Reúne los piñones en el bosque del norte' : 'Llévaselos a tu madre') : !c.f.tu ? 'Habla con tu madre, en el telar' : c.f.tu === 1 ? (c.has('witral') ? 'Vuelve a hablar con tu madre' : 'Observa el telar') : c.f.lana ? 'Vuelve a hablar con tu madre' : 'Alcánzale la lana'),
     check: (c) => { const s = c.f.m1 || 0; return s ? [s >= 2, s >= 2 ? c.total : c.got, c.total] : [false, 0, 1]; } }, // el avance cuenta piñones; se cumple al entregarlos
   { id: 'm2', main: true, n: 2, title: 'El traro', who: 'Curiñancu, tu padre', pts: 40, pide: 'm1',
     text: (c) => (!c.f.m2 ? 'Tu padre quiere mostrarte algo que solo se ve desde lo alto del cerro Treng Treng. Búscalo en la aldea, cerca del sendero del norte.' : 'Sube con tu padre por el sendero del nororiente hasta la cima del cerro Treng Treng. Si te quedas atrás, te espera. Arriba, vuelve a hablarle.'),
     aviso: (c) => (!c.f.m2 ? 'Nueva misión: El traro. Tu padre te espera en la aldea, cerca del sendero del norte.' : 'Sigue a tu padre por el sendero del nororiente hasta la cima del cerro. Arriba, háblale.'),
+    paso: (c) => (!c.f.m2 ? 'Habla con tu padre, en la aldea' : 'Sube con él a la cima y háblale'),
     check: (c) => [c.f.m2 === 2, c.f.m2 === 2 ? 1 : 0, 1] },
   { id: 'm3', main: true, n: 3, title: 'Las plantas de la machi', who: 'la machi', pts: 50, pide: 'm2',
     text: (c) => (!c.f.m3 ? 'Ñamku, el anciano, amaneció enfermo y la machi pregunta por ti. Búscala junto al rewe, al suroriente de la aldea.' : c.f.m3 === 1 ? 'La machi necesita hojas de canelo de dos árboles, un trozo de corteza de quillay y hojas de maqui para prepararle un lawen a Ñamku. Reúne las plantas con la tecla de acción y vuelve con ella.' : 'La machi preparó el lawen. Llévaselo a Ñamku, en su ruka al oriente de la aldea, mientras está tibio.'),
-    aviso: (c) => (!c.f.m3 ? 'Nueva misión: Las plantas de la machi. Baja a la aldea y búscala junto al rewe, al suroriente.' : c.f.m3 === 1 ? (c.hierbas < 5 ? 'Reúne hojas de canelo, corteza de quillay y hojas de maqui con la tecla de acción.' : 'Ya tienes las plantas. Vuelve con la machi.') : 'Recibiste el lawen. Llévaselo a Ñamku, en su ruka al oriente de la aldea.'),
+    aviso: (c) => (!c.f.m3 ? 'Nueva misión: Las plantas de la machi. Baja a la aldea y búscala junto al rewe, al suroriente.' : c.f.m3 === 1 ? (c.hierbas < 5 ? 'Reúne hojas de canelo, corteza de quillay y hojas de maqui: las hojas verdes del mapa ({mapa}) marcan dónde buscar. Junto a cada planta, pulsa {accion}.' : 'Ya tienes las plantas. Vuelve con la machi.') : 'Recibiste el lawen. Llévaselo a Ñamku, en su ruka al oriente de la aldea.'),
+    paso: (c) => (!c.f.m3 ? 'Busca a la machi, junto al rewe' : c.f.m3 === 1 ? (c.hierbas < 5 ? `Canelo ${c.llevo.canelo}/2 · quillay ${c.llevo.quillay}/1 · maqui ${c.llevo.maqui}/2 (hojas verdes en el mapa)` : 'Vuelve con la machi') : 'Lleva el lawen a Ñamku'),
     check: (c) => { const s = c.f.m3 || 0; return [s >= 3, s >= 2 ? s + 4 : s === 1 ? 1 + c.hierbas : 0, 7]; } },
   { id: 'm4', main: true, n: 4, title: 'Los invitados', pide: 'm3', soon: true },
   { id: 'm5', main: true, n: 5, title: 'La noche de las historias', pide: 'm4', soon: true },
