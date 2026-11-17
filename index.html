@@ -2,7 +2,7 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>Leftraru — Acto I: El mundo de Leftraru</title>
 <style>
   /* Diseño de la interfaz: paneles oscuros de esquinas escalonadas (como los rombos del tejido mapuche
@@ -165,6 +165,7 @@
   #tour-t kbd { font: inherit; font-size: 13px; border: 1px solid #f1e4c466; border-radius: 4px; padding: 1px 7px; margin-left: 8px; color: var(--dim); vertical-align: middle; }
   #tour-x { margin: 0 0 13px; font-size: 16px; line-height: 1.45; } #tour-pie { display: flex; justify-content: space-between; align-items: center; } #tour-pie .btn { padding: 8px 18px; font-size: 15px; }
   #tour-saltar { background: none; border: 0; color: var(--dim); font: inherit; font-size: 14px; cursor: pointer; text-decoration: underline; padding: 6px 0; }
+  #tour-flecha.sube { border-top: 0; border-bottom: 20px solid #e9b03a; }
   #tour-flecha { position: fixed; width: 0; height: 0; margin-left: -12px; border-left: 12px solid transparent; border-right: 12px solid transparent; border-top: 20px solid #e9b03a; filter: drop-shadow(0 2px 3px #000a); animation: tour-baja .7s ease-in-out infinite alternate; }
   @keyframes tour-baja { from { transform: translateY(-8px); } to { transform: translateY(2px); } }
   #btn-full .b, #btn-full.on .a { display: none; } #btn-full.on .b { display: block; }
@@ -274,8 +275,47 @@
   .ltrack { height: 8px; background: #ffffff14; clip-path: var(--step); } #load-bar { display: block; height: 100%; width: 4%; background: linear-gradient(90deg, var(--red), var(--copper)); transition: width .35s ease; }
   #load-text { margin: 14px 0 0; font-style: italic; color: var(--dim); font-size: 15px; }
   @media (max-width: 760px) { .dex { grid-template-columns: 1fr; } #minimap { width: 120px; height: 120px; } #apuntes { bottom: 148px; } .tool { min-width: 46px; } }
+  /* ---------- en el celular (pantalla táctil, sin ratón): el cuerpo lleva la clase «tactil» ---------- */
+  html, body { overscroll-behavior: none; }
+  body.tactil { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+  body.tactil canvas { touch-action: none; }
+  /* la palanca aparece donde se apoya el pulgar, en el lado izquierdo de la pantalla; llevada a fondo, corre */
+  #palanca { position: fixed; left: 0; top: 0; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%; border: 2px solid #efe6cf50; background: #14110f40; opacity: 0; pointer-events: none; z-index: 2; transition: opacity .15s; }
+  #palanca.on { opacity: 1; } #palanca i { position: absolute; left: 50%; top: 50%; width: 48px; height: 48px; margin: -24px 0 0 -24px; border-radius: 50%; background: #efe6cfb8; box-shadow: 0 2px 8px #0008; }
+  #palanca.corre { border-color: var(--copper); } #palanca.corre i { background: var(--copper); }
+  /* saltar y rodar, bajo el pulgar derecho */
+  .toque { position: fixed; display: none; border: 0; padding: 0; border-radius: 50%; background: #17130fd0; box-shadow: inset 0 0 0 2px #efe6cf45, 0 4px 12px #0007; align-items: center; justify-content: center; touch-action: none; z-index: 2; }
+  body.tactil.playing .toque { display: flex; } body.tactil.talking .toque, body.tactil.cine .toque { display: none; }
+  .toque svg { width: 50%; height: 50%; fill: none; stroke: var(--copper); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+  .toque.on { background: var(--copper); } .toque.on svg { stroke: var(--ink); }
+  #t-saltar { right: max(16px, env(safe-area-inset-right)); bottom: 16px; width: 70px; height: 70px; }
+  #t-rodar { right: calc(max(16px, env(safe-area-inset-right)) + 82px); bottom: 12px; width: 54px; height: 54px; }
+  /* la pantalla, acomodada: los cinco botones suben, el minimapa pasa arriba a la derecha y abajo quedan libres los pulgares */
+  body.tactil #btns { top: 8px; bottom: auto; right: 100px; gap: 4px; } body.tactil .tool.sim { width: 40px; padding: 8px 0; }
+  body.tactil .tool kbd, body.tactil .key, body.tactil #btn-nombre, body.tactil #arma-nombre, body.tactil #tour kbd { display: none; }
+  body.tactil #corner { top: 8px; right: max(10px, env(safe-area-inset-right)); }
+  body.tactil #arma { right: max(16px, env(safe-area-inset-right)); bottom: 98px; transform: none !important; }
+  body.tactil #minimap { left: auto; right: max(10px, env(safe-area-inset-right)); top: 56px; bottom: auto; width: 92px; height: 92px; }
+  body.tactil.playing #minimap { pointer-events: auto; }
+  body.tactil #apuntes { left: auto; right: max(10px, env(safe-area-inset-right)); top: 156px; bottom: auto; align-items: flex-end; max-width: 46vw; }
+  body.tactil #hudbox { top: 8px; left: max(10px, env(safe-area-inset-left)); width: min(280px, 36vw); gap: 6px; }
+  body.tactil #retrato { width: 52px; height: 52px; border-width: 2px; } body.tactil #barras { padding: 7px 12px 6px 11px; gap: 4px; }
+  body.tactil .fila { grid-template-columns: 78px 1fr 34px; font-size: 9.5px; } body.tactil .fila b { font-size: 13px; } body.tactil #pts-txt { display: none; }
+  /* de la lista de misiones queda solo la que está en curso, con su paso */
+  body.tactil #mis-lista { padding: 7px 12px 8px 10px; font-size: 13px; } body.tactil .ml.hecha, body.tactil #mis-lista h5, body.tactil #mis-lista h5:not(:first-child) ~ * { display: none; } body.tactil .ml.actual { font-size: 14.5px; padding-top: 0; }
+  body.tactil #hint { top: 56px; max-width: min(40vw, 340px); font-size: 14px; padding: 8px 16px; } /* bajo la fila de botones */
+  body.tactil #ayuda { top: 47%; font-size: 15px; white-space: normal; max-width: 56vw; }
+  /* los avisos de abajo se tocan: son el botón de hablar, observar, recoger o tirar */
+  body.tactil #prompt, body.tactil #prompt2 { bottom: 14px; padding: 13px 24px; font-size: 16px; } body.tactil #prompt2 { bottom: 68px !important; }
+  body.tactil #prompt.on, body.tactil #prompt2.on { pointer-events: auto; box-shadow: inset 0 0 0 2px var(--copper); }
+  body.tactil #dialogo { bottom: 8px; padding: 14px 22px 12px; } body.tactil #sub { bottom: 12vh; } body.tactil #focus { bottom: 14px; }
+  body.tactil #skip { right: 14px; bottom: 14px; padding: 10px 16px; background: var(--panel); font-size: 14px; } body.tactil.cine #skip { opacity: .9; pointer-events: auto; }
+  /* de pie no se juega: se pide girar el celular */
+  #gira { position: fixed; inset: 0; z-index: 30; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 30px; text-align: center; background: #14110ff5; color: var(--cream); font-size: 21px; }
+  #gira svg { width: 86px; height: 86px; fill: none; stroke: var(--copper); stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; } #gira small { color: var(--dim); font-size: 15px; }
+  @media (orientation: portrait) { body.tactil #gira { display: flex; } }
 </style>
-  <script type="module" crossorigin src="./assets/index-7ZDvtFrZ.js"></script>
+  <script type="module" crossorigin src="./assets/index-C3-nkqxg.js"></script>
   <link rel="modulepreload" crossorigin href="./assets/BufferGeometryUtils-DDgkh3MD.js">
 </head>
 <body>
@@ -318,6 +358,10 @@
 <div id="prompt" class="shadow"><span class="key" data-key="observar">E</span><span id="prompt-text"></span></div>
 <div id="focus"></div>
 <div id="dialogo"><div id="dlg-name"></div><div id="dlg-text"></div><div id="dlg-more"></div></div>
+<div id="palanca"><i></i></div>
+<button id="t-rodar" class="toque" aria-label="Rodar"><svg viewBox='0 0 24 24'><path d='M19.5 12a7.5 7.5 0 1 1-2.7-5.8M19.6 3.6v4.2h-4.2'/></svg></button>
+<button id="t-saltar" class="toque" aria-label="Saltar"><svg viewBox='0 0 24 24'><path d='M12 18V5.5M6.5 11 12 5.5 17.5 11M5.5 21h13'/></svg></button>
+<div id="gira"><svg viewBox='0 0 24 24'><rect x='8' y='3' width='9' height='17' rx='1.8'/><path d='M3 13.5a8.5 8.5 0 0 0 3.6 5.6M3 13.5v3.6M3 13.5h3.6'/><path d='M21 9.5A8.5 8.5 0 0 0 18.6 5'/></svg><p>Gira el celular para jugar</p><small>Leftraru se juega con la pantalla acostada.</small></div>
 <div id="btns" class="shadow">
   <button id="btn-notas" class="tool sim" aria-label="Cuaderno: todo lo que has descubierto, con sus fotos"><svg viewBox='0 0 24 24'><path d='M12 6.6C10.2 5.3 7.4 4.8 3.4 5v13.3c4-.2 6.8.3 8.6 1.6 1.8-1.3 4.6-1.8 8.6-1.6V5c-4-.2-6.8.3-8.6 1.6z'/><path d='M12 6.6v13.3M6.4 9.4c1.1 0 2.1.2 3 .5M6.4 12.7c1.1 0 2.1.2 3 .5M17.6 9.4c-1.1 0-2.1.2-3 .5M17.6 12.7c-1.1 0-2.1.2-3 .5'/></svg><kbd data-key="cuaderno">N</kbd></button>
   <button id="btn-misiones" class="tool sim" aria-label="Misiones: lo que tienes por hacer, principales y secundarias"><svg viewBox='0 0 24 24'><path d='M6 21.5V3'/><path d='M6 4.2h12.8l-3.3 4.1 3.3 4.1H6z' fill='currentColor'/></svg><kbd data-key="misiones">J</kbd></button>
