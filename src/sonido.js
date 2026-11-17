@@ -21,6 +21,12 @@ export function createSound() {
   const bells = (d, sr, t0, dur, count, amp) => { for (let k = 0; k < count; k++) { const f = R(3000, 6200), i0 = Math.floor((t0 + R(0, dur)) * sr), n = Math.floor(0.14 * sr), a = R(0.3, 1) * amp; let ph = 0; for (let i = 0; i < n && i0 + i < d.length; i++) { const t = i / sr; ph += 6.283 * f / sr; d[i0 + i] += (Math.sin(ph) + 0.5 * Math.sin(ph * 1.47)) * a * Math.min(1, t / 0.002) * Math.exp(-t * 50); } } };
   // un "toc" corto y afinado: madera contra madera, o una semilla que cae en la bolsa
   const tock = (d, sr, t0, f, amp, dec = 60, len = 0.18) => { let ph = 0; const i0 = Math.floor(t0 * sr), n = Math.floor(len * sr); for (let i = 0; i < n && i0 + i < d.length; i++) { const t = i / sr; ph += 6.283 * f / sr; d[i0 + i] += ((Math.sin(ph) + 0.4 * Math.sin(ph * 2.76)) * Math.exp(-t * dec) + (rnd() * 2 - 1) * 0.55 * Math.exp(-t * 420)) * amp; } };
+  // la voz de Leftraru cuando hace fuerza: un zumbido de garganta que baja de tono, pasado por las resonancias de una vocal
+  // abierta (forma: dónde resuena, con qué ancho y cuánto), con un poco de aire al empezar
+  const voz = (d, sr, t0, dur, f0, f1, amp, forma) => { const i0 = Math.floor(t0 * sr), n = Math.floor(dur * sr), ph = new Float64Array(16); let tiembla = 0;
+    for (let i = 0; i < n && i0 + i < d.length; i++) { const t = i / sr, u = i / n; tiembla += (rnd() - 0.5) * 0.02 - tiembla * 0.01; const f = (f0 + (f1 - f0) * u ** 0.7) * (1 + tiembla * 0.3), e = Math.min(1, t / 0.02) * Math.min(1, (dur - t) / 0.08) ** 1.4; let v = 0;
+      for (let h = 1; h < 16 && f * h < sr * 0.45; h++) { ph[h] += 6.283 * f * h / sr; let g = 0; for (const [F, B, A] of forma) g += A / (1 + ((f * h - F) / B) ** 2); v += Math.sin(ph[h]) * g / h; }
+      d[i0 + i] += (v + (rnd() * 2 - 1) * 0.1 * Math.exp(-t * 28)) * amp * e; } };
   // el aire del bosque: tres ecos cortos que se van apagando, para que nada suene pegado al oído
   const air = (d, sr, mix = 0.25) => { for (const [ms, g] of [[83, 0.5], [137, 0.36], [211, 0.26]]) { const k = Math.floor(ms / 1000 * sr); for (let i = k; i < d.length; i++) d[i] += d[i - k] * g * mix; } };
   const grains = (d, sr, count, len, amp) => { for (let k = 0; k < count; k++) { const i0 = Math.floor(rnd() * (d.length - len * sr)), n = Math.floor(R(0.3, 1) * len * sr), a = R(0.3, 1) * amp; for (let i = 0; i < n; i++) d[i0 + i] += (rnd() * 2 - 1) * a * Math.exp(-i / (n * 0.3)); } };
@@ -33,6 +39,13 @@ export function createSound() {
       buf[`paso-agua-${v}`] = make(0.5, (d, sr) => { noise(d); lp(d, sr, 1200); hp(d, sr, 300); env(d, sr, 0.03, 0.12); for (let k = 0; k < 7; k++) tone(d, sr, R(0.03, 0.3), R(0.02, 0.05), R(500, 1400), R(900, 2200), 0.12); });
       buf[`arbusto-${v}`] = make(0.6, (d, sr) => { grains(d, sr, 40, 0.04, 1); hp(d, sr, 1200); lp(d, sr, 3800); for (let i = 0; i < d.length; i++) { const t = i / sr; d[i] *= Math.sin(Math.PI * t / 0.6) ** 1.5 * (0.6 + 0.4 * Math.sin(t * 40 + v)); } });
     }
+    // el esfuerzo de un salto: un «¡hop!» corto, de niño, que no llega a grito
+    buf.esfuerzo = make(0.24, (d, sr) => { voz(d, sr, 0.005, 0.17, 350, 250, 1, [[760, 110, 1], [1400, 140, 0.55], [3100, 240, 0.2]]); lp(d, sr, 4600); air(d, sr, 0.1); });
+    // rodar por el suelo: el golpe sordo del hombro en la tierra, el roce del cuerpo y las hojas, y los pies que vuelven a caer
+    buf.rodar = make(0.66, (d, sr) => { noise(d);
+      for (let i = 0; i < d.length; i++) { const t = i / sr, golpe = (t < 0.04 ? t / 0.04 : Math.exp(-(t - 0.04) * 36)) + (t > 0.4 ? 0.8 * Math.exp(-(t - 0.4) * 32) : 0), roce = 0.3 * Math.sin(Math.PI * Math.min(1, t / 0.6)) * (0.6 + 0.4 * Math.sin(t * 46)); d[i] *= golpe + roce; }
+      lp(d, sr, 640); hp(d, sr, 110); tone(d, sr, 0.03, 0.11, 115, 58, 0.22); tone(d, sr, 0.39, 0.12, 100, 52, 0.17);
+      const hojas = new Float32Array(d.length); grains(hojas, sr, 26, 0.035, 1); hp(hojas, sr, 1400); lp(hojas, sr, 3600); for (let i = 0; i < d.length; i++) d[i] += hojas[i] * 0.05 * Math.sin(Math.PI * Math.min(1, i / d.length / 0.9)); });
     // sonidos continuos
     buf.rio = make(6, (d, sr) => { noise(d); lp(d, sr, 2600); hp(d, sr, 350); for (let i = 0; i < d.length; i++) { const t = i / sr; d[i] *= 0.7 + 0.2 * Math.sin(t * 1.9) + 0.1 * Math.sin(t * 5.3 + 1); } for (let k = 0; k < 140; k++) tone(d, sr, R(0, 5.9), R(0.02, 0.06), R(400, 1500), R(700, 2400), 0.02); seamless(d, sr); });
     buf.viento = make(9, (d, sr) => { noise(d); lp(d, sr, 900); hp(d, sr, 120); const g = new Float32Array(d.length); noise(g); hp(g, sr, 2500); lp(g, sr, 7000); for (let i = 0; i < d.length; i++) { const t = i / sr, gust = 0.45 + 0.3 * Math.sin(t * 0.7) + 0.2 * Math.sin(t * 1.63 + 2); d[i] = d[i] * gust + g[i] * 0.5 * Math.max(0, gust - 0.35) ** 2; } seamless(d, sr, 1); }); // rachas graves y, cuando arrecia, el siseo de las hojas

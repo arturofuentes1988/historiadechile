@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import RAPIER from '@dimforge/rapier3d-compat';
 import { uTime, uPlayer, buildLights, createPost, assets, TEX_LIVIANAS, texLivianasPorDefecto } from './gfx.js';
 import { buildWorld } from './world.js';
@@ -200,13 +201,14 @@ function lock() { /* ya no se captura el ratón */ }
 const locked = () => false;
 document.body.classList.add('sin-raton'); // deja a la vista la ayuda de cómo girar, hasta que se arrastra por primera vez
 renderer.domElement.addEventListener('mousedown', (e) => { if (state !== 'play') return; dragging = true; document.body.classList.add('girando'); e.preventDefault();
-  if (e.button === 2) { botonDer = true; if (puedeApuntar() && acc.apuntar(true)) captura(); else if (acc.tieneArco && !acc.equipado) hint(`Tienes el arco guardado. Sácalo con ${keyName(opts.keys.arma)} o desde la bolsa.`, 4); } // el botón derecho apunta
-  else if (e.button === 0 && acc.equipado && puedeApuntar()) { if (!acc.apunta && acc.apuntar(true)) captura(); salirAp = 0; acc.tensar(true); } }); // el izquierdo, mientras se mantiene, tensa el arco
+  if (e.button === 2) { botonDer = true; if (puedeApuntar() && acc.apuntar(true)) { captura(); if (e.buttons & 1) acc.tensar(true); } else if (acc.tieneArco && !acc.equipado) hint(`Tienes el arco guardado. Sácalo con ${keyName(opts.keys.arma)} o desde la bolsa.`, 4); } // el botón derecho apunta
+  else if (e.button === 0 && botonDer && acc.apunta) acc.tensar(true); }); // el izquierdo tensa el arco, pero solo mientras el derecho está apuntando: solo, no hace nada
 renderer.domElement.addEventListener('contextmenu', (e) => e.preventDefault());
-addEventListener('mouseup', (e) => { if (e.button === 0) { if (acc.apunta) { dispara(); if (!botonDer) salirAp = 0.5; } acc.tensar(false); } if (e.button === 2) { botonDer = false; if (acc.tira) salirAp = 0.01; else dejaDeApuntar(); } if (!e.buttons) { dragging = false; document.body.classList.remove('girando'); } });
+addEventListener('mouseup', (e) => { if (e.button === 0) { if (acc.apunta && botonDer) dispara(); acc.tensar(false); } if (e.button === 2) { botonDer = false; acc.tensar(false); dejaDeApuntar(); } /* soltar el derecho con el arco tenso lo baja sin tirar */ if (!e.buttons) { dragging = false; document.body.classList.remove('girando'); } });
 // ---------- el arco: apuntar y soltar ----------
-// Con el botón derecho apretado Leftraru tensa el arco, la cámara se le pone al hombro y aparece la mira. El ratón queda
-// capturado mientras tanto, para poder girar sin que el puntero se salga de la ventana.
+// Con el botón derecho apretado Leftraru levanta el arco, la cámara se le pone en los ojos y aparece la mira. Mientras lo
+// mantiene, el botón izquierdo tensa la cuerda y al soltarlo sale la flecha; el izquierdo solo, sin apuntar, no hace nada.
+// El ratón queda capturado mientras tanto, para poder girar sin que el puntero se salga de la ventana.
 const puedeApuntar = () => state === 'play' && !talk && !focus && !ui.open && !auto && !cine.active && !acc.sitting && player.grounded && !rueda;
 const capturado = () => document.pointerLockElement === renderer.domElement;
 function dejaDeApuntar() { salirAp = 0; if (acc.apunta) acc.apuntar(false); if (capturado()) document.exitPointerLock(); }
@@ -470,12 +472,12 @@ let rueda = null, ruedaT = 0; // rodando: { t, dur, dx, dz }; ruedaT: cuánto fa
 function rodar() { // una vuelta por el suelo hacia donde va caminando (o, quieto, hacia donde mira)
   if (state !== 'play' || rueda || ruedaT > 0 || talk || focus || ui.open || auto || acc.sitting || acc.busy || !player.grounded || desmayo > 0) return;
   dejaDeApuntar(); const mov = player.speed > 0.6, dx = mov ? player.dirX : Math.sin(player.facing), dz = mov ? player.dirZ : Math.cos(player.facing);
-  rueda = { t: 0, dur: 0.95, dx, dz }; ruedaT = 1.3; player.facing = Math.atan2(dx, dz); snd.play('arbusto-2', 0.35, 0.8);
+  rueda = { t: 0, dur: 0.7, dx, dz }; ruedaT = 1.0; player.facing = Math.atan2(dx, dz); snd.play('rodar', 0.6, 0.94 + Math.random() * 0.12);
 }
 let auto = null, miraOn = false, miraLista = false, miraN = -1; // la mira del arco: si está a la vista, si el arco ya está tenso y cuántas flechas muestra
 function updatePlayer(dt) {
   let ix = 0, iz = 0, andar = null;
-  if (rueda && state === 'play') { rueda.t += dt; const u = rueda.t / rueda.dur; andar = [rueda.dx, rueda.dz, 5.4 * (1 - 0.45 * u * u)]; if (u >= 1) rueda = null; } // rodando va derecho y rápido, y frena al final
+  if (rueda && state === 'play') { rueda.t += dt; const u = rueda.t / rueda.dur; andar = [rueda.dx, rueda.dz, 6.8 * (1 - 0.45 * u * u)]; if (u >= 1) rueda = null; } // rodando va derecho y rápido, y frena al final
   else if (auto && state === 'play') {
     const q = pp(), ax = auto.x - q.x, az = auto.z - q.z, ad = Math.hypot(ax, az); auto.t = (auto.t || 0) + dt;
     if (ad > 0.14 && auto.t < 6) andar = [ax / ad, az / ad, Math.min(2.3, 0.6 + ad * 2.5)]; // hacia allá, frenando al acercarse
@@ -506,7 +508,7 @@ function updatePlayer(dt) {
       yaw = Math.max(-0.9, Math.min(0.9, c)); pit = Math.max(-0.4, Math.min(0.3, -Math.atan2(a.g.position.y + a.h * 0.94 - (q.y - FEET + boy.h * 0.94), Math.hypot(a.x - q.x, a.z - q.z) || 1))); } // y levanta o baja la vista hasta su cara
     player.giro = (player.giro || 0) + (giro - (player.giro || 0)) * Math.min(1, dt * 10); // cuánto está girando en el lugar: da los pasitos
     player.miraY = (player.miraY || 0) + (yaw - (player.miraY || 0)) * Math.min(1, dt * 6); player.miraX = (player.miraX || 0) + (pit - (player.miraX || 0)) * Math.min(1, dt * 6); }
-  if (player.grounded && state === 'play' && !ui.open && !talk && !focus && !acc.sitting && !auto && !apunta && !rueda && down('saltar')) { player.vy = 6.6 * (ui.skill('salto') ? 1.22 : 1); player.grounded = false; }
+  if (player.grounded && state === 'play' && !ui.open && !talk && !focus && !acc.sitting && !auto && !apunta && !rueda && down('saltar')) { player.vy = 6.6 * (ui.skill('salto') ? 1.22 : 1); player.grounded = false; snd.play('esfuerzo', 0.32, 0.95 + Math.random() * 0.1); } /* al saltar se le escapa un quejido corto, de esfuerzo */
   player.vy = Math.max(-25, player.vy - 18 * dt);
   if (player.vy > 0) ctrl.disableSnapToGround(); else ctrl.enableSnapToGround(0.3);
   const mvx = (player.dirX || 0) * player.speed * dt, mvz = (player.dirZ || 0) * player.speed * dt;
@@ -673,7 +675,7 @@ function updateItems() {
 
 const ui = createUI({ world, onToast: (t, kind) => toast(t, 5, kind || 'hallazgo'), onClose: () => { if (state === 'play' && !menuOpen) lock(); }, onSkill: () => applySkills(), onGuide: (g) => setGuia(g, 'jugador') });
 renderer.domElement.addEventListener('webglcontextrestored', () => ui.repaint()); // si el navegador pierde y recupera el contexto gráfico, el fondo del minimapa se vuelve a pintar
-const acc = createActions({ world, ui, snd, scene, hint, murmur, player, tecla: (a) => keyName(opts.keys[a]), choca: (a, b) => { const d = V3().subVectors(b, a), L = d.length(); if (L < 1e-6) return null; d.divideScalar(L); const hit = physics.castRay(new RAPIER.Ray(a, d), L, true, undefined, undefined, pCol); return hit ? V3().copy(a).addScaledVector(d, hit.timeOfImpact ?? hit.toi) : null; }, /* choca: ¿la flecha da con algo sólido entre a y b? */ story, pinones: () => [got, world.items.length], sanar: (n) => { vida = Math.min(100, vida + n); },
+const acc = createActions({ world, ui, snd, scene, hint, murmur, player, tecla: (a) => keyName(opts.keys[a]), guiar: (g) => setGuia(g, 'jugador'), choca: (a, b) => { const d = V3().subVectors(b, a), L = d.length(); if (L < 1e-6) return null; d.divideScalar(L); const hit = physics.castRay(new RAPIER.Ray(a, d), L, true, undefined, undefined, pCol); return hit ? V3().copy(a).addScaledVector(d, hit.timeOfImpact ?? hit.toi) : null; }, /* choca: ¿la flecha da con algo sólido entre a y b? */ story, pinones: () => [got, world.items.length], sanar: (n) => { vida = Math.min(100, vida + n); },
   place: (x, z, facing) => { setPos(x, height(x, z) + FEET + 0.05, z); player.vy = 0; player.speed = 0; player.facing = facing; },
   speak: (name, lines, done, gestos) => { const who = world.life.actors.find((a) => a.name && a.name.toLowerCase() === name.toLowerCase()) || null, gira = !!who && !who.quieto && !acc.sitting; // quien habla, si está en el mundo; el que está mirando el valle no se da vuelta
     talk = { name, lines, i: 0, done: done || null, who, gira, gestos: gestos || null }; charla(who, gira); sigue(); if (cuerpo && who) cuerpo.habla = 0.9; },
@@ -684,6 +686,20 @@ for (const i of acc.pins) { const it = world.items[i]; if (it && !it.taken) { it
 // El destino puede ser un punto marcado en el mapa, una persona o una misión (entonces apunta a donde toque ir ahora).
 // La línea parte siempre de Leftraru: a medida que avanza, lo recorrido deja de dibujarse.
 let guia = null, guiaT = null, guiaVia = false, guiaNo = null; // guiaNo: la misión de la historia a la que el jugador le quitó la guía (no se le vuelve a poner sola)
+// ---------- el casillero del arco, sobre los botones de abajo a la derecha ----------
+// Aparece cuando Leftraru ya tiene el arco. Arriba, el arco (en la mano o guardado) con las flechas que quedan: un clic lo saca
+// o lo guarda. Abajo, hacer una flecha: dice lo que pide y lo que llevas; si falta algo, queda marcado en el mapa dónde buscarlo.
+let armaFirma = null;
+$('arma-arco').addEventListener('click', () => { if (state === 'play' && !talk) acc.equipar(); });
+$('arma-hacer').addEventListener('click', () => { if (state === 'play' && !talk) acc.hacerFlecha(); });
+function updateArma() {
+  const a = acc.arma, firma = a.tiene ? `${a.eq}|${a.flechas}|${a.quila}|${a.pluma}` : ''; if (firma === armaFirma) return; armaFirma = firma;
+  $('arma').classList.toggle('hay', a.tiene); if (!a.tiene) return;
+  const cuantas = (n, una, varias) => `${n} ${n === 1 ? una : varias}`, lleno = a.flechas >= a.tope;
+  $('arma-arco').classList.toggle('on', a.eq); $('arma-arco').classList.toggle('sin', !a.flechas); $('arma-estado').textContent = a.eq ? 'en la mano' : 'guardado'; $('arma-n').textContent = a.flechas; $('arma-nt').textContent = a.flechas === 1 ? 'flecha' : 'flechas';
+  $('arma-llevas').innerHTML = lleno ? 'Ya llevas todas las que caben' : `Llevas <span class="${a.quila ? '' : 'falta'}">${cuantas(a.quila, 'caña', 'cañas')}</span> y <span class="${a.pluma ? '' : 'falta'}">${cuantas(a.pluma, 'pluma', 'plumas')}</span>`;
+  $('arma-hacer').classList.toggle('no', lleno || !a.quila || !a.pluma);
+}
 function setGuia(g, quien) { // quien: 'jugador' si la puso o la quitó él en el mapa o en la lista; 'sola' si la pone la historia
   if (quien === 'jugador') guiaNo = !g && guia && guia.kind === 'mision' ? guia.id : null;
   guia = g; guiaT = null; ui.guide = null; ui.guideKey = g ? (g.kind === 'mision' ? 'm:' + g.id : 'p') : ''; misT = 0;
@@ -736,7 +752,7 @@ function updateVida(dt) {
 }
 drawKeys(); applySkills();
 await assets.whenLoaded(); bar(1, 'Listo'); assets.onProgress = null; $('loading').classList.add('hide'); setTimeout(() => $('loading').remove(), 700);
-window.__g = { CAM_ARCO, rodar, get rueda() { return rueda; }, snd, height, ui, explorer, acc, story, toasts, murmur, setGuia, renderer, get vida() { return vida; }, set vida(v) { vida = v; }, camera, abrirPrologo, cerrarPrologo, get prologo() { return prologo; }, get acto() { return acto; }, hojas, cerrarActo, portadaMenu, avanzarPrologo, ayudas, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, get guia() { return guia; }, get guiaT() { return guiaT; }, get tour() { return tour; }, get gesto() { return gesto; }, tourIr, relato, get plano() { return plano; }, get planoK() { return planoK; }, outro, apuntes, sueltaTodo, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter() { portadaMenu(); coverT = 0; enter(); }, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
+window.__g = { CAM_ARCO, get VM() { return VM; }, rehaceManos() { const C = cuerpo, v = C.manos; scene.remove(v.g); C.manos = haceManos(CARA_LEFTRARU.piel); scene.add(C.manos.g); }, rodar, get rueda() { return rueda; }, snd, height, ui, explorer, acc, story, toasts, murmur, setGuia, renderer, get vida() { return vida; }, set vida(v) { vida = v; }, camera, abrirPrologo, cerrarPrologo, get prologo() { return prologo; }, get acto() { return acto; }, hojas, cerrarActo, portadaMenu, avanzarPrologo, ayudas, ACTIONS, menuPage, interact, get near() { return near; }, get talk() { return talk; }, get guia() { return guia; }, get guiaT() { return guiaT; }, get tour() { return tour; }, get gesto() { return gesto; }, tourIr, relato, get plano() { return plano; }, get planoK() { return planoK; }, outro, apuntes, sueltaTodo, player, cam, world, pp, get state() { return state; }, get got() { return got; }, cine, enter() { portadaMenu(); coverT = 0; enter(); }, setMenu, opts, get menuOpen() { return menuOpen; }, paused: false, keys,
   tp(x, y, z) { setPos(x, y, z); player.vy = 0; },
   view(x, y, z, lx, ly, lz) { camera.position.set(x, y, z); camera.lookAt(lx, ly, lz); world.update(0, time, camera.position, pp()); draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); },
   snap() { draw(); return renderer.domElement.toDataURL('image/jpeg', 0.9); } };
@@ -808,9 +824,16 @@ if (!ANTIGUO) import('three/examples/jsm/loaders/GLTFLoader.js').then(({ GLTFLoa
   const { ojos, boca, bocaAlto } = haceCara(H.Head, CARA_LEFTRARU.ojos, CARA_LEFTRARU.boca, CARA_LEFTRARU.piel);
   // el arco, cuando lo tensa: va en su mano izquierda, de pie y apuntando hacia donde mira
   const arcoN = new THREE.Mesh(new THREE.TorusGeometry(0.6, 0.011, 5, 18, Math.PI * 0.5).rotateZ(-Math.PI * 0.25).rotateY(-Math.PI / 2).translate(0, 0, -0.6), new THREE.MeshStandardMaterial({ color: 0x4a3626, roughness: 1 })); arcoN.visible = false; arcoN.castShadow = true; arcoN.rotation.order = 'YXZ'; scene.add(arcoN); boy.sinArco = true;
-  const puesta = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.72, 5).rotateX(Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0xb49a62, roughness: 1 })); puesta.visible = false; scene.add(puesta); // la flecha puesta en el arco, antes de soltarla
+  const puesta = new THREE.Mesh(flechaGeo(), new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 })); puesta.visible = false; scene.add(puesta); // la flecha puesta en el arco, antes de soltarla
   const cuerda = new THREE.Group(), hilo = new THREE.CylinderGeometry(0.0022, 0.0022, 1, 4).rotateX(Math.PI / 2).translate(0, 0, 0.5), hiloM = new THREE.MeshStandardMaterial({ color: 0xd8cfb8, roughness: 1 }); cuerda.add(new THREE.Mesh(hilo, hiloM), new THREE.Mesh(hilo, hiloM)); cuerda.visible = false; scene.add(cuerda); // la cuerda: de una punta del arco a la otra, pasando por donde la lleva la mano
-  cuerpo = { mixer, acciones, H, m, y0: m.position.y, peso: { anda: 0, quieto: 0, corre: 0 }, aire: 0, sienta: 0, atento: 0, junta: 0, tapa: 0, pie: [0, 0], parp: 2, habla: 0, ojos, boca, bocaAlto, arco: arcoN, puesta, cuerda, palma: { Left: palmaDe(m, H.LeftHand), Right: palmaDe(m, H.RightHand) } }; window.__g.modelo = m; window.__g.cuerpo = cuerpo;
+  const manos = haceManos(CARA_LEFTRARU.piel); scene.add(manos.g); // las manos que se ven de cerca al apuntar
+  // Mientras se ven esas, los brazos del modelo no se pintan (uFP), pero siguen ahí para la sombra: en el suelo se ve al arquero entero.
+  { const vistos = new Set(); m.traverse((o) => { if (!o.isSkinnedMesh) return; const I = o.geometry.attributes.skinIndex, Wt = o.geometry.attributes.skinWeight, a = new Float32Array(I.count), br = new Set(['LeftArm', 'LeftForeArm', 'LeftHand', 'RightArm', 'RightForeArm', 'RightHand'].map((k) => o.skeleton.bones.findIndex((b) => b.name === k)));
+      for (let i = 0; i < I.count; i++) for (let c = 0; c < 4; c++) if (br.has(I.getComponent(i, c))) a[i] += Wt.getComponent(i, c);
+      o.geometry.setAttribute('aBrazo', new THREE.BufferAttribute(a, 1)); const mat = o.material; if (vistos.has(mat)) return; vistos.add(mat); const antes = mat.onBeforeCompile;
+      mat.onBeforeCompile = (sh, r) => { if (antes) antes(sh, r); sh.uniforms.uFP = uFP; sh.vertexShader = 'attribute float aBrazo;\nvarying float vBrazo;\n' + sh.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n  vBrazo = aBrazo;'); sh.fragmentShader = 'uniform float uFP;\nvarying float vBrazo;\n' + sh.fragmentShader.replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>\n  if (uFP > 0.5 && vBrazo > 0.5) discard;'); };
+      mat.customProgramCacheKey = () => 'sin-brazos'; mat.needsUpdate = true; }); }
+  cuerpo = { mixer, acciones, H, m, y0: m.position.y, peso: { anda: 0, quieto: 0, corre: 0 }, aire: 0, sienta: 0, atento: 0, junta: 0, tapa: 0, pend: 0, pie: [0, 0], parp: 2, habla: 0, ojos, boca, bocaAlto, arco: arcoN, puesta, cuerda, manos, vmK: 0, pegada: true, palma: { Left: palmaDe(m, H.LeftHand), Right: palmaDe(m, H.RightHand) } }; window.__g.modelo = m; window.__g.cuerpo = cuerpo;
 }, undefined, () => { for (const c of viejo) c.visible = true; }));
 // ---------- la gente de la aldea en 3D ----------
 // Quien tiene modelo 3D lo lleva encima de su cuerpo de siempre, que queda invisible y sigue decidiendo todo: dónde está, qué
@@ -881,6 +904,11 @@ function updateCuerpo(dt) {
   const f = player.facing; let fx = Math.sin(f), fz = Math.cos(f), rx = -fz, rz = fx;
   const brazo = (lado, ad, arr, cos, ad2, arr2, cos2, k) => { const sg = lado === 'Right' ? 1 : -1; apunta(H[lado + 'Arm'], fx * ad + rx * cos * sg, arr, fz * ad + rz * cos * sg, k); apunta(H[lado + 'ForeArm'], fx * ad2 + rx * cos2 * sg, arr2, fz * ad2 + rz * cos2 * sg, k); }; // hacia dónde van el brazo y el antebrazo: cuánto adelante, arriba y al costado
   const env = h ? suave(0, 0.35, h.t / h.dur) * (1 - suave(0.7, 1, h.t / h.dur)) : 0;
+  // Parado, los brazos no quedan tiesos: se mecen apenas adelante y atrás, como un péndulo lento, cada uno a su tiempo y el
+  // antebrazo un poco después que el brazo. (Con algo entre manos, sentado o apuntando, no.)
+  cuerpo.pend += ((h || gesto || acc.sitting || entrega.alza > 0 || apK > 0 || !jugando ? 0 : (W.quieto || 0) * (1 - tapa)) - cuerpo.pend) * Math.min(1, dt * 2.5);
+  if (cuerpo.pend > 0.01) for (const [l, fase, k] of [['Right', 0, 1], ['Left', 2.3, acc.equipado ? 0 : 0.85]]) { if (!k) continue; const a = cuerpo.pend * k, w = time * 1.15 + fase; VC.set(rx, 0, rz);
+    tuerce(H[l + 'Arm'], QR.setFromAxisAngle(VC, Math.sin(w) * 0.05 * a), 1); tuerce(H[l + 'ForeArm'], QR.setFromAxisAngle(VC, (Math.sin(w - 0.7) * 0.035 - 0.02) * a), 1); }
   if (gesto && gesto.yo) brazo('Right', 0.9, -0.25, 0.15, 1, 0.05, 0, gesto.yo);                       // entregar o recibir: la mano adelante
   if (h && h.tipo === 'alcanzar') brazo('Right', 0.9, 0.1, 0.1, 1, 0.15, 0, env);                         // estirar la mano a la altura del pecho
   if (h && h.tipo === 'saludar') brazo('Right', 0.3, 0.9, 0.25, 0.1, 1, 0, env);                          // la mano en alto
@@ -986,6 +1014,80 @@ function armaArco(dt, f, h) {
   cuerdaPor(C, puestaYa || (acc.tira && ka > 0.7) ? PN : null);
   if (puestaYa) { C.puesta.visible = true; C.puesta.position.set(PN.x + ax * 0.36, PN.y + ay * 0.36, PN.z + az * 0.36); C.puesta.lookAt(PN.x + ax * 2, PN.y + ay * 2, PN.z + az * 2); }
 }
+// ---------- las manos del arco, de cerca ----------
+// Apuntando, la cámara va en los ojos de Leftraru y sus manos quedan a un palmo de ella. Las del modelo no tienen dedos que se
+// muevan, así que ahí se usan otras, hechas para verse de cerca: la izquierda cerrada en la empuñadura, con los cuatro dedos
+// abrazándola por delante y el pulgar por detrás; la derecha enganchando la cuerda con dos dedos, el índice sobre la flecha y
+// el medio debajo, con los otros dos recogidos contra la palma. Cada mano es una sola malla, con su antebrazo.
+// Todo se arma en el espacio del arco: +y hacia la punta de arriba, +z hacia donde sale la flecha, +x a la izquierda del arquero.
+// VM dice dónde queda eso visto desde los ojos (derecha, arriba, atrás): la empuñadura (G), hasta dónde llega la mano con la
+// cuerda al tensar del todo (N), cuánto se inclina el arco (cant), por dónde pasa la flecha junto a la empuñadura (ax, ay) y
+// dónde está el hombro izquierdo, hacia donde va ese brazo.
+const VM = { G: [-0.02, -0.1, -0.62], N: [0.035, -0.085, -0.27], cant: 0.5, ax: 0.019, ay: 0.042, hombroI: [-0.18, -0.21, 0.06], talla: 0.84 }; // talla: el tamaño de las manos (1 sería la de un adulto)
+const VMB = { q: new THREE.Quaternion(), G: V3(), D1: 0.39, ax: 0, ay: 0 }, uFP = { value: 0 }, LARGO_FL = 0.72; // uFP: 1 mientras se ven las manos de cerca (entonces los brazos del modelo no se pintan)
+function flechaGeo() { // una flecha: la caña, la punta endurecida al fuego y tres medias plumas atrás. Va a lo largo de z, con la punta hacia +z
+  const pinta = (g, c) => { const n = g.attributes.position.count, a = new Float32Array(n * 3), k = new THREE.Color(c); for (let i = 0; i < n; i++) k.toArray(a, i * 3); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; };
+  const p = [pinta(new THREE.CylinderGeometry(0.008, 0.008, 0.66, 6).rotateX(Math.PI / 2).translate(0, 0, -0.03), 0xb49a62), pinta(new THREE.ConeGeometry(0.0095, 0.07, 6).rotateX(Math.PI / 2).translate(0, 0, 0.325), 0x47301f)];
+  for (let i = 0; i < 3; i++) p.push(pinta(new THREE.BoxGeometry(0.0016, 0.017, 0.075).translate(0, 0.0145, -0.3).rotateZ(i * Math.PI * 2 / 3), 0xb5a88f));
+  return mergeGeometries(p);
+}
+function haceManos(piel) {
+  const PIEL = new THREE.Color(piel).multiplyScalar(0.9), CUERO = new THREE.Color(0x5a3d26), Q = new THREE.Quaternion(), UP = V3(0, 1, 0);
+  const pinta = (g, c) => { const n = g.attributes.position.count, a = new Float32Array(n * 3); for (let i = 0; i < n; i++) c.toArray(a, i * 3); g.setAttribute('color', new THREE.BufferAttribute(a, 3)); return g; };
+  const tramo = (lista, a, b, r, r2 = r, c = PIEL) => { const d = V3().subVectors(b, a), L = d.length(); // un trozo redondo de a a b: una falange, un antebrazo (r2: el grosor en b, si cambia)
+    const g = r2 === r ? new THREE.CapsuleGeometry(r, L, 3, 8) : new THREE.CylinderGeometry(r2, r, L, 10, 1); g.applyQuaternion(Q.setFromUnitVectors(UP, d.divideScalar(L))); g.translate((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2); lista.push(pinta(g, c)); };
+  const dedo = (lista, pts, r) => { for (let i = 0; i + 1 < pts.length; i++) tramo(lista, pts[i], pts[i + 1], r * (1 - i * 0.07)); };
+  const bola = (lista, p, rx, ry, rz) => { const g = new THREE.SphereGeometry(1, 12, 9); g.scale(rx, ry, rz); g.translate(p.x, p.y, p.z); lista.push(pinta(g, PIEL)); };
+  const G2R = Math.PI / 180, cil = (gr, r, y) => V3(Math.cos(gr * G2R) * r, y, Math.sin(gr * G2R) * r); // alrededor de la empuñadura: los grados van desde su izquierda (+x) hacia adelante (+z)
+  // cómo queda el espacio del arco visto desde los ojos
+  const G = V3(...VM.G), N = V3(...VM.N), X = V3(-1, 0, 0), Y = V3(0, 1, 0), Z = V3(0, 0, -1), arr = V3(Math.sin(VM.cant), Math.cos(VM.cant), 0);
+  for (let i = 0; i < 4; i++) { Z.copy(G).addScaledVector(X, VM.ax).addScaledVector(Y, VM.ay).sub(N); VMB.D1 = Z.length(); Z.normalize(); Y.copy(arr).addScaledVector(Z, -arr.dot(Z)).normalize(); X.crossVectors(Y, Z); }
+  VMB.q.setFromRotationMatrix(new THREE.Matrix4().makeBasis(X, Y, Z)); VMB.G.copy(G); VMB.ax = VM.ax; VMB.ay = VM.ay;
+  const alArco = (p) => { const d = V3(...p).sub(G); return V3(d.dot(X), d.dot(Y), d.dot(Z)); }; // un punto visto desde los ojos, pasado al espacio del arco
+  // ---- la izquierda: cerrada en la empuñadura ----
+  const I = []; // (la empuñadura, forrada en cuero, se agrega al final: no cambia con la talla de la mano)
+  [[0.031, 1, 1], [0.0105, 1.03, 1], [-0.0098, 1, 0.97], [-0.029, 0.9, 0.86]].forEach(([y, k, g]) => dedo(I, [cil(-14, 0.041, y), cil(48, 0.0375 * k, y), cil(112, 0.0295 * k, y - 0.001), cil(170, 0.0238, y - 0.002)], 0.0099 * g));
+  dedo(I, [V3(0.013, 0.031, -0.043), cil(248, 0.0285, 0.035), cil(202, 0.0262, 0.031)], 0.0108); // el pulgar, por detrás
+  bola(I, V3(0.036, 0.001, -0.046), 0.019, 0.043, 0.043); bola(I, V3(0.011, 0.012, -0.032), 0.018, 0.029, 0.02); // el dorso y la base del pulgar, que es donde empuja el arco
+  const mu = V3(0.035, -0.008, -0.09), hom = alArco(VM.hombroI), codo = V3().copy(mu).addScaledVector(V3().subVectors(hom, mu).normalize(), 0.245); codo.y -= 0.02;
+  bola(I, mu, 0.0215, 0.027, 0.027); tramo(I, mu, codo, 0.0235, 0.036); bola(I, codo, 0.036, 0.036, 0.036); tramo(I, codo, hom, 0.036, 0.043);
+  // ---- la derecha: dos dedos en la cuerda. Su origen es el punto de la cuerda donde va la cola de la flecha ----
+  const D = [];
+  for (const y of [0.0128, -0.0128]) dedo(D, [V3(-0.031, y * 1.25 + 0.002, -0.052), V3(-0.0215, y, -0.014), V3(-0.0065, y, 0.0098), V3(0.0165, y, 0.0078)], 0.0093); // índice arriba de la flecha, medio debajo: enganchan la cuerda por delante
+  dedo(D, [V3(-0.03, -0.034, -0.052), V3(-0.017, -0.035, -0.02), V3(-0.001, -0.036, -0.03), V3(-0.008, -0.035, -0.05)], 0.0088); // el anular, doblado contra la palma
+  dedo(D, [V3(-0.028, -0.052, -0.055), V3(-0.016, -0.053, -0.028), V3(-0.002, -0.053, -0.037), V3(-0.009, -0.051, -0.054)], 0.0078); // el meñique
+  dedo(D, [V3(-0.012, 0.03, -0.07), V3(0.004, 0.031, -0.046), V3(0.011, 0.024, -0.024)], 0.0108); // el pulgar, recogido sobre la mano
+  bola(D, V3(-0.029, -0.014, -0.083), 0.016, 0.045, 0.039); bola(D, V3(-0.011, 0.004, -0.087), 0.02, 0.031, 0.031);
+  const mu2 = V3(-0.027, -0.012, -0.124), codo2 = V3().copy(mu2).addScaledVector(V3(-0.1, 0.1, -1).normalize(), 0.3);
+  bola(D, mu2, 0.0215, 0.027, 0.027); tramo(D, mu2, codo2, 0.0235, 0.037);
+  for (const q of [...I, ...D]) q.scale(VM.talla, VM.talla, VM.talla); I.push(pinta(new THREE.CylinderGeometry(0.0135, 0.0135, 0.1, 10), CUERO));
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.82 }), g = new THREE.Group();
+  const izq = new THREE.Mesh(mergeGeometries(I), mat), der = new THREE.Mesh(mergeGeometries(D), mat);
+  for (const o of [izq, der]) { o.receiveShadow = true; o.frustumCulled = false; g.add(o); } g.visible = false;
+  return { g, izq, der };
+}
+// Se llama en cada cuadro, después de poner la cámara: así las manos van pegadas a lo que se ve, sin atraso.
+function manosArco(dt) {
+  const C = cuerpo, Mn = C.manos, entra = acc.equipado && acc.apunta && apK >= 0.9 && boy.g.visible && state === 'play', recien = C.vmK === 0;
+  C.vmK = entra ? Math.min(1, C.vmK + dt / 0.16) : 0; const on = C.vmK > 0; Mn.g.visible = on; uFP.value = on ? 1 : 0; // entran cuando la cámara ya llegó a los ojos, y salen de golpe al bajarlo
+  if (!on) { C.puesta.scale.set(1, 1, 1); return; }
+  camera.updateMatrixWorld(true);
+  const e = ease(C.vmK), anda = Math.min(1, player.speed / 3), c = suave(0, 1, acc.tensa), rec = acc.recarga, hay = acc.ctx().tengo('flecha') > 0;
+  // dónde va el arco visto desde los ojos, con un vaivén leve al caminar y al respirar, el temblor de tenerlo tenso y el golpe al soltar
+  PA.set(VMB.G.x + Math.cos(time * 5.2) * 0.003 * anda, VMB.G.y + Math.sin(time * 10.4) * 0.004 * anda + Math.sin(time * 1.3) * 0.0015 + Math.sin(time * 43) * 0.0006 * suave(0.85, 1, c) + retro * 0.018, VMB.G.z).applyMatrix4(camera.matrixWorld);
+  QF.copy(camera.quaternion).multiply(VMB.q);
+  Mn.g.position.copy(C.arco.position).lerp(PA, e); Mn.g.quaternion.copy(C.arco.quaternion).slerp(QF, e); Mn.g.updateMatrixWorld(true); // parte de donde lo tenía la mano del modelo y se acomoda
+  C.arco.position.copy(Mn.g.position); C.arco.quaternion.copy(Mn.g.quaternion); C.arco.scale.set(1, 1 - 0.06 * c, 1 + 0.5 * c); // al tensarlo, las puntas se vienen hacia atrás
+  // la mano derecha: en la cuerda mientras apunta y tensa; después de soltar baja a buscar otra flecha y vuelve con ella
+  const largo = PANZA + 0.012 + (VMB.D1 - PANZA - 0.012) * c, enCuerda = PB.set(VMB.ax, VMB.ay, -largo), lista = hay && !acc.vuela && rec < 0.45, md = Mn.der.position;
+  if (recien || acc.tira || (C.pegada && rec <= 0)) { md.copy(enCuerda); C.pegada = true; }
+  else { md.lerp(rec > 0.45 ? PC.set(VMB.ax - 0.07, VMB.ay - 0.27, -PANZA - 0.12) : enCuerda, 1 - Math.exp(-dt * (rec > 0.45 ? 14 : 22))); C.pegada = rec <= 0.45 && md.distanceTo(enCuerda) < 0.012; if (C.pegada) md.copy(enCuerda); }
+  Mn.der.rotation.x = -Math.min(0.6, md.distanceTo(enCuerda) * 2.4); // al bajar, la mano se vuelca un poco hacia abajo
+  // la flecha va con la mano: la cola entre los dos dedos y la punta hacia su apoyo, junto a la empuñadura
+  const mano = Mn.g.localToWorld(PD.copy(md)); C.puesta.visible = lista;
+  if (lista) { const dir = Mn.g.localToWorld(PE.set(VMB.ax, VMB.ay, 0)).sub(mano).normalize(); C.puesta.scale.set(0.5, 0.5, 1); C.puesta.position.copy(mano).addScaledVector(dir, LARGO_FL / 2); C.puesta.lookAt(PG.copy(mano).addScaledVector(dir, 2)); }
+  cuerdaPor(C, C.pegada && (lista || acc.tira) ? PF.copy(mano) : null);
+}
 // La gente en 3D, cuadro a cuadro: después de que su cuerpo de siempre tomó la postura de este momento, el modelo la copia.
 const PT = V3();
 function ikBrazo(sup, inf, fin, T, polo, k) { // gira brazo y antebrazo para que la muñeca llegue a T; polo: hacia dónde queda el codo; k: cuánto (0 nada, 1 del todo)
@@ -1012,7 +1114,7 @@ function updateGente3D(dt) {
     pisa(P, dt, { suelo: a.g.position.y, apoyado: true, f: a.face, quieto: 1 - P.w.camina, slope: 0, h: a.h });
     const inc = a.body.rotation.x; if (Math.abs(inc) > 0.004 && H.Spine02) tuerce(H.Spine02, QR.setFromAxisAngle(VC.set(fz, 0, -fx), inc), 1); // el tronco se inclina igual
     [['Left', a.armL, a.foreL, 1], ['Right', a.armR, a.foreR, -1]].forEach(([l, br, an, sx], i) => { // las manos van a donde están las del cuerpo de siempre; con los brazos caídos, se queda la postura de reposo
-      const uso = suave(0.06, 0.3, Math.abs(br.rotation.x) + Math.abs(an.rotation.x) + Math.abs(br.rotation.z - sx * 0.1)) * (1 - P.w.camina); // caminando, los brazos los lleva el movimiento P.brazo[i] += (uso - P.brazo[i]) * Math.min(1, dt * 8);
+      const uso = suave(0.06, 0.3, Math.abs(br.rotation.x) + Math.abs(an.rotation.x) + Math.abs(br.rotation.z - sx * 0.1)) * (1 - P.w.camina); /* caminando, los brazos los lleva el movimiento */ P.brazo[i] += (uso - P.brazo[i]) * Math.min(1, dt * 8);
       if (P.brazo[i] < 0.99) apunta(H[l + 'Arm'], fz * sx * 0.17 + fx * 0.04, -1, -fx * sx * 0.17 + fz * 0.04, 0.55 * (1 - P.brazo[i]) * (1 - P.w.camina) * (1 - P.w.habla)); // en reposo, los brazos caen junto al cuerpo
       if (P.brazo[i] > 0.01) ikBrazo(H[l + 'Arm'], H[l + 'ForeArm'], H[l + 'Hand'], an.localToWorld(PT.set(0, -0.2, 0.03)), V3(fz * sx * 0.45 - fx * 0.5, -0.75, -fx * sx * 0.45 - fz * 0.5), P.brazo[i]); }); // el codo, hacia abajo, atrás y afuera
     if (H.Head) { VD.set(0, 0, 1).applyQuaternion(a.head.getWorldQuaternion(QD)).normalize(); const mira = PT.copy(VD); // la cabeza mira hacia donde mira la del cuerpo de siempre
@@ -1033,7 +1135,8 @@ function tick(dt) {
   else if (fuera()) { const a = time * 0.04 + 2.4; camera.position.set(Math.sin(a) * 31, 12, Math.cos(a) * 31); camera.lookAt(0, 4, 0); }
   else if (focus) updateFocus(dt);
   else updateCamera(dt);
-  updateItems();
+  if (cuerpo) manosArco(dt);
+  updateArma(); updateItems();
   { const p = pp(); uPlayer.value.set(p.x, p.y - FEET, p.z); // las plantas se apartan al paso
     ui.people.length = 0;
     for (const a of world.life.actors) if (a.mark) { const id = PERSON[a.name], w = acc.wants(id), kind = w === 'main' ? 'main' : ui.has(id) ? w : 'nuevo'; // estrella: con esta persona sigue la historia; rombo: encargo; círculo: aún no la conoces

@@ -37,7 +37,7 @@ export function buildWorld(scene, RAPIER, physics) {
   { const ST = 2, NX = (B.x1 - B.x0) / ST, NZ = (B.z1 - B.z0) / ST, verts = new Float32Array((NX + 1) * (NZ + 1) * 3), idx = new Uint32Array(NX * NZ * 6);
     for (let j = 0, k = 0; j <= NZ; j++) for (let i = 0; i <= NX; i++, k += 3) { const x = B.x0 + i * ST, z = B.z0 + j * ST; verts[k] = x; verts[k + 1] = height(x, z); verts[k + 2] = z; }
     for (let j = 0, k = 0; j < NZ; j++) for (let i = 0; i < NX; i++) { const a = j * (NX + 1) + i, b = a + 1, c = a + NX + 1, d = c + 1; idx[k++] = a; idx[k++] = c; idx[k++] = b; idx[k++] = b; idx[k++] = c; idx[k++] = d; }
-    physics.createCollider(RAPIER.ColliderDesc.trimesh(verts, idx), fixed);
+    physics.createCollider(RAPIER.ColliderDesc.trimesh(verts, idx).setCollisionGroups(0x0002ffff), fixed); // el suelo va en su propio grupo: así la gente, al tantear por dónde pasar, puede no contarlo
   }
 
   // terreno exterior, más tosco: cerros boscosos al oriente, bajada hacia el mar al poniente
