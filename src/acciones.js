@@ -313,7 +313,7 @@ export function createActions({ world, ui, snd, scene, hint, speak, murmur, ripp
   function equipar(si) {
     if (!(f.cz >= 2 && have('arco') > 0)) return false;
     S.eq = si === undefined ? !S.eq : !!si; save(); COSAS.arco.usar = S.eq ? 'Guardar' : 'Equipar'; if (!S.eq) apuntar(false);
-    snd.play('ui-clic', 0.4, S.eq ? 1.1 : 0.8); hint(S.eq ? `Arco en la mano. Mantén el botón derecho para apuntar y, sin soltarlo, el izquierdo para tensar; suéltalo para tirar. ${tecla('flecha')} hace una flecha.` : 'Guardaste el arco.', S.eq ? 7 : 3); return true;
+    snd.play('ui-clic', 0.4, S.eq ? 1.1 : 0.8); hint(S.eq ? (TACTIL ? 'Arco en la mano. Cerca del blanco o de un pudú, toca «Tirar»: la flecha apunta sola.' : `Arco en la mano. Mantén el botón derecho para apuntar y, sin soltarlo, el izquierdo para tensar; suéltalo para tirar. ${tecla('flecha')} hace una flecha.`) : 'Guardaste el arco.', S.eq ? 7 : 3); return true;
   }
   // Tensar: mientras se mantiene apretado el botón, el arco se va cargando; al soltarlo, sale la flecha con esa fuerza.
   const empiezaATensar = () => { if (!punt.on || !punt.quiere || punt.tira || vuelo || punt.pausa > 0 || !have('flecha')) return false; punt.tira = true; return true; };

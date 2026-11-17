@@ -22,8 +22,10 @@ const $ = (id) => document.getElementById(id);
 await RAPIER.init();
 const physics = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
 
+const TACTIL = matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches, PR_AUTO = TACTIL ? 1.25 : 1.5; // celular o tableta, sin ratón; PR_AUTO: hasta cuántos puntos por punto de pantalla se dibuja en calidad automática
+document.body.classList.toggle('tactil', TACTIL);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
+renderer.setPixelRatio(Math.min(devicePixelRatio, PR_AUTO));
 renderer.setSize(innerWidth, innerHeight);
 document.body.prepend(renderer.domElement);
 const scene = new THREE.Scene();
@@ -67,14 +69,13 @@ const pp = () => pCol.translation();
 // Aventura aparece la pantalla del acto y, si la historia recién empieza, el prólogo —un aviso antiguo cuya tinta va
 // apareciendo— y dos planos que llevan del relato al juego. Si ya habías empezado, del acto se pasa directo al juego.
 let coverT = 0, prologo = false, acto = false, actoT = 0, prologoT = [];
-const TACTIL = matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches; // celular o tableta, sin ratón
 const fuera = () => state === 'title' || prologo || acto; // todavía no se está en el mundo
 $('c-toca').textContent = TACTIL ? 'Toca la pantalla para comenzar' : 'Haz clic para comenzar';
 function portadaMenu() { if (!$('cover-1').hidden) return; coverT = performance.now(); $('c-toca').hidden = true; $('cover-1').hidden = false; $('title').classList.add('menu'); }
 function enter() {
   if (state !== 'title' || $('cover-1').hidden || performance.now() - coverT < 250) return;
   setMenu(false); $('title').classList.add('hide');
-  if (!document.fullscreenElement) { try { document.documentElement.requestFullscreen?.()?.catch?.(() => {}); } catch { /* el navegador no lo permitió */ } }
+  if (!document.fullscreenElement) { try { const p = document.documentElement.requestFullscreen?.(); if (TACTIL && p && p.then) p.then(() => screen.orientation?.lock?.('landscape')?.catch?.(() => {})); p?.catch?.(() => {}); } catch { /* el navegador no lo permitió */ } } // en el celular, además, se pide dejar la pantalla acostada
   lock();
   state = 'cine'; acto = true; coverT = performance.now(); $('acto').classList.add('on'); actoT = setTimeout(cerrarActo, 4600); // la pantalla del acto se va sola; un clic o Enter la adelantan
 }
@@ -99,8 +100,9 @@ function tourIr(i) {
   document.body.classList.add('tour'); b.classList.add('tour-on');
   $('tour-n').textContent = `${i + 1} de ${TOUR.length}`; $('tour-t').innerHTML = `${nombre} <kbd>${keyName(opts.keys[tecla])}</kbd>`; $('tour-x').textContent = texto; $('tour-sig').textContent = i === TOUR.length - 1 ? 'Entendido' : 'Siguiente';
   const r = b.getBoundingClientRect(), cx = r.left + r.width / 2, w = caja.offsetWidth; // el recuadro queda sobre el botón, sin salirse de la pantalla, y la flecha justo encima de él
-  caja.style.left = `${Math.max(12, Math.min(innerWidth - w - 12, cx - w / 2))}px`; caja.style.bottom = `${innerHeight - r.top + 34}px`;
-  $('tour-flecha').style.left = `${cx}px`; $('tour-flecha').style.bottom = `${innerHeight - r.top + 8}px`;
+  const fl = $('tour-flecha'), arriba = r.top < innerHeight / 2; fl.classList.toggle('sube', arriba); /* en el celular los botones van arriba: el recuadro queda debajo y la flecha apunta hacia arriba */
+  caja.style.left = `${Math.max(12, Math.min(innerWidth - w - 12, cx - w / 2))}px`; caja.style.bottom = arriba ? 'auto' : `${innerHeight - r.top + 34}px`; caja.style.top = arriba ? `${r.bottom + 34}px` : 'auto';
+  fl.style.left = `${cx}px`; fl.style.bottom = arriba ? 'auto' : `${innerHeight - r.top + 8}px`; fl.style.top = arriba ? `${r.bottom + 8}px` : 'auto';
 }
 $('tour').addEventListener('click', (e) => { e.stopPropagation(); tourIr(e.target.closest('#tour-saltar') ? -1 : tour + 1); });
 addEventListener('keydown', (e) => { if (tour < 0) return; e.stopImmediatePropagation(); e.preventDefault(); if (e.code === 'Escape') tourIr(-1); else if (!e.repeat && ['Enter', 'Space', 'ArrowRight', 'KeyE'].includes(e.code)) tourIr(tour + 1); }, true);
@@ -156,9 +158,9 @@ function drawKeys() {
 let page = 'opciones';
 function menuPage(pg) { rebinding = null; page = pg; $('pg-opciones').hidden = pg !== 'opciones'; $('pg-controles').hidden = pg !== 'controles'; if (pg === 'controles') drawKeys(); }
 const detalleInicial = opts.detalle;
-let menuOpen = false, pr = Math.min(devicePixelRatio, 1.5);
+let menuOpen = false, pr = Math.min(devicePixelRatio, PR_AUTO);
 function applyOpts() {
-  pr = opts.calidad === 'auto' ? Math.min(devicePixelRatio, 1.5) : Math.min(parseFloat(opts.calidad), Math.max(1, devicePixelRatio));
+  pr = opts.calidad === 'auto' ? Math.min(devicePixelRatio, PR_AUTO) : Math.min(parseFloat(opts.calidad), Math.max(1, devicePixelRatio));
   renderer.setPixelRatio(pr); post.resize(); document.body.classList.toggle('nomini', !opts.mini); medidor.show(opts.medidor || MEDIR);
   $('o-reload').hidden = opts.detalle === detalleInicial; $('o-reload-tex').hidden = opts.texLivianas === TEX_LIVIANAS; // las texturas se eligen al cargar: si la opción ya no calza con lo cargado, falta recargar
   localStorage.setItem('leftraru.opciones', JSON.stringify(opts));
@@ -220,6 +222,35 @@ function dispara() { // suelta la flecha hacia donde marca la mira: lo primero q
   for (let k = 2; k < dist; k += 0.5) if (o.y + d.y * k < height(o.x + d.x * k, o.z + d.z * k)) { dist = k; break; } // el suelo, a pasos
   const algo = acc.mira(o, d); if (algo !== null && algo < dist) dist = algo; // un blanco o un pudú que esté antes
   if (acc.soltar(cuerpo ? cuerpo.arco.position.clone() : V3(pp().x, pp().y + 0.35, pp().z), V3().copy(o).addScaledVector(d, dist))) retro = 1; else acc.tensar(false);
+}
+// ---------- en el celular: palanca para caminar, arrastrar para mirar y botones ----------
+// Sin teclado ni ratón, el pulgar izquierdo camina y el derecho mira. Donde se apoya el izquierdo (en el lado izquierdo de la
+// pantalla) aparece una palanca: hacia dónde se arrastra es hacia dónde va Leftraru, y llevada a fondo corre. Arrastrar en
+// cualquier otra parte gira la cámara. Saltar y rodar tienen su botón; hablar, observar, recoger y tirar con el arco se hacen
+// tocando el aviso que sale abajo (el mismo que en el computador muestra la tecla).
+const toque = { x: 0, z: 0, corre: false, palanca: -1, mira: -1, px: 0, py: 0, mx: 0, my: 0 }; // palanca, mira: qué dedo lleva cada cosa (−1: ninguno)
+const sueltaToque = () => { toque.palanca = toque.mira = -1; toque.x = toque.z = 0; toque.corre = false; $('palanca').classList.remove('on', 'corre'); };
+if (TACTIL) {
+  const cv = renderer.domElement, pal = $('palanca'), perilla = pal.firstElementChild, RADIO = 52;
+  cv.addEventListener('touchstart', (e) => e.preventDefault(), { passive: false }); // sin esto el navegador inventa clics de ratón, agranda la página o la arrastra
+  cv.addEventListener('pointerdown', (e) => { if (e.pointerType === 'mouse' || state !== 'play') return;
+    if (toque.palanca < 0 && e.clientX < innerWidth * 0.42) { toque.palanca = e.pointerId; toque.px = e.clientX; toque.py = e.clientY; pal.style.left = `${e.clientX}px`; pal.style.top = `${e.clientY}px`; perilla.style.transform = ''; pal.classList.add('on'); }
+    else if (toque.mira < 0) { toque.mira = e.pointerId; toque.mx = e.clientX; toque.my = e.clientY; }
+    try { cv.setPointerCapture(e.pointerId); } catch { /* el dedo ya se levantó */ } });
+  cv.addEventListener('pointermove', (e) => {
+    if (e.pointerId === toque.palanca) { let dx = e.clientX - toque.px, dy = e.clientY - toque.py; const d = Math.hypot(dx, dy); if (d > RADIO) { dx *= RADIO / d; dy *= RADIO / d; }
+      toque.x = dx / RADIO; toque.z = -dy / RADIO; toque.corre = d > RADIO * 0.94; perilla.style.transform = `translate(${dx.toFixed(1)}px, ${dy.toFixed(1)}px)`; pal.classList.toggle('corre', toque.corre); }
+    else if (e.pointerId === toque.mira && !focus) { const dx = e.clientX - toque.mx, dy = e.clientY - toque.my; toque.mx = e.clientX; toque.my = e.clientY;
+      cam.yaw -= dx * 0.0066 * opts.sens; cam.pitch = Math.min(1.2, Math.max(Math.min(-0.25, cam.pitch), cam.pitch + dy * 0.005 * opts.sens * (opts.inv ? -1 : 1))); } });
+  const fin = (e) => { if (e.pointerId === toque.palanca) { toque.palanca = -1; toque.x = toque.z = 0; toque.corre = false; pal.classList.remove('on', 'corre'); } if (e.pointerId === toque.mira) toque.mira = -1; };
+  cv.addEventListener('pointerup', fin); cv.addEventListener('pointercancel', fin);
+  const boton = (id, fn) => { const b = $(id); b.addEventListener('pointerdown', (e) => { e.preventDefault(); b.classList.add('on'); fn(true); }); for (const ev of ['pointerup', 'pointercancel', 'pointerleave']) b.addEventListener(ev, () => { b.classList.remove('on'); fn(false); }); b.addEventListener('contextmenu', (e) => e.preventDefault()); };
+  boton('t-saltar', (si) => { keys[opts.keys.saltar] = si; }); boton('t-rodar', (si) => { if (si) rodar(); });
+  $('prompt').addEventListener('click', () => interact());
+  $('prompt2').addEventListener('click', () => { if (doable && state === 'play' && !talk && !ui.open && !focus) { const a = doable; doable = null; $('prompt2').classList.remove('on'); a.run(); } });
+  $('skip').textContent = 'Saltar ▸'; $('skip').addEventListener('click', () => { if (!talk && !prologo && !acto) cine.skip(); });
+  $('minimap').addEventListener('click', () => { if (state === 'play' && !talk && !focus) { snd.play('ui-cuaderno', 0.6); ui.show('mapa'); } });
+  document.querySelectorAll('button, small').forEach((e) => { if (!e.children.length && e.textContent.includes(' · Esc')) e.textContent = e.textContent.replace(' · Esc', ''); }); // sin teclado no hay Esc
 }
 renderer.domElement.addEventListener('wheel', (e) => { if (state === 'play' && !focus) cam.dist = Math.min(9, Math.max(2.6, cam.dist + Math.sign(e.deltaY) * 0.6)); }, { passive: true });
 
@@ -416,7 +447,16 @@ function toast(txt, secs = 5, sound = null, grande = GRANDE.includes(sound)) { i
 // Las instrucciones de cómo jugar (qué tecla hace qué, y los pasos del tutorial) van aparte: al centro de la pantalla,
 // en letra blanca y sin recuadro, para que no se confundan con los avisos de misión ni con los puntos.
 let ayudaT = 0, ayudaGap = 0; const ayudas = [];
-const teclasHTML = (s) => s.replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])).replace(/\{(\w+)\}/g, (_, a) => `<kbd>${keyName(opts.keys[a] || a)}</kbd>`); // {observar} → la tecla, dibujada como tecla
+// En el celular no hay teclas ni ratón: los textos que los nombran se dicen de otra manera.
+const TOQUES = [[/Camina con \{adelante\} \{izquierda\} \{atras\} \{derecha\}/, 'Camina con la palanca: apoya el pulgar en el lado izquierdo y arrastra'], [/\{correr\} para correr y \{saltar\} para saltar/, 'Lleva la palanca a fondo para correr; el botón redondo salta'],
+  [/Arrastra con el ratón para girar la cámara/, 'Arrastra el lado derecho de la pantalla para mirar alrededor'], [/\{misiones\} abre las misiones y \{mapa\}, el mapa/, 'Los botones de arriba abren las misiones y el mapa'],
+  [/pulsa \{(observar|accion)\}/g, 'toca el aviso de abajo'], [/Con \{accion\} recoges cosas y ayudas\./, 'Así recoges cosas y ayudas.'], [/ \(\{(cuaderno|mapa)\}\)/g, ''], [/\{flecha\} hace una flecha/, 'El botón de la flecha hace una flecha'], [/\{arma\} guarda o saca el arco/, 'El botón del arco lo guarda o lo saca'],
+  [/Mantén apretado el botón derecho del ratón para apuntar y, sin soltarlo, mantén el izquierdo para tensar el arco y suéltalo para tirar: mientras más lo tenses, más fuerte y más lejos sale la flecha\./, 'Párate a unos pasos, con el arco en la mano, y toca «Tirar al blanco»: la flecha apunta sola.'],
+  [/Mantén apretado el botón derecho del ratón para apuntar/, 'Párate a unos pasos del blanco, con el arco en la mano'], [/Sin soltarlo, mantén el izquierdo para tensar el arco y suéltalo para tirar/, 'Toca «Tirar al blanco»: la flecha apunta sola'], [/Mientras más lo tenses, más fuerte y más lejos sale la flecha/, 'Si el aviso no sale, acércate o aléjate un poco'],
+  [/apunta con el botón derecho del ratón, tensa con el izquierdo y suéltalo/, 'y cuando lo tengas cerca toca «Tirar la flecha»'], [/Apunta con el botón derecho, tensa con el izquierdo y suéltalo/, 'Cuando lo tengas cerca, toca «Tirar la flecha»']];
+const NOMBRE_TOQUE = { observar: 'el aviso de abajo', accion: 'el aviso de abajo', saltar: 'el botón de saltar', rodar: 'el botón de rodar', correr: 'la palanca a fondo', arma: 'el botón del arco', flecha: 'el botón de la flecha' };
+const aToque = (s) => { if (!TACTIL) return s; for (const [de, a] of TOQUES) s = s.replace(de, a); return s.replace(/\{(\w+)\}/g, (_, a) => NOMBRE_TOQUE[a] || 'su botón'); };
+const teclasHTML = (s) => aToque(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])).replace(/\{(\w+)\}/g, (_, a) => `<kbd>${keyName(opts.keys[a] || a)}</kbd>`); // {observar} → la tecla, dibujada como tecla
 function showAyuda(txt, secs) { // va en una sola línea si cabe en el espacio libre del centro (sin meterse sobre el panel de estado); si no, se reparte en dos o tres
   const el = $('ayuda'); el.innerHTML = teclasHTML(txt.replace(/^\?/, '')); el.classList.remove('larga'); if (el.offsetWidth > Math.max(300, innerWidth - 2 * (Math.min(390, innerWidth * 0.4) + 32))) el.classList.add('larga');
   el.classList.add('on'); ayudaT = secs; ayudaGap = 5;
@@ -428,7 +468,7 @@ function apunte(txt, sound) { // un renglón sobre el minimapa, que se va solo a
 }
 // cada tipo de aviso suena distinto: algo nuevo en el cuaderno, un encargo o una misión por hacer, algo logrado
 const TOQUE = { hallazgo: ['ui-hallazgo', 0.45], encargo: ['ui-mision', 0.5], mision: ['ui-mision', 0.5], logro: ['ui-logro', 0.5], foto: ['ui-cuaderno', 0.5] };
-const teclas = (s) => s.replace(/\{(\w+)\}/g, (_, a) => keyName(opts.keys[a] || a)); // {observar} → la tecla que tenga esa acción
+const teclas = (s) => aToque(s).replace(/\{(\w+)\}/g, (_, a) => keyName(opts.keys[a] || a)); // {observar} → la tecla que tenga esa acción
 
 addEventListener('keydown', (e) => {
   if (rebinding) { // se está eligiendo una tecla nueva para una acción
@@ -454,7 +494,7 @@ addEventListener('keydown', (e) => {
 addEventListener('keyup', (e) => { keys[e.code] = false; });
 // Si la ventana pierde el foco con una tecla apretada, el navegador nunca avisa que se soltó y Leftraru seguiría
 // caminando solo. Al salir de la ventana se sueltan todas, y también el arrastre de la cámara.
-const sueltaTodo = () => { for (const k in keys) keys[k] = false; dragging = false; document.body.classList.remove('girando'); botonDer = false; acc.tensar(false); dejaDeApuntar(); };
+const sueltaTodo = () => { for (const k in keys) keys[k] = false; dragging = false; document.body.classList.remove('girando'); botonDer = false; acc.tensar(false); dejaDeApuntar(); sueltaToque(); };
 addEventListener('blur', sueltaTodo); document.addEventListener('visibilitychange', sueltaTodo);
 addEventListener('mousemove', (e) => {
   if (dragging && !e.buttons) { dragging = false; document.body.classList.remove('girando'); } // el botón se soltó fuera de la ventana
@@ -488,9 +528,10 @@ function updatePlayer(dt) {
     ix = (down('derecha') || keys.ArrowRight ? 1 : 0) - (down('izquierda') || keys.ArrowLeft ? 1 : 0);
     iz = (down('adelante') || keys.ArrowUp ? 1 : 0) - (down('atras') || keys.ArrowDown ? 1 : 0);
     cam.yaw += ((down('camIzq') ? 1 : 0) - (down('camDer') ? 1 : 0)) * dt * 1.8;
+    if (toque.palanca >= 0 && Math.hypot(toque.x, toque.z) > 0.22) { ix = toque.x; iz = toque.z; } // en el celular, la palanca
   }
   const wade = Math.min(1, Math.max(0, (WATER_Y - (pp().y - FEET)) / 0.8)); player.wade = wade; // con el agua a las rodillas se avanza más lento
-  const run = down('correr'), apunta = acc.apunta, target = andar ? andar[2] : (ix || iz ? (apunta ? 2.0 : run ? 6.2 * (ui.skill('ligero') ? 1.18 : 1) : 3.3) : 0) * (1 - wade * 0.5);
+  const run = down('correr') || (toque.palanca >= 0 && toque.corre), apunta = acc.apunta, target = andar ? andar[2] : (ix || iz ? (apunta ? 2.0 : run ? 6.2 * (ui.skill('ligero') ? 1.18 : 1) : 3.3) : 0) * (1 - wade * 0.5);
   player.speed += (target - player.speed) * Math.min(1, dt * 10);
   const fx = -Math.sin(cam.yaw), fz = -Math.cos(cam.yaw), rx = Math.cos(cam.yaw), rz = -Math.sin(cam.yaw);
   let dx = fx * iz + rx * ix, dz = fz * iz + rz * ix; if (andar) { dx = andar[0]; dz = andar[1]; } const l = Math.hypot(dx, dz);
@@ -675,7 +716,7 @@ function updateItems() {
 
 const ui = createUI({ world, onToast: (t, kind) => toast(t, 5, kind || 'hallazgo'), onClose: () => { if (state === 'play' && !menuOpen) lock(); }, onSkill: () => applySkills(), onGuide: (g) => setGuia(g, 'jugador') });
 renderer.domElement.addEventListener('webglcontextrestored', () => ui.repaint()); // si el navegador pierde y recupera el contexto gráfico, el fondo del minimapa se vuelve a pintar
-const acc = createActions({ world, ui, snd, scene, hint, murmur, player, tecla: (a) => keyName(opts.keys[a]), guiar: (g) => setGuia(g, 'jugador'), choca: (a, b) => { const d = V3().subVectors(b, a), L = d.length(); if (L < 1e-6) return null; d.divideScalar(L); const hit = physics.castRay(new RAPIER.Ray(a, d), L, true, undefined, undefined, pCol); return hit ? V3().copy(a).addScaledVector(d, hit.timeOfImpact ?? hit.toi) : null; }, /* choca: ¿la flecha da con algo sólido entre a y b? */ story, pinones: () => [got, world.items.length], sanar: (n) => { vida = Math.min(100, vida + n); },
+const acc = createActions({ world, ui, snd, scene, hint, murmur, player, tecla: (a) => (TACTIL ? NOMBRE_TOQUE[a] || 'su botón' : keyName(opts.keys[a])), guiar: (g) => setGuia(g, 'jugador'), choca: (a, b) => { const d = V3().subVectors(b, a), L = d.length(); if (L < 1e-6) return null; d.divideScalar(L); const hit = physics.castRay(new RAPIER.Ray(a, d), L, true, undefined, undefined, pCol); return hit ? V3().copy(a).addScaledVector(d, hit.timeOfImpact ?? hit.toi) : null; }, /* choca: ¿la flecha da con algo sólido entre a y b? */ story, pinones: () => [got, world.items.length], sanar: (n) => { vida = Math.min(100, vida + n); },
   place: (x, z, facing) => { setPos(x, height(x, z) + FEET + 0.05, z); player.vy = 0; player.speed = 0; player.facing = facing; },
   speak: (name, lines, done, gestos) => { const who = world.life.actors.find((a) => a.name && a.name.toLowerCase() === name.toLowerCase()) || null, gira = !!who && !who.quieto && !acc.sitting; // quien habla, si está en el mundo; el que está mirando el valle no se da vuelta
     talk = { name, lines, i: 0, done: done || null, who, gira, gestos: gestos || null }; charla(who, gira); sigue(); if (cuerpo && who) cuerpo.habla = 0.9; },
