@@ -2,7 +2,7 @@
 // tarjetas de follaje con textura de hojas) que se repiten por el mapa con distinto tamaño y giro.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { TEX, MAT, mulberry32, photo, withWind } from './gfx.js';
+import { TEX, MAT, SUN, mulberry32, photo, withWind } from './gfx.js';
 import { height } from './terrain.js';
 
 const PI = Math.PI, UP = new THREE.Vector3(0, 1, 0);
@@ -198,38 +198,98 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
     for (let i = 0; i < 3; i++) scatter('fern', x + R(-1, 1) * len * 0.4, height(x, z), z + R(-1, 1), R(0.6, 0.9));
   }
 
+  // ---------- de lo que se repite por todo el mapa, solo se dibuja lo que hace falta ----------
+  // Los árboles y las rocas van en mallas repetidas que cubren el mapa entero, y antes se mandaban a dibujar todos en cada
+  // cuadro, dos veces (la imagen y las sombras), aunque estuvieran a la espalda o al otro lado del valle. Ahora cada grupo
+  // guarda su lista completa y, antes de cada cuadro, deja en la malla solo los que caen dentro de lo que ve la cámara.
+  // Las sombras van en una malla gemela, con los que caen dentro del cuadro que cubre el mapa de sombras (también los que
+  // quedan a la espalda, que igual dan sombra hacia adelante): la gemela se dibuja solo en la pasada de sombras, y la otra no proyecta.
+  const groups = [], frustum = new THREE.Frustum(), PV = new THREE.Matrix4(), PL = new Float32Array(24), lastP = V(1e9, 0, 0), lastT = V(1e9, 0, 0); // PL: los seis planos de lo que ve la cámara, en números sueltos
+  let anyHidden = false; // ¿hay algún árbol oculto por estar observando algo?
+  const sun = scene.children.find((o) => o.isDirectionalLight), SX = new THREE.Vector3().crossVectors(UP, SUN).normalize(), SY = new THREE.Vector3().crossVectors(SUN, SX); // los dos ejes del mapa de sombras
+  let cam = null, force = true; // cam: la cámara con que se dibuja; se conoce al primer cuadro, y hasta entonces se dibuja todo
+  const TODO = new URLSearchParams(location.search).has('todo'); // con ?todo en la dirección se dibuja todo siempre, como antes: sirve para comparar si algo falta en pantalla
+  // Un triángulo que no se ve, bajo el suelo, puesto en la escena antes que las mallas de aquí. Sirve de aviso: three.js lo
+  // llama cuando empieza a dibujar las sombras (ahí se encienden las gemelas) y cuando dibuja la imagen (ahí se apagan otra
+  // vez, para que no cuesten nada en esa pasada, y de paso se anota con qué cámara se está dibujando).
+  const twins = [], aviso = new THREE.Mesh(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute([0, -900, 0, 0.01, -900, 0, 0, -900, 0.01], 3)), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
+  aviso.castShadow = true; aviso.frustumCulled = false; aviso.onBeforeShadow = () => { for (const m of twins) m.visible = true; }; aviso.onBeforeRender = (r, s, camera) => { if (!TODO) cam = camera; for (const m of twins) m.visible = false; }; scene.add(aviso);
+  // parts: las mallas del grupo [{ geo, mat, color, receive }]; items: cada ejemplar { m, col, c, r, rec }, con la esfera que lo envuelve (centro c, radio r)
+  function culled(parts, items, cast) {
+    const n = items.length, src = new Float32Array(n * 16), col = new Float32Array(n * 3), sph = new Float32Array(n * 4), recs = items.map((it) => it.rec || null); // todo en listas de números, para que revisarlas cada cuadro no cueste casi nada
+    items.forEach((it, i) => { it.m.toArray(src, i * 16); if (it.col) it.col.toArray(col, i * 3); sph.set([it.c.x, it.c.y, it.c.z, it.r], i * 4); });
+    const mk = (p, shadow) => { const m = new THREE.InstancedMesh(p.geo, p.mat, n); m.instanceMatrix.array.set(src); if (p.color && !shadow) m.instanceColor = new THREE.InstancedBufferAttribute(col.slice(), 3); m.frustumCulled = false; m.castShadow = shadow; m.receiveShadow = !shadow && !!p.receive; scene.add(m); return m; };
+    const g = { src, col, sph, recs, n, vis: new Int32Array(n), key: NaN, main: parts.map((p) => mk(p, false)), shadow: cast ? parts.map((p) => mk(p, true)) : [] };
+    for (const m of g.shadow) { m.visible = false; twins.push(m); } // las gemelas solo se encienden mientras se dibujan las sombras
+    groups.push(g);
+  }
+  const copy = (m, g, k, i) => { const A = m.instanceMatrix.array, o = k * 16, s = i * 16; for (let j = 0; j < 16; j++) A[o + j] = g.src[s + j]; if (m.instanceColor) { const C = m.instanceColor.array; C[k * 3] = g.col[i * 3]; C[k * 3 + 1] = g.col[i * 3 + 1]; C[k * 3 + 2] = g.col[i * 3 + 2]; } };
+  function cull(p) { // p: dónde está la cámara
+    const t = sun ? sun.target.position : p, half = (sun ? sun.shadow.camera.right : 75) + 14; // 14 m de holgura: la lista de sombras se rehace cada 6 m de avance
+    const redo = force || lastP.distanceTo(p) > 6 || lastT.distanceTo(t) > 6; if (redo) { lastP.copy(p); lastT.copy(t); }
+    const P = PL, ax = SX.x, ay = SX.y, az = SX.z, bx = SY.x, by = SY.y, bz = SY.z;
+    for (const g of groups) {
+      const S = g.sph, vis = g.vis, recs = anyHidden ? g.recs : null; let k = 0, key = 0;
+      for (let i = 0, o = 0; i < g.n; i++, o += 4) { // queda fuera el que está entero detrás de alguno de los seis planos que encierran lo que ve la cámara
+        const x = S[o], y = S[o + 1], z = S[o + 2], nr = -S[o + 3];
+        if (P[0] * x + P[1] * y + P[2] * z + P[3] < nr || P[4] * x + P[5] * y + P[6] * z + P[7] < nr || P[8] * x + P[9] * y + P[10] * z + P[11] < nr || P[12] * x + P[13] * y + P[14] * z + P[15] < nr || P[16] * x + P[17] * y + P[18] * z + P[19] < nr || P[20] * x + P[21] * y + P[22] * z + P[23] < nr) continue;
+        if (recs && recs[i] && recs[i].hidden) continue;
+        vis[k++] = i; key = (key * 31 + i + 1) | 0;
+      }
+      key = (key * 31 + k) | 0;
+      if (key !== g.key) { g.key = key; for (const m of g.main) { for (let j = 0; j < k; j++) copy(m, g, j, vis[j]); m.count = k; m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; } } // solo se vuelve a subir si cambió lo que se ve
+      if (redo && g.shadow.length) { // las sombras: los que caen en el cuadro del mapa de sombras, puesto en la cámara o donde quedó centrado la última vez
+        let s = 0;
+        for (let i = 0, o = 0; i < g.n; i++, o += 4) {
+          if (recs && recs[i] && recs[i].hidden) continue;
+          const x = S[o], y = S[o + 1], z = S[o + 2], lim = half + S[o + 3]; let dx = x - p.x, dy = y - p.y, dz = z - p.z;
+          let ok = Math.abs(dx * ax + dy * ay + dz * az) < lim && Math.abs(dx * bx + dy * by + dz * bz) < lim;
+          if (!ok) { dx = x - t.x; dy = y - t.y; dz = z - t.z; ok = Math.abs(dx * ax + dy * ay + dz * az) < lim && Math.abs(dx * bx + dy * by + dz * bz) < lim; }
+          if (ok) vis[s++] = i;
+        }
+        for (const m of g.shadow) { for (let j = 0; j < s; j++) copy(m, g, j, vis[j]); m.count = s; m.instanceMatrix.needsUpdate = true; }
+      }
+    }
+    force = false;
+  }
+
   // ---------- arma las mallas repetidas ----------
   const chunks = [];
   function build() {
     const M = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(); let tris = 0;
+    const sphOf = (mdl) => { if (!mdl.sph) { mdl.wood.computeBoundingBox(); mdl.leaves.computeBoundingBox(); mdl.sph = mdl.wood.boundingBox.clone().union(mdl.leaves.boundingBox).getBoundingSphere(new THREE.Sphere()); } return mdl.sph; }; // la esfera que envuelve al árbol modelo
     for (const k in SPEC) for (const far of [false, true]) SPEC[k].models.forEach((mdl, v) => { // los árboles de fuera del mapa no proyectan sombra
       const list = (far ? SPEC[k].far : SPEC[k].inst)[v]; if (!list.length) return;
-      const wood = new THREE.InstancedMesh(mdl.wood, SPEC[k].bark, list.length), leaf = new THREE.InstancedMesh(mdl.leaves, SPEC[k].leaf, list.length);
-      list.forEach((t, i) => { M.compose(V(t.x, t.y, t.z), q.setFromAxisAngle(UP, t.yaw), V(t.s, t.s, t.s)); wood.setMatrixAt(i, M); leaf.setMatrixAt(i, M); leaf.setColorAt(i, c.setScalar(t.tint)); t.meshes = [wood, leaf]; t.i = i; });
-      for (const m of [wood, leaf]) { m.castShadow = !far; m.receiveShadow = m === wood && !far; m.frustumCulled = false; scene.add(m); } // la copa no se sombrea a sí misma: se vería negra
+      const sp = sphOf(mdl), items = list.map((t) => { M.compose(V(t.x, t.y, t.z), q.setFromAxisAngle(UP, t.yaw), V(t.s, t.s, t.s)); return { m: M.clone(), col: new THREE.Color().setScalar(t.tint), c: sp.center.clone().applyMatrix4(M), r: sp.radius * t.s + 0.4, rec: t }; });
+      culled([{ geo: mdl.wood, mat: SPEC[k].bark, receive: !far }, { geo: mdl.leaves, mat: SPEC[k].leaf, color: true }], items, !far); // la copa no se sombrea a sí misma: se vería negra
       tris += (mdl.wood.index.count + mdl.leaves.index.count) / 3 * list.length;
     });
     for (const k in SCATTER) for (const [key, list] of SCATTER[k].cells) {
       // Las matas que tienen modelo «de lejos» llevan dos mallas con las mismas plantas en los mismos lugares; update muestra una u otra.
-      const sc = SCATTER[k], m = new THREE.InstancedMesh(sc.geo, sc.mat, list.length), far = sc.far ? new THREE.InstancedMesh(sc.far, sc.mat, list.length) : null, both = far ? [m, far] : [m], [ci, cj] = key.split(',').map(Number);
-      list.forEach((t, i) => { t.yaw = rng() * 6.28; t.sy = 0.8 + rng() * 0.5; t.meshes = both; t.i = i; M.compose(V(t.x, t.y - 0.03, t.z), q.setFromAxisAngle(UP, t.yaw), V(t.s, t.s * t.sy, t.s)); c.set(t.color).multiplyScalar(0.62 + rng() * 0.34); for (const o of both) { o.setMatrixAt(i, M); o.setColorAt(i, c); } });
+      const sc = SCATTER[k], m = new THREE.InstancedMesh(sc.geo, sc.mat, list.length), far = sc.far ? new THREE.InstancedMesh(sc.far, sc.mat, list.length) : null, both = far ? [m, far] : [m], [ci, cj] = key.split(',').map(Number); let y0 = Infinity, y1 = -Infinity;
+      list.forEach((t, i) => { t.yaw = rng() * 6.28; t.sy = 0.8 + rng() * 0.5; t.meshes = both; t.i = i; M.compose(V(t.x, t.y - 0.03, t.z), q.setFromAxisAngle(UP, t.yaw), V(t.s, t.s * t.sy, t.s)); c.set(t.color).multiplyScalar(0.62 + rng() * 0.34); for (const o of both) { o.setMatrixAt(i, M); o.setColorAt(i, c); } y0 = Math.min(y0, t.y); y1 = Math.max(y1, t.y); });
       for (const o of both) { o.receiveShadow = true; o.frustumCulled = false; scene.add(o); } if (far) far.visible = false;
-      chunks.push({ m, far, cx: (ci + 0.5) * CS, cz: (cj + 0.5) * CS, range: sc.range });
+      const cx = (ci + 0.5) * CS, cz = (cj + 0.5) * CS; // sph: la esfera que envuelve al trozo entero, para saber si queda dentro de lo que ve la cámara
+      chunks.push({ m, far, cx, cz, range: sc.range, sph: new THREE.Sphere(V(cx, (y0 + y1) / 2 + 1.5, cz), Math.hypot(CS * 0.71, (y1 - y0) / 2 + 4) + 2) });
     }
     const rm = MAT.rock();
-    rocks.forEach((list, v) => { // una malla por nivel de detalle; las piedritas (nivel 1) no proyectan sombra: medía un par de puntos
-      const n = [0, 0]; for (const t of list) n[t.lod]++;
-      const ms = n.map((k, lod) => (k ? new THREE.InstancedMesh(rockLod[lod][v], rm, k) : null)), at = [0, 0];
-      for (const t of list) { const m = ms[t.lod], i = at[t.lod]++; m.setMatrixAt(i, t.m); m.setColorAt(i, c.set(t.color).multiplyScalar(0.85 + rng() * 0.3)); }
-      ms.forEach((m, lod) => { if (!m) return; m.castShadow = lod === 0; m.receiveShadow = true; m.frustumCulled = false; scene.add(m); });
+    rocks.forEach((list, v) => { // un grupo por nivel de detalle; las piedritas (nivel 1) no proyectan sombra: medía un par de puntos
+      const byLod = [[], []];
+      for (const t of list) byLod[t.lod].push({ m: t.m, col: new THREE.Color(t.color).multiplyScalar(0.85 + rng() * 0.3), c: V().setFromMatrixPosition(t.m), r: 1.5 * t.m.getMaxScaleOnAxis() });
+      byLod.forEach((items, lod) => { if (items.length) culled([{ geo: rockLod[lod][v], mat: rm, color: true, receive: true }], items, lod === 0); });
     });
     if (logs.length) { const g = new THREE.CylinderGeometry(1, 0.85, 1, 10), m = new THREE.InstancedMesh(g, MAT.bark(0xa89a78), logs.length); logs.forEach((mm, i) => m.setMatrixAt(i, mm)); m.castShadow = m.receiveShadow = true; m.frustumCulled = false; scene.add(m); }
     return tris;
   }
-  // Cada trozo de mapa se dibuja solo si está a la vista. Los que tienen modelo «de lejos» usan el detallado cuando la cámara
-  // está a menos de CERCA metros de su centro (así toda mata a menos de unos 17 m va siempre con todo su detalle) y el liviano más allá.
+  // Cada trozo de mapa se dibuja solo si está cerca y dentro de lo que ve la cámara. Los que tienen modelo «de lejos» usan el
+  // detallado cuando la cámara está a menos de CERCA metros de su centro (así toda mata a menos de unos 17 m va siempre con todo
+  // su detalle) y el liviano más allá. Después se revisan, ejemplar por ejemplar, los árboles y las rocas (cull).
   const CERCA = 45;
-  function update(p) { for (const c of chunks) { const d = Math.hypot(p.x - c.cx, p.z - c.cz), on = d < c.range + 30; if (c.far) { c.m.visible = on && d < CERCA; c.far.visible = on && d >= CERCA; } else c.m.visible = on; } }
+  function update(p) {
+    if (cam) { cam.updateMatrixWorld(); frustum.setFromProjectionMatrix(PV.copy(cam.matrixWorld).invert().premultiply(cam.projectionMatrix)); frustum.planes.forEach((pl, i) => { PL[i * 4] = pl.normal.x; PL[i * 4 + 1] = pl.normal.y; PL[i * 4 + 2] = pl.normal.z; PL[i * 4 + 3] = pl.constant; }); }
+    for (const c of chunks) { const d = Math.hypot(p.x - c.cx, p.z - c.cz), on = d < c.range + 30 && (!cam || frustum.intersectsSphere(c.sph)); if (c.far) { c.m.visible = on && d < CERCA; c.far.visible = on && d >= CERCA; } else c.m.visible = on; }
+    if (cam) cull(p);
+  }
 
   // ---------- despejar la vista: al observar algo, lo que tapa el encuadre se oculta un momento ----------
   const hidden = [], ZERO = new THREE.Matrix4().makeScale(0, 0, 0), TM = new THREE.Matrix4(), TQ = new THREE.Quaternion();
@@ -244,11 +304,12 @@ export function makeFlora({ rng, scene, physics, RAPIER, fixed }) {
     const list = blockers(a, b, except);
     if (plants) for (const k in SCATTER) { const i0 = Math.floor(Math.min(a.x, b.x) / CS) - 1, i1 = Math.floor(Math.max(a.x, b.x) / CS) + 1, j0 = Math.floor(Math.min(a.z, b.z) / CS) - 1, j1 = Math.floor(Math.max(a.z, b.z) / CS) + 1;
       for (let i = i0; i <= i1; i++) for (let j = j0; j <= j1; j++) { const l = SCATTER[k].cells.get(i + ',' + j); if (l) for (const t of l) if (t !== except && k !== 'litter' && segDist(t.x, t.z, a, b)[0] < 0.75) list.push(t); } }
-    for (const t of list) { for (const m of t.meshes) { m.setMatrixAt(t.i, ZERO); m.instanceMatrix.needsUpdate = true; } hidden.push(t); }
+    // un árbol se marca como oculto y cull lo deja fuera (también de las sombras); una planta chica se achica a nada en sus mallas
+    for (const t of list) { if (t.tree) { t.hidden = true; force = anyHidden = true; } else for (const m of t.meshes) { m.setMatrixAt(t.i, ZERO); m.instanceMatrix.needsUpdate = true; } hidden.push(t); }
   }
   function restoreView() {
-    for (const t of hidden) { if (t.tree) TM.compose(V(t.x, t.y, t.z), TQ.setFromAxisAngle(UP, t.yaw), V(t.s, t.s, t.s)); else TM.compose(V(t.x, t.y - 0.03, t.z), TQ.setFromAxisAngle(UP, t.yaw), V(t.s, t.s * t.sy, t.s)); for (const m of t.meshes) { m.setMatrixAt(t.i, TM); m.instanceMatrix.needsUpdate = true; } }
-    hidden.length = 0;
+    for (const t of hidden) { if (t.tree) { t.hidden = false; force = true; continue; } TM.compose(V(t.x, t.y - 0.03, t.z), TQ.setFromAxisAngle(UP, t.yaw), V(t.s, t.s * t.sy, t.s)); for (const m of t.meshes) { m.setMatrixAt(t.i, TM); m.instanceMatrix.needsUpdate = true; } }
+    hidden.length = 0; anyHidden = false;
   }
 
   // búsquedas para la exploración: ¿hay una planta de este tipo cerca?
